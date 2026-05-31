@@ -101,8 +101,9 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_cheats, "sv_cheats", "", 0, 0, qfalse },
 
 	// noset vars
-	{ NULL, "gamename", GAMEVERSION , CVAR_SERVERINFO | CVAR_ROM, 0, qfalse  },
-	{ NULL, "gamedate", PRODUCT_DATE , CVAR_ROM, 0, qfalse  },
+	{ NULL, "gamename", GAMEVERSION, CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
+	{ NULL, "gamedate", __DATE__, CVAR_ROM, 0, qfalse },
+
 	{ &g_restarted, "g_restarted", "0", CVAR_ROM, 0, qfalse  },
 
 	// latched vars
@@ -410,7 +411,8 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	G_Printf ("------- Game Initialization -------\n");
 	G_Printf ("gamename: %s\n", GAMEVERSION);
-	G_Printf ("gamedate: %s\n", PRODUCT_DATE);
+	G_Printf ("gamedate: %s\n", __DATE__);
+	G_Printf ("^2[oDFs] qagame DLL loaded\n");
 
 	srand( randomSeed );
 
@@ -540,7 +542,7 @@ void G_ShutdownGame( int restart ) {
 
 //===================================================================
 
-void QDECL Com_Error ( int logLevel, const char *error, ... ) {
+void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error ( errorParm_t logLevel, const char *error, ... ) {
 	va_list		argptr;
 	char		text[1024];
 

@@ -26,106 +26,72 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // q_shared.h -- included first by ALL program modules.
 // A user mod should never modify this file
 
-#ifdef STANDALONE
-  #define PRODUCT_NAME				"iofoo3"
-  #define BASEGAME					"foobar"
-  #define CLIENT_WINDOW_TITLE		"changeme"
-  #define CLIENT_WINDOW_MIN_TITLE	"changeme2"
-  #define HOMEPATH_NAME_UNIX_LEGACY	".foo"
-  #define HOMEPATH_NAME				"FooBar"
-  #define GAMENAME_FOR_MASTER		"foobar"	// must NOT contain whitespace
-  #define CINEMATICS_LOGO		"foologo.roq"
-  #define CINEMATICS_INTRO		"intro.roq"
-//  #define LEGACY_PROTOCOL	// You probably don't need this for your standalone game
-//  #define PROTOCOL_HANDLER		"foobar"
-  #define CONFIG_PREFIX			"fooconfig"
-#else
-  #define PRODUCT_NAME				"ioq3"
-  #define BASEGAME					"baseq3"
-  #define CLIENT_WINDOW_TITLE		"ioquake3"
-  #define CLIENT_WINDOW_MIN_TITLE	"ioq3"
-  #define HOMEPATH_NAME_UNIX_LEGACY	".q3a"
-  #define HOMEPATH_NAME				"Quake3"
-  #define GAMENAME_FOR_MASTER		"Quake3Arena"
-  #define CINEMATICS_LOGO		"idlogo.RoQ"
-  #define CINEMATICS_INTRO		"intro.RoQ"
-  #define LEGACY_PROTOCOL
-  #define PROTOCOL_HANDLER		"quake3"
-  #define CONFIG_PREFIX			"q3config"
+#define Q3_VERSION            "Q3 1.32e"
+#ifndef SVN_VERSION
+  #define SVN_VERSION Q3_VERSION
 #endif
+#define CLIENT_WINDOW_TITLE   "Open DeFRaG Engine"
+#define CONSOLE_WINDOW_TITLE  "Open DeFRaG Console"
+// 1.32 released 7-10-2002
 
-// Heartbeat for dpmaster protocol. You shouldn't change this unless you know what you're doing
-#define HEARTBEAT_FOR_MASTER		"DarkPlaces"
+#define DEFAULT_GAME			"defrag"
 
-// When com_gamename is LEGACY_MASTER_GAMENAME, use quake3 master protocol.
-// You shouldn't change this unless you know what you're doing
-#define LEGACY_MASTER_GAMENAME		"Quake3Arena"
-#define LEGACY_HEARTBEAT_FOR_MASTER	"QuakeArena-1"
+#define BASEGAME				"baseq3"
+#define BASEDEMO				"demoq3"
+#define BASETA					"missionpack"
+#define STEAMPATH_NAME			"Quake 3 Arena"
+#define STEAMPATH_APPID			"2200"
 
-#define BASETA				"missionpack"
-
-#ifndef PRODUCT_VERSION
-  #define PRODUCT_VERSION "1.36"
-#endif
-
-#ifndef PRODUCT_DATE
-#  define PRODUCT_DATE __DATE__
-#endif
-
-#define Q3_VERSION PRODUCT_NAME " " PRODUCT_VERSION
-
-#define MAX_TEAMNAME		32
+#define MAX_TEAMNAME            32
 #define MAX_MASTER_SERVERS      5	// number of supported master servers
+
+#define GAMENAME_FOR_MASTER		"Quake3Arena"
+#define HEARTBEAT_FOR_MASTER	"QuakeArena-1"
 
 #define DEMOEXT	"dm_"			// standard demo extension
 
 #ifdef _MSC_VER
 
 #pragma warning(disable : 4018)     // signed/unsigned mismatch
-#pragma warning(disable : 4032)
-#pragma warning(disable : 4051)
+//#pragma warning(disable : 4032)
+//#pragma warning(disable : 4051)
 #pragma warning(disable : 4057)		// slightly different base types
 #pragma warning(disable : 4100)		// unreferenced formal parameter
-#pragma warning(disable : 4115)
+//#pragma warning(disable : 4115)
 #pragma warning(disable : 4125)		// decimal digit terminates octal escape sequence
 #pragma warning(disable : 4127)		// conditional expression is constant
-#pragma warning(disable : 4136)
+//#pragma warning(disable : 4136)
 #pragma warning(disable : 4152)		// nonstandard extension, function/data pointer conversion in expression
+#pragma warning(disable : 4200)		// nonstandard extension used: size-sided array in struct/union
 //#pragma warning(disable : 4201)
+#pragma warning(disable : 4206)		// nonstandard extension used: translation unit is empty
 //#pragma warning(disable : 4214)
+#pragma warning(disable : 4267)		// conversion from 'size_t' to 'int', possible loss of data
 #pragma warning(disable : 4244)
 #pragma warning(disable : 4142)		// benign redefinition
 //#pragma warning(disable : 4305)		// truncation from const double to float
 //#pragma warning(disable : 4310)		// cast truncates constant value
 //#pragma warning(disable:  4505) 	// unreferenced local function has been removed
-#pragma warning(disable : 4514)
+//#pragma warning(disable : 4514)
 #pragma warning(disable : 4702)		// unreachable code
 #pragma warning(disable : 4711)		// selected for automatic inline expansion
 #pragma warning(disable : 4220)		// varargs matches remaining parameters
+#pragma warning(disable : 4324)		// 'q_jpeg_error_mgr_s' : structure was padded due to alignment specifier
+#pragma warning(disable : 4091)		// 'typedef': ignored on lef of <..> when no variable is declared
 //#pragma intrinsic( memset, memcpy )
 #endif
 
-#ifdef __GNUC__
-#define Q_UNUSED_VAR __attribute__((unused))
-#define Q_NO_RETURN __attribute__((noreturn))
-
-#ifdef __MINGW32__
-// For some reason MinGW wants both gnu_printf and ms_printf
-#define Q_PRINTF_FUNC(fmt, va) \
-	__attribute__((format(gnu_printf, fmt, va))) \
-	__attribute__((format(ms_printf, fmt, va)))
-#else
-#define Q_PRINTF_FUNC(fmt, va) __attribute__((format(printf, fmt, va)))
+//Ignore __attribute__ on non-gcc/clang platforms
+#if !defined(__GNUC__) && !defined(__clang__)
+#ifndef __attribute__
+#define __attribute__(x)
+#endif
 #endif
 
-#define Q_SCANF_FUNC(fmt, va) __attribute__((format(scanf, fmt, va)))
-#define Q_ALIGN(x) __attribute__((aligned(x)))
+#ifdef __GNUC__
+#define UNUSED_VAR __attribute__((unused))
 #else
-#define Q_UNUSED_VAR
-#define Q_NO_RETURN
-#define Q_PRINTF_FUNC(fmt, va)
-#define Q_SCANF_FUNC(fmt, va)
-#define Q_ALIGN(x)
+#define UNUSED_VAR
 #endif
 
 #if (defined _MSC_VER)
@@ -136,6 +102,24 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define Q_EXPORT __attribute__((visibility("default")))
 #else
 #define Q_EXPORT
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+#define NORETURN __attribute__((noreturn))
+#define NORETURN_PTR __attribute__((noreturn))
+#elif defined(_MSC_VER)
+#define NORETURN __declspec(noreturn)
+// __declspec doesn't work on function pointers
+#define NORETURN_PTR /* nothing */
+#else
+#define NORETURN /* nothing */
+#define NORETURN_PTR /* nothing */
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+#define FORMAT_PRINTF(x, y) __attribute__((format (printf, x, y)))
+#else
+#define FORMAT_PRINTF(x, y) /* nothing */
 #endif
 
 /**********************************************************************
@@ -158,8 +142,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../game/bg_lib.h"
 
-typedef int intptr_t;
-
 #else
 
 #include <assert.h>
@@ -167,37 +149,86 @@ typedef int intptr_t;
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
-#include <stddef.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <time.h>
 #include <ctype.h>
 #include <limits.h>
-#include <stdint.h>
-
-#ifdef _WIN32
-  // vsnprintf is ISO/IEC 9899:1999
-  // abstracting this to make it portable
-  int Q_vsnprintf(char *str, size_t size, const char *format, va_list ap) Q_PRINTF_FUNC(3, 0);
-#else
-  #define Q_vsnprintf vsnprintf
-#endif
 
 #endif
 
+//endianness
+short ShortSwap( short l );
+int LongSwap( int l );
+float FloatSwap( const float *f );
 
 #include "q_platform.h"
 
 //=============================================================
 
-typedef unsigned char 		byte;
+#ifdef Q3_VM
+	typedef int intptr_t;
+#else
+	#if defined (_MSC_VER) && !defined(__clang__)
+		typedef __int64 int64_t;
+		typedef __int32 int32_t;
+		typedef __int16 int16_t;
+		typedef signed __int8 int8_t;
+		typedef unsigned __int64 uint64_t;
+		typedef unsigned __int32 uint32_t;
+		typedef unsigned __int16 uint16_t;
+		typedef unsigned __int8 uint8_t;
+	#else
+		#include <stdint.h>
+	#endif
 
-typedef enum {qfalse, qtrue}	qboolean;
+	#ifdef _WIN32
+		// vsnprintf is ISO/IEC 9899:1999
+		// abstracting this to make it portable
+		int Q_vsnprintf( char *str, size_t size, const char *format, va_list ap );
+	#else
+		#define Q_vsnprintf vsnprintf
+	#endif
+#endif
+
+#if defined (_WIN32)
+#if !defined(_MSC_VER)
+// use GCC/Clang functions
+#define Q_setjmp __builtin_setjmp
+#define Q_longjmp __builtin_longjmp
+#elif idx64 && (_MSC_VER >= 1910)
+// use custom setjmp()/longjmp() implementations
+#define Q_setjmp Q_setjmp_c
+#define Q_longjmp Q_longjmp_c
+int Q_setjmp_c(void *);
+int Q_longjmp_c(void *, int);
+#else // !idx64 || MSVC<2017
+#define Q_setjmp setjmp
+#define Q_longjmp longjmp
+#endif
+#else // !_WIN32
+#define Q_setjmp setjmp
+#define Q_longjmp longjmp
+#endif
+
+typedef unsigned char byte;
+
+typedef enum { qfalse = 0, qtrue } qboolean;
+
+typedef union floatint_u
+{
+	int32_t i;
+	uint32_t u;
+	float f;
+	byte b[4];
+}
+floatint_t;
 
 typedef union {
-	float f;
-	int i;
-	unsigned int ui;
-} floatint_t;
+	byte rgba[4];
+	uint32_t u32;
+} color4ub_t;
+
 
 typedef int		qhandle_t;
 typedef int		sfxHandle_t;
@@ -209,19 +240,23 @@ typedef int		clipHandle_t;
 
 #define PADP(base, alignment)	((void *) PAD((intptr_t) (base), (alignment)))
 
+#ifdef __GNUC__
+#define QALIGN(x) __attribute__((aligned(x)))
+#else
+#define QALIGN(x)
+#endif
+
 #ifndef NULL
 #define NULL ((void *)0)
 #endif
 
-#define STRING(s)			#s
-// expand constants before stringifying them
-#define XSTRING(s)			STRING(s)
-
 #define	MAX_QINT			0x7fffffff
 #define	MIN_QINT			(-MAX_QINT-1)
 
-#define ARRAY_LEN(x)			(sizeof(x) / sizeof(*(x)))
-#define STRARRAY_LEN(x)			(ARRAY_LEN(x) - 1)
+#define	MAX_UINT			((unsigned)(~0))
+
+#define ARRAY_LEN(x)		(sizeof(x) / sizeof(*(x)))
+#define STRARRAY_LEN(x)		(ARRAY_LEN(x) - 1)
 
 // angle indexes
 #define	PITCH				0		// up / down
@@ -235,8 +270,10 @@ typedef int		clipHandle_t;
 #define	MAX_TOKEN_CHARS		1024	// max length of an individual token
 
 #define	MAX_INFO_STRING		1024
-#define	MAX_INFO_KEY		  1024
+#define	MAX_INFO_KEY		1024
 #define	MAX_INFO_VALUE		1024
+
+#define MAX_USERINFO_LENGTH (MAX_INFO_STRING-13) // incl. length of 'connect ""' or 'userinfo ""' and reserving one byte to avoid q3msgboom
 
 #define	BIG_INFO_STRING		8192  // used for system info key only
 #define	BIG_INFO_KEY		  8192
@@ -251,7 +288,6 @@ typedef int		clipHandle_t;
 #endif
 
 #define	MAX_NAME_LENGTH		32		// max length of a client name
-#define	MAX_HOSTNAME_LENGTH	80		// max length of a host name
 
 #define	MAX_SAY_TEXT	150
 
@@ -315,7 +351,7 @@ typedef enum {
 #define UI_INVERSE		0x00002000
 #define UI_PULSE		0x00004000
 
-#if !defined(NDEBUG) && !defined(BSPC)
+#if defined(_DEBUG) && !defined(BSPC)
 	#define HUNK_DEBUG
 #endif
 
@@ -330,6 +366,14 @@ typedef enum {
 void *Hunk_AllocDebug( int size, ha_pref preference, char *label, char *file, int line );
 #else
 void *Hunk_Alloc( int size, ha_pref preference );
+#endif
+
+#if defined(__GNUC__) && !defined(__MINGW32__) && !defined(MACOS_X)
+// https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=371
+// custom Snd_Memset implementation for glibc memset bug workaround
+void Snd_Memset (void* dest, const int val, const size_t count);
+#else
+#define Snd_Memset Com_Memset
 #endif
 
 #define Com_Memset memset
@@ -366,6 +410,22 @@ typedef	int	fixed16_t;
 #define M_PI		3.14159265358979323846f	// matches value in gcc v2 math.h
 #endif
 
+#ifndef M_LN2
+#define M_LN2      0.693147180559945309417f
+#endif
+
+#ifdef __linux__
+#ifdef __GLIBC__
+#if idx64
+// force version for better runtime compatibility
+__asm__(".symver logf,logf@GLIBC_2.2.5");
+__asm__(".symver powf,powf@GLIBC_2.2.5");
+__asm__(".symver expf,expf@GLIBC_2.2.5");
+__asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
+#endif
+#endif
+#endif
+
 #define NUMVERTEXNORMALS	162
 extern	vec3_t	bytedirs[NUMVERTEXNORMALS];
 
@@ -399,21 +459,20 @@ extern	vec4_t		colorMdGrey;
 extern	vec4_t		colorDkGrey;
 
 #define Q_COLOR_ESCAPE	'^'
-qboolean Q_IsColorString(const char *p);  // ^[0-9a-zA-Z]
+#define Q_IsColorString(p) ( *(p) == Q_COLOR_ESCAPE && *((p)+1) && *((p)+1) != Q_COLOR_ESCAPE && *((p)+1) != '\n' && *((p)+1) != '\r' )
 
-#define COLOR_BLACK	'0'
-#define COLOR_RED	'1'
-#define COLOR_GREEN	'2'
+#define COLOR_BLACK		'0'
+#define COLOR_RED		'1'
+#define COLOR_GREEN		'2'
 #define COLOR_YELLOW	'3'
-#define COLOR_BLUE	'4'
-#define COLOR_CYAN	'5'
+#define COLOR_BLUE		'4'
+#define COLOR_CYAN		'5'
 #define COLOR_MAGENTA	'6'
-#define COLOR_WHITE	'7'
-#define ColorIndexForNumber(c) ((c) & 0x07)
-#define ColorIndex(c) (ColorIndexForNumber((c) - '0'))
+#define COLOR_WHITE		'7'
+#define ColorIndex(c)	( ( (c) - '0' ) & 7 )
 
 #define S_COLOR_BLACK	"^0"
-#define S_COLOR_RED	"^1"
+#define S_COLOR_RED		"^1"
 #define S_COLOR_GREEN	"^2"
 #define S_COLOR_YELLOW	"^3"
 #define S_COLOR_BLUE	"^4"
@@ -421,7 +480,8 @@ qboolean Q_IsColorString(const char *p);  // ^[0-9a-zA-Z]
 #define S_COLOR_MAGENTA	"^6"
 #define S_COLOR_WHITE	"^7"
 
-extern vec4_t	g_color_table[8];
+extern const vec4_t	g_color_table[ 64 ];
+extern int ColorIndexFromChar( char ccode );
 
 #define	MAKERGB( v, r, g, b ) v[0]=r;v[1]=g;v[2]=b
 #define	MAKERGBA( v, r, g, b, a ) v[0]=r;v[1]=g;v[2]=b;v[3]=a
@@ -431,104 +491,32 @@ extern vec4_t	g_color_table[8];
 
 struct cplane_s;
 
-extern	vec3_t	vec3_origin;
+extern	const vec3_t	vec3_origin;
 extern	vec3_t	axisDefault[3];
 
 #define	nanmask (255<<23)
 
 #define	IS_NAN(x) (((*(int *)&x)&nanmask)==nanmask)
 
-int Q_isnan(float x);
-
-#if idx64
-  extern long qftolsse(float f);
-  extern int qvmftolsse(void);
-  extern void qsnapvectorsse(vec3_t vec);
-
-  #define Q_ftol qftolsse
-  #define Q_SnapVector qsnapvectorsse
-
-  extern int (*Q_VMftol)(void);
-#elif id386
-  extern long QDECL qftolx87(float f);
-  extern long QDECL qftolsse(float f);
-  extern int QDECL qvmftolx87(void);
-  extern int QDECL qvmftolsse(void);
-  extern void QDECL qsnapvectorx87(vec3_t vec);
-  extern void QDECL qsnapvectorsse(vec3_t vec);
-
-  extern long (QDECL *Q_ftol)(float f);
-  extern int (QDECL *Q_VMftol)(void);
-  extern void (QDECL *Q_SnapVector)(vec3_t vec);
-#else
-  // Q_ftol must expand to a function name so the pluggable renderer can take
-  // its address
-  #define Q_ftol lrintf
-  #define Q_SnapVector(vec)\
-	do\
-	{\
-		vec3_t *temp = (vec);\
-		\
-		(*temp)[0] = round((*temp)[0]);\
-		(*temp)[1] = round((*temp)[1]);\
-		(*temp)[2] = round((*temp)[2]);\
-	} while(0)
-#endif
-/*
-// if your system does not have lrintf() and round() you can try this block. Please also open a bug report at bugzilla.icculus.org
-// or write a mail to the ioq3 mailing list.
-#else
-  #define Q_ftol(v) ((long) (v))
-  #define Q_round(v) do { if((v) < 0) (v) -= 0.5f; else (v) += 0.5f; (v) = Q_ftol((v)); } while(0)
-  #define Q_SnapVector(vec) \
-	do\
-	{\
-		vec3_t *temp = (vec);\
-		\
-		Q_round((*temp)[0]);\
-		Q_round((*temp)[1]);\
-		Q_round((*temp)[2]);\
-	} while(0)
-#endif
-*/
-
-#if idppc
-
-static ID_INLINE float Q_rsqrt( float number ) {
-		float x = 0.5f * number;
-                float y;
-#ifdef __GNUC__            
-                asm("frsqrte %0,%1" : "=f" (y) : "f" (number));
-#else
-		y = __frsqrte( number );
-#endif
-		return y * (1.5f - (x * y * y));
-	}
-
-#ifdef __GNUC__            
-static ID_INLINE float Q_fabs(float x) {
-    float abs_x;
-    
-    asm("fabs %0,%1" : "=f" (abs_x) : "f" (x));
-    return abs_x;
-}
-#else
-#define Q_fabs __fabsf
-#endif
-
-#else
 float Q_fabs( float f );
 float Q_rsqrt( float f );		// reciprocal square root
-#endif
+
+float Q_log2f( float f );
+float Q_exp2f( float f );
 
 #define SQRTFAST( x ) ( (x) * Q_rsqrt( x ) )
 
 signed char ClampChar( int i );
+signed char ClampCharMove( int i );
 signed short ClampShort( int i );
 
 // this isn't a real cheap function to call!
 int DirToByte( vec3_t dir );
 void ByteToDir( int b, vec3_t dir );
+
+#ifndef SGN
+#define SGN(x) (((x) >= 0) ? !!(x) : -1)
+#endif
 
 #if	1
 
@@ -538,6 +526,9 @@ void ByteToDir( int b, vec3_t dir );
 #define VectorCopy(a,b)			((b)[0]=(a)[0],(b)[1]=(a)[1],(b)[2]=(a)[2])
 #define	VectorScale(v, s, o)	((o)[0]=(v)[0]*(s),(o)[1]=(v)[1]*(s),(o)[2]=(v)[2]*(s))
 #define	VectorMA(v, s, b, o)	((o)[0]=(v)[0]+(b)[0]*(s),(o)[1]=(v)[1]+(b)[1]*(s),(o)[2]=(v)[2]+(b)[2]*(s))
+
+#define DotProduct4(a,b)		((a)[0]*(b)[0] + (a)[1]*(b)[1] + (a)[2]*(b)[2] + (a)[3]*(b)[3])
+#define VectorScale4(a,b,c)		((c)[0]=(a)[0]*(b),(c)[1]=(a)[1]*(b),(c)[2]=(a)[2]*(b),(c)[3]=(a)[3]*(b))
 
 #else
 
@@ -564,6 +555,7 @@ typedef struct {
 #define VectorClear(a)			((a)[0]=(a)[1]=(a)[2]=0)
 #define VectorNegate(a,b)		((b)[0]=-(a)[0],(b)[1]=-(a)[1],(b)[2]=-(a)[2])
 #define VectorSet(v, x, y, z)	((v)[0]=(x), (v)[1]=(y), (v)[2]=(z))
+#define Vector4Set(v,x,y,z,w)	((v)[0]=(x), (v)[1]=(y), (v)[2]=(z), v[3]=(w))
 #define Vector4Copy(a,b)		((b)[0]=(a)[0],(b)[1]=(a)[1],(b)[2]=(a)[2],(b)[3]=(a)[3])
 
 #define Byte4Copy(a,b)			((b)[0]=(a)[0],(b)[1]=(a)[1],(b)[2]=(a)[2],(b)[3]=(a)[3])
@@ -592,12 +584,12 @@ void AddPointToBounds( const vec3_t v, vec3_t mins, vec3_t maxs );
 static ID_INLINE int VectorCompare( const vec3_t v1, const vec3_t v2 ) {
 	if (v1[0] != v2[0] || v1[1] != v2[1] || v1[2] != v2[2]) {
 		return 0;
-	}			
+	}
 	return 1;
 }
 
 static ID_INLINE vec_t VectorLength( const vec3_t v ) {
-	return (vec_t)sqrt (v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+	return (vec_t)sqrtf (v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
 }
 
 static ID_INLINE vec_t VectorLengthSquared( const vec3_t v ) {
@@ -665,7 +657,7 @@ void CrossProduct( const vec3_t v1, const vec3_t v2, vec3_t cross );
 vec_t VectorNormalize (vec3_t v);		// returns vector length
 vec_t VectorNormalize2( const vec3_t v, vec3_t out );
 void Vector4Scale( const vec4_t in, vec_t scale, vec4_t out );
-void VectorRotate( vec3_t in, vec3_t matrix[3], vec3_t out );
+void VectorRotate( const vec3_t in, const vec3_t matrix[3], vec3_t out );
 int Q_log2(int val);
 
 float Q_acos(float c);
@@ -684,7 +676,7 @@ void AxisClear( vec3_t axis[3] );
 void AxisCopy( vec3_t in[3], vec3_t out[3] );
 
 void SetPlaneSignbits( struct cplane_s *out );
-int BoxOnPlaneSide (vec3_t emins, vec3_t emaxs, struct cplane_s *plane);
+int BoxOnPlaneSide (const vec3_t emins, const vec3_t emaxs, const struct cplane_s *plane);
 
 qboolean BoundsIntersect(const vec3_t mins, const vec3_t maxs,
 		const vec3_t mins2, const vec3_t maxs2);
@@ -714,6 +706,8 @@ void MakeNormalVectors( const vec3_t forward, vec3_t right, vec3_t up );
 void MatrixMultiply(float in1[3][3], float in2[3][3], float out[3][3]);
 void AngleVectors( const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up);
 void PerpendicularVector( vec3_t dst, const vec3_t src );
+int Q_isnan( float x );
+float Q_atof( const char *str );
 
 #ifndef MAX
 #define MAX(x,y) ((x)>(y)?(x):(y))
@@ -733,14 +727,39 @@ void	COM_StripExtension(const char *in, char *out, int destsize);
 qboolean COM_CompareExtension(const char *in, const char *ext);
 void	COM_DefaultExtension( char *path, int maxSize, const char *extension );
 
+unsigned long Com_GenerateHashValue( const char *fname, const unsigned int size );
+
 void	COM_BeginParseSession( const char *name );
 int		COM_GetCurrentParseLine( void );
-char	*COM_Parse( char **data_p );
-char	*COM_ParseExt( char **data_p, qboolean allowLineBreak );
+const char	*COM_Parse( const char **data_p );
+const char	*COM_ParseExt( const char **data_p, qboolean allowLineBreak );
 int		COM_Compress( char *data_p );
-void	COM_ParseError( char *format, ... ) Q_PRINTF_FUNC(1, 2);
-void	COM_ParseWarning( char *format, ... ) Q_PRINTF_FUNC(1, 2);
-//int		COM_ParseInfos( char *buf, int max, char infos[][MAX_INFO_STRING] );
+void	COM_ParseError( const char *format, ... ) __attribute__ ((format (printf, 1, 2)));
+void	COM_ParseWarning( const char *format, ... ) __attribute__ ((format (printf, 1, 2)));
+//int		COM_ParseInfos( const char *buf, int max, char infos[][MAX_INFO_STRING] );
+
+char	*COM_ParseComplex( const char **data_p, qboolean allowLineBreak );
+
+typedef enum {
+	TK_GENEGIC = 0, // for single-char tokens
+	TK_STRING,
+	TK_QUOTED,
+	TK_EQ,
+	TK_NEQ,
+	TK_GT,
+	TK_GTE,
+	TK_LT,
+	TK_LTE,
+	TK_MATCH,
+	TK_OR,
+	TK_AND,
+	TK_SCOPE_OPEN,
+	TK_SCOPE_CLOSE,
+	TK_NEWLINE,
+	TK_EOF,
+} tokenType_t;
+
+extern tokenType_t com_tokentype;
 
 #define MAX_TOKENLENGTH		1024
 
@@ -764,22 +783,21 @@ typedef struct pc_token_s
 
 // data is an in/out parm, returns a parsed out token
 
-void	COM_MatchToken( char**buf_p, char *match );
+qboolean SkipBracedSection( const char **program, int depth );
+void SkipRestOfLine( const char **data );
 
-qboolean SkipBracedSection (char **program, int depth);
-void SkipRestOfLine ( char **data );
+void Parse1DMatrix( const char **buf_p, int x, float *m);
+void Parse2DMatrix( const char **buf_p, int y, int x, float *m);
+void Parse3DMatrix( const char **buf_p, int z, int y, int x, float *m);
 
-void Parse1DMatrix (char **buf_p, int x, float *m);
-void Parse2DMatrix (char **buf_p, int y, int x, float *m);
-void Parse3DMatrix (char **buf_p, int z, int y, int x, float *m);
-int Com_HexStrToInt( const char *str );
+int QDECL Com_sprintf( char *dest, int size, const char *fmt, ... ) __attribute__ ((format (printf, 3, 4)));
 
-int QDECL Com_sprintf (char *dest, int size, const char *fmt, ...) Q_PRINTF_FUNC(3, 4);
-
-char *Com_SkipTokens( char *s, int numTokens, char *sep );
-char *Com_SkipCharset( char *s, char *sep );
+const char *Com_SkipTokens( const char *s, int numTokens, const char *sep );
+const char *Com_SkipCharset( const char *s, const char *sep );
 
 void Com_RandomBytes( byte *string, int len );
+
+void Com_SortList( char** list, int n );
 
 // mode parm for FS_FOpenFile
 typedef enum {
@@ -797,12 +815,14 @@ typedef enum {
 
 //=============================================
 
+extern const byte locase[ 256 ];
+
 int Q_isprint( int c );
 int Q_islower( int c );
 int Q_isupper( int c );
 int Q_isalpha( int c );
-qboolean Q_isanumber( const char *s );
-qboolean Q_isintegral( float f );
+
+qboolean Q_streq( const char *s1, const char *s2 );
 
 // portable case insensitive compare
 int		Q_stricmp (const char *s1, const char *s2);
@@ -812,14 +832,24 @@ char	*Q_strlwr( char *s1 );
 char	*Q_strupr( char *s1 );
 const char	*Q_stristr( const char *s, const char *find);
 
+qboolean Q_isanumber( const char *s );
+qboolean Q_isintegral( float f );
+
 // buffer size safe library replacements
 void	Q_strncpyz( char *dest, const char *src, int destsize );
 void	Q_strcat( char *dest, int size, const char *src );
 
+int     Q_replace( const char *str1, const char *str2, char *src, int max_len );
+
+char	*Q_stradd( char *dst, const char *src );
+char	*Q_strncpy( char *dest, char *src, int destsize );
+
 // strlen that discounts Quake color sequences
 int Q_PrintStrlen( const char *string );
-// removes color sequences from string
+// removes color sequences, unprintable and special characters from string
 char *Q_CleanStr( char *string );
+// removes color sequences from string
+char *Q_DecolorStr( char *string );
 // Count the number of char tocount encountered in string
 int Q_CountChar(const char *string, char tocount);
 
@@ -852,7 +882,7 @@ float	LittleFloat (const float *l);
 
 void	Swap_Init (void);
 */
-char	* QDECL va(char *format, ...) Q_PRINTF_FUNC(1, 2);
+const char *QDECL va( const char *format, ... ) __attribute__ ((format( printf, 1, 2 )));
 
 #define TRUNCATE_LENGTH	64
 void Com_TruncateLongString( char *buffer, const char *s );
@@ -862,17 +892,19 @@ void Com_TruncateLongString( char *buffer, const char *s );
 //
 // key / value info strings
 //
-char *Info_ValueForKey( const char *s, const char *key );
-void Info_RemoveKey( char *s, const char *key );
-void Info_RemoveKey_Big( char *s, const char *key );
-void Info_SetValueForKey( char *s, const char *key, const char *value );
-void Info_SetValueForKey_Big( char *s, const char *key, const char *value );
+const char *Info_ValueForKey( const char *s, const char *key );
+void Info_Tokenize( const char *s );
+const char *Info_ValueForKeyToken( const char *key );
+#define Info_SetValueForKey( buf, key, value ) Info_SetValueForKey_s( (buf), MAX_INFO_STRING, (key), (value) )
+qboolean Info_SetValueForKey_s( char *s, int slen, const char *key, const char *value );
 qboolean Info_Validate( const char *s );
-void Info_NextPair( const char **s, char *key, char *value );
+qboolean Info_ValidateKeyValue( const char *s );
+const char *Info_NextPair( const char *s, char *key, char *value );
+int Info_RemoveKey( char *s, const char *key );
 
 // this is only here so the functions in q_shared.c and bg_*.c can link
-void	QDECL Com_Error( int level, const char *error, ... ) Q_NO_RETURN Q_PRINTF_FUNC(2, 3);
-void	QDECL Com_Printf( const char *msg, ... ) Q_PRINTF_FUNC(1, 2);
+void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t level, const char *fmt, ... );
+void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *msg, ... );
 
 
 /*
@@ -892,50 +924,75 @@ default values.
 #define	CVAR_USERINFO		0x0002	// sent to server on connect or change
 #define	CVAR_SERVERINFO		0x0004	// sent in response to front end requests
 #define	CVAR_SYSTEMINFO		0x0008	// these cvars will be duplicated on all clients
-#define	CVAR_INIT		0x0010	// don't allow change from console at all,
+#define	CVAR_INIT			0x0010	// don't allow change from console at all,
 					// but can be set from the command line
-#define	CVAR_LATCH		0x0020	// will only change when C code next does
+#define	CVAR_LATCH			0x0020	// will only change when C code next does
 					// a Cvar_Get(), so it can't be changed
 					// without proper initialization.  modified
 					// will be set, even though the value hasn't
 					// changed yet
-#define	CVAR_ROM		0x0040	// display only, cannot be set by user at all
+#define	CVAR_ROM			0x0040	// display only, cannot be set by user at all
 #define	CVAR_USER_CREATED	0x0080	// created by a set command
-#define	CVAR_TEMP		0x0100	// can be set even when cheats are disabled, but is not archived
-#define CVAR_CHEAT		0x0200	// can not be changed if cheats are disabled
+#define	CVAR_TEMP			0x0100	// can be set even when cheats are disabled, but is not archived
+#define CVAR_CHEAT			0x0200	// can not be changed if cheats are disabled
 #define CVAR_NORESTART		0x0400	// do not clear when a cvar_restart is issued
 
 #define CVAR_SERVER_CREATED	0x0800	// cvar was created by a server the client connected to.
 #define CVAR_VM_CREATED		0x1000	// cvar was created exclusively in one of the VMs.
 #define CVAR_PROTECTED		0x2000	// prevent modifying this var from VMs or the server
+
+#define CVAR_NODEFAULT		0x4000	// do not write to config if matching with default value
+
+#define CVAR_PRIVATE		0x8000	// can't be read from VM
+
+#define CVAR_DEVELOPER		0x10000 // can be set only in developer mode
+#define CVAR_NOTABCOMPLETE	0x20000 // no tab completion in console
+
+#define CVAR_ARCHIVE_ND		(CVAR_ARCHIVE | CVAR_NODEFAULT)
+
 // These flags are only returned by the Cvar_Flags() function
 #define CVAR_MODIFIED		0x40000000	// Cvar was modified
 #define CVAR_NONEXISTENT	0x80000000	// Cvar doesn't exist.
+
+typedef enum {
+	CV_NONE = 0,
+	CV_FLOAT,
+	CV_INTEGER,
+	CV_FSPATH,
+	CV_MAX,
+} cvarValidator_t;
+
+typedef enum {
+	CVG_NONE = 0,
+	CVG_RENDERER,
+	CVG_SERVER,
+	CVG_MAX,
+} cvarGroup_t;
 
 // nothing outside the Cvar_*() functions should modify these fields!
 typedef struct cvar_s cvar_t;
 
 struct cvar_s {
-	char			*name;
-	char			*string;
-	char			*resetString;		// cvar_restart will reset to this value
-	char			*latchedString;		// for CVAR_LATCH vars
-	int				flags;
+	char		*name;
+	char		*string;
+	char		*resetString;		// cvar_restart will reset to this value
+	char		*latchedString;		// for CVAR_LATCH vars
+	int			flags;
 	qboolean	modified;			// set each time the cvar is changed
-	int				modificationCount;	// incremented each time the cvar is changed
-	float			value;				// atof( string )
-	int				integer;			// atoi( string )
-	qboolean	validate;
-	qboolean	integral;
-	float			min;
-	float			max;
-	char			*description;
+	int			modificationCount;	// incremented each time the cvar is changed
+	float		value;				// Q_atof( string )
+	int			integer;			// atoi( string )
+	cvarValidator_t validator;
+	char		*mins;
+	char		*maxs;
+	char		*description;
 
-	cvar_t *next;
-	cvar_t *prev;
-	cvar_t *hashNext;
-	cvar_t *hashPrev;
+	cvar_t		*next;
+	cvar_t		*prev;
+	cvar_t		*hashNext;
+	cvar_t		*hashPrev;
 	int			hashIndex;
+	cvarGroup_t	group;				// to track changes
 };
 
 #define	MAX_CVAR_VALUE_STRING	256
@@ -951,23 +1008,6 @@ typedef struct {
 	int			integer;
 	char		string[MAX_CVAR_VALUE_STRING];
 } vmCvar_t;
-
-
-/*
-==============================================================
-
-VoIP
-
-==============================================================
-*/
-
-// if you change the count of flags be sure to also change VOIP_FLAGNUM
-#define VOIP_SPATIAL		0x01		// spatialized voip message
-#define VOIP_DIRECT		0x02		// non-spatialized voip message
-
-// number of flags voip knows. You will have to bump protocol version number if you
-// change this.
-#define VOIP_FLAGCNT		2
 
 /*
 ==============================================================
@@ -1015,7 +1055,7 @@ typedef struct {
 	cplane_t	plane;		// surface normal at impact, transformed to world space
 	int			surfaceFlags;	// surface hit
 	int			contents;	// contents on other side of surface hit
-	int			entityNum;	// entity the contacted sirface is a part of
+	int			entityNum;	// entity the contacted surface is a part of
 } trace_t;
 
 // trace->entityNum can also be 0 to (MAX_GENTITIES-1)
@@ -1040,15 +1080,15 @@ typedef struct {
 
 // in order from highest priority to lowest
 // if none of the catchers are active, bound key strings will be executed
-#define KEYCATCH_CONSOLE		0x0001
-#define	KEYCATCH_UI					0x0002
-#define	KEYCATCH_MESSAGE		0x0004
-#define	KEYCATCH_CGAME			0x0008
+#define KEYCATCH_CONSOLE    0x0001
+#define KEYCATCH_UI         0x0002
+#define KEYCATCH_MESSAGE    0x0004
+#define KEYCATCH_CGAME      0x0008
 
 
 // sound channels
 // channel 0 never willingly overrides
-// other channels will allways override a playing sound on that channel
+// other channels will always override a playing sound on that channel
 typedef enum {
 	CHAN_AUTO,
 	CHAN_LOCAL,		// menu sounds, etc
@@ -1119,7 +1159,7 @@ typedef struct {
 #define	MAX_STATS				16
 #define	MAX_PERSISTANT			16
 #define	MAX_POWERUPS			16
-#define	MAX_WEAPONS				16		
+#define	MAX_WEAPONS				16
 
 #define	MAX_PS_EVENTS			2
 
@@ -1199,7 +1239,7 @@ typedef struct playerState_s {
 
 	// not communicated over the net at all
 	int			ping;			// server to game info for scoreboard
-	int			pmove_framecount;
+	int			pmove_framecount;	// FIXME: don't transmit over the network
 	int			jumppad_frame;
 	int			entityEventSequence;
 } playerState_t;
@@ -1239,7 +1279,7 @@ typedef struct usercmd_s {
 	int				serverTime;
 	int				angles[3];
 	int 			buttons;
-	byte			weapon;           // weapon 
+	byte			weapon;           // weapon
 	signed char	forwardmove, rightmove, upmove;
 } usercmd_t;
 
@@ -1319,7 +1359,7 @@ typedef struct entityState_s {
 typedef enum {
 	CA_UNINITIALIZED,
 	CA_DISCONNECTED, 	// not talking to a server
-	CA_AUTHORIZING,		// not used any more, was checking cd key 
+	CA_AUTHORIZING,		// not used any more, was checking cd key
 	CA_CONNECTING,		// sending request packets to the server
 	CA_CHALLENGING,		// sending challenge packets to the server
 	CA_CONNECTED,		// netchan_t established, getting gamestate
@@ -1329,7 +1369,7 @@ typedef enum {
 	CA_CINEMATIC		// playing a cinematic or a static pic, not connected to a server
 } connstate_t;
 
-// font support 
+// font support
 
 #define GLYPH_START 0
 #define GLYPH_END 255

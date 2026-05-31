@@ -29,7 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //==================================================================
 
 // the "gameversion" client command will print this plus compile date
-#define	GAMEVERSION	BASEGAME
+#define	GAMEVERSION	"defrag-5"
 
 #define BODY_QUEUE_SIZE		8
 
@@ -604,10 +604,10 @@ void SetLeader(int team, int client);
 void CheckTeamLeader( int team );
 void G_RunThink (gentity_t *ent);
 void AddTournamentQueue(gclient_t *client);
-void QDECL G_LogPrintf( const char *fmt, ... ) Q_PRINTF_FUNC(1, 2);
+void QDECL G_LogPrintf( const char *fmt, ... );
 void SendScoreboardMessageToAllClients( void );
-void QDECL G_Printf( const char *fmt, ... ) Q_PRINTF_FUNC(1, 2);
-void QDECL G_Error( const char *fmt, ... ) Q_NO_RETURN Q_PRINTF_FUNC(1, 2);
+void QDECL G_Printf( const char *fmt, ... );
+_Noreturn void QDECL G_Error( const char *fmt, ... );
 
 //
 // g_client.c
@@ -747,7 +747,7 @@ extern	vmCvar_t	g_proxMineTimeout;
 extern	vmCvar_t	g_localTeamPref;
 
 void	trap_Print( const char *text );
-void	trap_Error( const char *text ) Q_NO_RETURN;
+_Noreturn void	trap_Error( const char *text );
 int		trap_Milliseconds( void );
 int	trap_RealTime( qtime_t *qtime );
 int		trap_Argc( void );
