@@ -29,7 +29,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //==================================================================
 
 // the "gameversion" client command will print this plus compile date
-#define	GAMEVERSION	"defrag-5"
+#define	GAMEVERSION		"defrag-5"
+#define	ODFS_VERSION	"0.1.0"
 
 #define BODY_QUEUE_SIZE		8
 
@@ -458,7 +459,7 @@ void SaveRegisteredItems( void );
 //
 int G_ModelIndex( char *name );
 int		G_SoundIndex( char *name );
-void	G_TeamCommand( team_t team, char *cmd );
+void	G_TeamCommand( team_t team, const char *cmd );
 void	G_KillBox (gentity_t *ent);
 gentity_t *G_Find (gentity_t *from, int fieldofs, const char *match);
 gentity_t *G_PickTarget (char *targetname);
@@ -564,7 +565,7 @@ int TeamCount( int ignoreClientNum, team_t team );
 int TeamLeader( int team );
 team_t PickTeam( int ignoreClientNum );
 void SetClientViewAngle( gentity_t *ent, vec3_t angle );
-gentity_t *SelectSpawnPoint (vec3_t avoidPoint, vec3_t origin, vec3_t angles, qboolean isbot);
+gentity_t *SelectSpawnPoint (const vec3_t avoidPoint, vec3_t origin, vec3_t angles, qboolean isbot);
 void CopyToBodyQue( gentity_t *ent );
 void ClientRespawn(gentity_t *ent);
 void BeginIntermission (void);
@@ -580,7 +581,7 @@ qboolean SpotWouldTelefrag( gentity_t *spot );
 //
 qboolean	ConsoleCommand( void );
 void G_ProcessIPBans(void);
-qboolean G_FilterPacket (char *from);
+qboolean G_FilterPacket (const char *from);
 
 //
 // g_weapon.c
@@ -745,6 +746,8 @@ extern	vmCvar_t	g_enableBreath;
 extern	vmCvar_t	g_singlePlayer;
 extern	vmCvar_t	g_proxMineTimeout;
 extern	vmCvar_t	g_localTeamPref;
+
+extern	vmCvar_t	df_promode;
 
 void	trap_Print( const char *text );
 _Noreturn void	trap_Error( const char *text );

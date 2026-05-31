@@ -180,7 +180,7 @@ SelectRandomFurthestSpawnPoint
 Chooses a player start, deathmatch start, etc
 ============
 */
-gentity_t *SelectRandomFurthestSpawnPoint ( vec3_t avoidPoint, vec3_t origin, vec3_t angles, qboolean isbot ) {
+gentity_t *SelectRandomFurthestSpawnPoint ( const vec3_t avoidPoint, vec3_t origin, vec3_t angles, qboolean isbot ) {
 	gentity_t	*spot;
 	vec3_t		delta;
 	float		dist;
@@ -265,7 +265,7 @@ SelectSpawnPoint
 Chooses a player start, deathmatch start, etc
 ============
 */
-gentity_t *SelectSpawnPoint ( vec3_t avoidPoint, vec3_t origin, vec3_t angles, qboolean isbot ) {
+gentity_t *SelectSpawnPoint ( const vec3_t avoidPoint, vec3_t origin, vec3_t angles, qboolean isbot ) {
 	return SelectRandomFurthestSpawnPoint( avoidPoint, origin, angles, isbot );
 
 	/*
@@ -703,7 +703,7 @@ if desired.
 void ClientUserinfoChanged( int clientNum ) {
 	gentity_t *ent;
 	int		teamTask, teamLeader, health;
-	char	*s;
+	const char	*s;
 	char	model[MAX_QPATH];
 	char	headModel[MAX_QPATH];
 	char	oldname[MAX_STRING_CHARS];
@@ -888,7 +888,7 @@ restarts.
 ============
 */
 char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
-	char		*value;
+	const char	*value;
 //	char		*areabits;
 	gclient_t	*client;
 	char		userinfo[MAX_INFO_STRING];
