@@ -194,6 +194,7 @@ typedef struct {
 	int			pmove_msec;
 
 	int			obs_disabled;
+	int			promode;
 
 	// callbacks to test the world
 	// these will be different functions during game and cgame

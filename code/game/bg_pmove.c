@@ -40,6 +40,12 @@ float	pm_airaccelerate = 1.0f;
 float	pm_wateraccelerate = 4.0f;
 float	pm_flyaccelerate = 8.0f;
 
+// CPM physics constants
+float 	cpm_pm_airaccelerate = 70.0f;
+float 	cpm_pm_airaccelerate_slick = 15.0f;
+float 	cpm_pm_accelerate = 15.0f;
+float 	cpm_max_air_wishspeed = 30.0f;
+
 float	pm_friction = 6.0f;
 float	pm_waterfriction = 1.0f;
 float	pm_flightfriction = 3.0f;
@@ -593,6 +599,38 @@ static void PM_FlyMove( void ) {
 
 /*
 ===================
+CPM_PM_Aircontrol
+
+Source: https://github.com/jangroothuijse/openpromode/blob/master/code/game/bg_pmove.c#L655
+===================
+*/
+static void CPM_PM_Aircontrol(pmove_t *pm, vec3_t wishdir, float wishspeed )
+{
+	float	zspeed, speed, dot, k;
+	int		i;
+
+	if ( (pm->ps->movementDir && pm->ps->movementDir !=4) || wishspeed == 0.0)
+		return;
+
+	zspeed = pm->ps->velocity[2];
+	pm->ps->velocity[2] = 0;
+	speed = VectorNormalize(pm->ps->velocity);
+
+	dot = DotProduct(pm->ps->velocity,wishdir);
+	k = 4800*dot*dot*pml.frametime;
+
+	for (i=0; i < 2; i++)
+		pm->ps->velocity[i] = pm->ps->velocity[i]*speed + wishdir[i]*k;
+	VectorNormalize(pm->ps->velocity);
+
+	for (i=0; i < 2; i++)
+		pm->ps->velocity[i] *=speed;
+
+	pm->ps->velocity[2] = zspeed;
+}
+
+/*
+===================
 PM_AirMove
 
 ===================
@@ -605,6 +643,8 @@ static void PM_AirMove( void ) {
 	float		wishspeed;
 	float		scale;
 	usercmd_t	cmd;
+	float		accel;
+	float		wishspeed2;
 
 	PM_Friction();
 
@@ -632,8 +672,24 @@ static void PM_AirMove( void ) {
 	wishspeed = VectorNormalize(wishdir);
 	wishspeed *= scale;
 
-	// not on ground, so little effect on velocity
-	PM_Accelerate (wishdir, wishspeed, pm_airaccelerate);
+	if ( pm->promode ) {
+		wishspeed2 = wishspeed;
+		if (DotProduct(pm->ps->velocity, wishdir) < 0)
+			accel = 3;
+		else
+			accel = pm_airaccelerate;
+		if (pm->ps->movementDir == 2 || pm->ps->movementDir == 6) {
+			if (wishspeed > cpm_max_air_wishspeed)
+				wishspeed = cpm_max_air_wishspeed;
+			accel = cpm_pm_airaccelerate;
+		}
+
+		PM_Accelerate( wishdir, wishspeed, accel );
+		CPM_PM_Aircontrol( pm, wishdir, wishspeed2 );
+	} else {
+		// not on ground, so little effect on velocity
+		PM_Accelerate( wishdir, wishspeed, pm_airaccelerate );
+	}
 
 	// we may have a ground plane that is very steep, even
 	// though we don't have a groundentity
@@ -769,9 +825,9 @@ static void PM_WalkMove( void ) {
 	// when a player gets hit, they temporarily lose
 	// full control, which allows them to be moved a bit
 	if ( ( pml.groundTrace.surfaceFlags & SURF_SLICK ) || pm->ps->pm_flags & PMF_TIME_KNOCKBACK ) {
-		accelerate = pm_airaccelerate;
+		accelerate = pm->promode ? cpm_pm_airaccelerate_slick : pm_airaccelerate;
 	} else {
-		accelerate = pm_accelerate;
+		accelerate = pm->promode ? cpm_pm_accelerate : pm_accelerate;
 	}
 
 	PM_Accelerate (wishdir, wishspeed, accelerate);
