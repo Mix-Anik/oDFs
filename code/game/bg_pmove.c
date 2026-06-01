@@ -1985,6 +1985,11 @@ void PmoveSingle (pmove_t *pmove) {
 		// swimming
 		PM_WaterMove();
 	} else if ( pml.walking ) {
+		// Enabling/disabling overbounce mechanic
+		if (pm->obs_disabled && pm->ps->velocity[2] != 0) {
+			pm->ps->velocity[2] = 0;
+		}
+
 		// walking on ground
 		PM_WalkMove();
 	} else {

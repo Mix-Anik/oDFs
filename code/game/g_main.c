@@ -84,6 +84,7 @@ vmCvar_t	g_listEntity;
 vmCvar_t	g_localTeamPref;
 
 vmCvar_t	df_promode;
+vmCvar_t	df_ob_killobs;
 #ifdef MISSIONPACK
 vmCvar_t	g_obeliskHealth;
 vmCvar_t	g_obeliskRegenPeriod;
@@ -184,12 +185,13 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_localTeamPref, "g_localTeamPref", "", 0, 0, qfalse },
 
 	// oDFs cvars
-	{ NULL,        	"df_version",    	ODFS_VERSION,	CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
-	{ NULL, 		"defrag_vers",     	ODFS_VERSION,	CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
-	{ &df_promode, 	"df_promode",    	"0",         	CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
-	{ NULL, 		"defrag_flags",    	"2",    	 	CVAR_SERVERINFO, 0, qfalse },
-	{ NULL, 		"defrag_gametype", 	"1",    	 	CVAR_SERVERINFO, 0, qfalse },
-	{ NULL, 		"defrag_mode",     	"-1",   	 	CVAR_SERVERINFO, 0, qfalse },
+	{ NULL,        		"df_version",    	ODFS_VERSION,	CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
+	{ NULL, 			"defrag_vers",     	ODFS_VERSION,	CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
+	{ &df_promode,    	"df_promode",    	"0", 			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
+	{ &df_ob_killobs, 	"df_ob_killobs", 	"0", 			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
+	{ NULL, 			"defrag_flags",    	"2",    	 	CVAR_SERVERINFO, 0, qfalse },
+	{ NULL, 			"defrag_gametype", 	"1",    	 	CVAR_SERVERINFO, 0, qfalse },
+	{ NULL, 			"defrag_mode",     	"-1",   	 	CVAR_SERVERINFO, 0, qfalse },
 };	
 
 static int gameCvarTableSize = ARRAY_LEN( gameCvarTable );
