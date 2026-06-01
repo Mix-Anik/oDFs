@@ -381,38 +381,40 @@ void RespawnItem( gentity_t *ent ) {
 	ent->r.svFlags &= ~SVF_NOCLIENT;
 	trap_LinkEntity (ent);
 
-	if ( ent->item->giType == IT_POWERUP ) {
-		// play powerup spawn sound to all clients
-		gentity_t	*te;
+	if ( !df_mode.integer ) {
+		if ( ent->item->giType == IT_POWERUP ) {
+			// play powerup spawn sound to all clients
+			gentity_t	*te;
 
-		// if the powerup respawn sound should Not be global
-		if (ent->speed) {
-			te = G_TempEntity( ent->s.pos.trBase, EV_GENERAL_SOUND );
+			// if the powerup respawn sound should Not be global
+			if (ent->speed) {
+				te = G_TempEntity( ent->s.pos.trBase, EV_GENERAL_SOUND );
+			}
+			else {
+				te = G_TempEntity( ent->s.pos.trBase, EV_GLOBAL_SOUND );
+			}
+			te->s.eventParm = G_SoundIndex( "sound/items/poweruprespawn.wav" );
+			te->r.svFlags |= SVF_BROADCAST;
 		}
-		else {
-			te = G_TempEntity( ent->s.pos.trBase, EV_GLOBAL_SOUND );
+
+		if ( ent->item->giType == IT_HOLDABLE && ent->item->giTag == HI_KAMIKAZE ) {
+			// play powerup spawn sound to all clients
+			gentity_t	*te;
+
+			// if the powerup respawn sound should Not be global
+			if (ent->speed) {
+				te = G_TempEntity( ent->s.pos.trBase, EV_GENERAL_SOUND );
+			}
+			else {
+				te = G_TempEntity( ent->s.pos.trBase, EV_GLOBAL_SOUND );
+			}
+			te->s.eventParm = G_SoundIndex( "sound/items/kamikazerespawn.wav" );
+			te->r.svFlags |= SVF_BROADCAST;
 		}
-		te->s.eventParm = G_SoundIndex( "sound/items/poweruprespawn.wav" );
-		te->r.svFlags |= SVF_BROADCAST;
+
+		// play the normal respawn sound only to nearby clients
+		G_AddEvent( ent, EV_ITEM_RESPAWN, 0 );
 	}
-
-	if ( ent->item->giType == IT_HOLDABLE && ent->item->giTag == HI_KAMIKAZE ) {
-		// play powerup spawn sound to all clients
-		gentity_t	*te;
-
-		// if the powerup respawn sound should Not be global
-		if (ent->speed) {
-			te = G_TempEntity( ent->s.pos.trBase, EV_GENERAL_SOUND );
-		}
-		else {
-			te = G_TempEntity( ent->s.pos.trBase, EV_GLOBAL_SOUND );
-		}
-		te->s.eventParm = G_SoundIndex( "sound/items/kamikazerespawn.wav" );
-		te->r.svFlags |= SVF_BROADCAST;
-	}
-
-	// play the normal respawn sound only to nearby clients
-	G_AddEvent( ent, EV_ITEM_RESPAWN, 0 );
 
 	ent->nextthink = 0;
 }
@@ -488,7 +490,7 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 	}
 
 	// powerup pickups are global broadcasts
-	if ( ent->item->giType == IT_POWERUP || ent->item->giType == IT_TEAM) {
+	if (!df_mode.integer && (ent->item->giType == IT_POWERUP || ent->item->giType == IT_TEAM)) {
 		// if we want the global sound to play
 		if (!ent->speed) {
 			gentity_t	*te;
@@ -696,19 +698,6 @@ void FinishSpawningItem( gentity_t *ent ) {
 		ent->r.contents = 0;
 		return;
 	}
-
-	// powerups don't spawn in for a while
-	if ( ent->item->giType == IT_POWERUP ) {
-		float	respawn;
-
-		respawn = 45 + crandom() * 15;
-		ent->s.eFlags |= EF_NODRAW;
-		ent->r.contents = 0;
-		ent->nextthink = level.time + respawn * 1000;
-		ent->think = RespawnItem;
-		return;
-	}
-
 
 	trap_LinkEntity (ent);
 }

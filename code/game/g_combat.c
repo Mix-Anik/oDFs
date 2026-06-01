@@ -57,6 +57,10 @@ void AddScore( gentity_t *ent, vec3_t origin, int score ) {
 	if ( level.warmupTime ) {
 		return;
 	}
+	// disable while defrag mode is turned on
+	if ( df_mode.integer ) {
+		return;
+	}
 	// show score plum
 	ScorePlum(ent, origin, score);
 	//
@@ -561,7 +565,8 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 		}
 	}
 
-	TossClientItems( self );
+	if ( !df_mode.integer )
+		TossClientItems( self );
 #ifdef MISSIONPACK
 	TossClientPersistantPowerups( self );
 	if( g_gametype.integer == GT_HARVESTER ) {

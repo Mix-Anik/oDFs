@@ -528,6 +528,22 @@ ClientRespawn
 ================
 */
 void ClientRespawn( gentity_t *ent ) {
+	int         i;
+    gentity_t   *e;
+
+    // force all picked-up items to respawn immediately
+	for (i = MAX_CLIENTS; i < level.num_entities; i++) {
+		e = &g_entities[i];
+
+		if (e->s.eType != ET_ITEM)
+			continue;
+
+		// not hidden, skip
+		if (!(e->r.svFlags & SVF_NOCLIENT))
+			continue;
+
+		RespawnItem(e);
+	}
 
 	CopyToBodyQue (ent);
 	ClientSpawn(ent);
@@ -1218,8 +1234,10 @@ void ClientSpawn(gentity_t *ent) {
 			// positively link the client, even if the command times are weird
 			VectorCopy(ent->client->ps.origin, ent->r.currentOrigin);
 
-			tent = G_TempEntity(ent->client->ps.origin, EV_PLAYER_TELEPORT_IN);
-			tent->s.clientNum = ent->s.clientNum;
+			if ( !df_mode.integer ) {
+				tent = G_TempEntity(ent->client->ps.origin, EV_PLAYER_TELEPORT_IN);
+				tent->s.clientNum = ent->s.clientNum;
+			}
 
 			trap_LinkEntity (ent);
 		}

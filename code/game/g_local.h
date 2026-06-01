@@ -749,6 +749,7 @@ extern	vmCvar_t	g_localTeamPref;
 
 extern	vmCvar_t	df_promode;
 extern	vmCvar_t	df_ob_killobs;
+extern	vmCvar_t	df_mode;
 
 void	trap_Print( const char *text );
 _Noreturn void	trap_Error( const char *text );
