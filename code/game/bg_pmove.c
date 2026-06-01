@@ -1986,7 +1986,9 @@ void PmoveSingle (pmove_t *pmove) {
 		PM_WaterMove();
 	} else if ( pml.walking ) {
 		// Enabling/disabling overbounce mechanic
-		if (pm->obs_disabled && pm->ps->velocity[2] != 0) {
+		if (pm->obs_disabled &&
+			!(pml.groundTrace.surfaceFlags & SURF_SLICK)
+			&& pm->ps->velocity[2] != 0) {
 			pm->ps->velocity[2] = 0;
 		}
 
