@@ -243,10 +243,7 @@ PM_StepSlideMove
 */
 void PM_StepSlideMove( qboolean gravity ) {
 	vec3_t		start_o, start_v;
-//	vec3_t		down_o, down_v;
 	trace_t		trace;
-//	float		down_dist, up_dist;
-//	vec3_t		delta, delta2;
 	vec3_t		up, down;
 	float		stepSize;
 
@@ -254,7 +251,7 @@ void PM_StepSlideMove( qboolean gravity ) {
 	VectorCopy (pm->ps->velocity, start_v);
 
 	if ( PM_SlideMove( gravity ) == 0 ) {
-		return;		// we got exactly where we wanted to go first try	
+		return; // we got exactly where we wanted to go first try
 	}
 
 	VectorCopy(start_o, down);
