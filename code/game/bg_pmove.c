@@ -355,7 +355,6 @@ static void PM_SetMovementDir( void ) {
 	}
 }
 
-
 /*
 =============
 PM_CheckJump
@@ -363,7 +362,7 @@ PM_CheckJump
 */
 static qboolean PM_CheckJump( void ) {
 	if ( pm->ps->pm_flags & PMF_RESPAWNED ) {
-		return qfalse;		// don't allow jump until all buttons are up
+		return qfalse; // don't allow jump until all buttons are up
 	}
 
 	if ( pm->cmd.upmove < 10 ) {
@@ -378,10 +377,9 @@ static qboolean PM_CheckJump( void ) {
 		return qfalse;
 	}
 
-	pml.groundPlane = qfalse;		// jumping away
+	pml.groundPlane = qfalse; // jumping away
 	pml.walking = qfalse;
 	pm->ps->pm_flags |= PMF_JUMP_HELD;
-
 	pm->ps->groundEntityNum = ENTITYNUM_NONE;
 	pm->ps->velocity[2] = JUMP_VELOCITY;
 	PM_AddEvent( EV_JUMP );
@@ -1232,7 +1230,7 @@ static void PM_GroundTrace( void ) {
 		if ( pm->debugLevel ) {
 			Com_Printf("%i:Land\n", c_pmove);
 		}
-		
+
 		PM_CrashLand();
 
 		// don't do landing time if we were just going down a slope
@@ -1245,8 +1243,11 @@ static void PM_GroundTrace( void ) {
 
 	pm->ps->groundEntityNum = trace.entityNum;
 
-	// don't reset the z velocity for slopes
-//	pm->ps->velocity[2] = 0;
+	// OBS (overbounce) kill
+	if ( (pm->obs_disabled || (pml.groundTrace.surfaceFlags & SURF_NOOB)) &&
+	     trace.plane.normal[2] == 1.0f ) {
+		pm->ps->velocity[2] = 0;
+	}
 
 	PM_AddTouchEnt( trace.entityNum );
 }
@@ -2041,13 +2042,6 @@ void PmoveSingle (pmove_t *pmove) {
 		// swimming
 		PM_WaterMove();
 	} else if ( pml.walking ) {
-		// Enabling/disabling overbounce mechanic
-		if (pm->obs_disabled &&
-			!(pml.groundTrace.surfaceFlags & SURF_SLICK)
-			&& pm->ps->velocity[2] != 0) {
-			pm->ps->velocity[2] = 0;
-		}
-
 		// walking on ground
 		PM_WalkMove();
 	} else {
