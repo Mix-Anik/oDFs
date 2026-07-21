@@ -790,3 +790,13 @@ int trap_PC_ReadToken( int handle, pc_token_t *pc_token ) {
 int trap_PC_SourceFileAndLine( int handle, char *filename, int *line ) {
 	return syscall( BOTLIB_PC_SOURCE_FILE_AND_LINE, handle, filename, line );
 }
+
+/* Com_Error for DLL builds */
+void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error(int level, const char *fmt, ...) {
+	va_list argptr;
+	char text[1024];
+	va_start(argptr, fmt);
+	Q_vsnprintf(text, sizeof(text), fmt, argptr);
+	va_end(argptr);
+	trap_Error(text);
+}

@@ -45,6 +45,10 @@ float 	cpm_pm_airaccelerate = 70.0f;
 float 	cpm_pm_airaccelerate_slick = 15.0f;
 float 	cpm_pm_accelerate = 15.0f;
 float 	cpm_max_air_wishspeed = 30.0f;
+float 	cpm_pm_wateraccelerate = 5.0f;
+float 	cpm_pm_waterfriction = 0.5f;
+static const float cpm_pm_swimscale_shallow = 0.585f;  // wading wishspeed cap (waterlevel == 1)
+static const float cpm_pm_swimscale_deep    = 0.54f;   // swimming wishspeed cap (waterlevel > 1)
 
 float	pm_friction = 6.0f;
 float	pm_waterfriction = 1.0f;
@@ -210,7 +214,8 @@ static void PM_Friction( void ) {
 
 	// apply water friction even if just wading
 	if ( pm->waterlevel ) {
-		drop += speed*pm_waterfriction*pm->waterlevel*pml.frametime;
+		float wf = pm->promode ? cpm_pm_waterfriction : pm_waterfriction;
+		drop += speed * wf * pm->waterlevel * pml.frametime;
 	}
 
 	// apply flying friction
@@ -381,7 +386,22 @@ static qboolean PM_CheckJump( void ) {
 	pml.walking = qfalse;
 	pm->ps->pm_flags |= PMF_JUMP_HELD;
 	pm->ps->groundEntityNum = ENTITYNUM_NONE;
-	pm->ps->velocity[2] = JUMP_VELOCITY;
+
+	if ( pm->promode && pm->ps->velocity[2] > 0.0f ) {
+		// double jump: additive when already going up (matches Defrag QVM)
+		pm->ps->velocity[2] += JUMP_VELOCITY;
+	} else {
+		pm->ps->velocity[2] = JUMP_VELOCITY;
+	}
+
+	if ( pm->promode ) {
+		if ( pm->ps->stats[STAT_DOUBLEJUMP_WINDOW] > 0 ) {
+			pm->ps->velocity[2] += 100.0f;
+			pm->ps->stats[STAT_DOUBLEJUMP_USED] = 1;
+		}
+		pm->ps->stats[STAT_DOUBLEJUMP_WINDOW] = 400;
+	}
+
 	PM_AddEvent( EV_JUMP );
 
 	if ( pm->cmd.forwardmove >= 0 ) {
@@ -517,11 +537,16 @@ static void PM_WaterMove( void ) {
 	VectorCopy (wishvel, wishdir);
 	wishspeed = VectorNormalize(wishdir);
 
-	if ( wishspeed > pm->ps->speed * pm_swimScale ) {
-		wishspeed = pm->ps->speed * pm_swimScale;
+	if ( pm->promode ) {
+		float cap = (pm->waterlevel == 1) ? cpm_pm_swimscale_shallow : cpm_pm_swimscale_deep;
+		if ( wishspeed > pm->ps->speed * cap )
+			wishspeed = pm->ps->speed * cap;
+		PM_Accelerate( wishdir, wishspeed, cpm_pm_wateraccelerate );
+	} else {
+		if ( wishspeed > pm->ps->speed * pm_swimScale )
+			wishspeed = pm->ps->speed * pm_swimScale;
+		PM_Accelerate( wishdir, wishspeed, pm_wateraccelerate );
 	}
-
-	PM_Accelerate (wishdir, wishspeed, pm_wateraccelerate);
 
 	// make sure we can go up slopes easily under water
 	if ( pml.groundPlane && DotProduct( pm->ps->velocity, pml.groundTrace.plane.normal ) < 0 ) {
@@ -615,11 +640,13 @@ static void CPM_PM_Aircontrol(pmove_t *pm, vec3_t wishdir, float wishspeed )
 	speed = VectorNormalize(pm->ps->velocity);
 
 	dot = DotProduct(pm->ps->velocity,wishdir);
-	k = 4800*dot*dot*pml.frametime;
+	if ( dot > 0 ) { // DeFRaG: skip aircontrol when velocity not aligned toward wishdir
+		k = 4800*dot*dot*pml.frametime;
 
-	for (i=0; i < 2; i++)
-		pm->ps->velocity[i] = pm->ps->velocity[i]*speed + wishdir[i]*k;
-	VectorNormalize(pm->ps->velocity);
+		for (i=0; i < 2; i++)
+			pm->ps->velocity[i] = pm->ps->velocity[i]*speed + wishdir[i]*k;
+		VectorNormalize(pm->ps->velocity);
+	}
 
 	for (i=0; i < 2; i++)
 		pm->ps->velocity[i] *=speed;
@@ -673,7 +700,7 @@ static void PM_AirMove( void ) {
 	if ( pm->promode ) {
 		wishspeed2 = wishspeed;
 		if (DotProduct(pm->ps->velocity, wishdir) < 0)
-			accel = 3;
+			accel = 2.5f;
 		else
 			accel = pm_airaccelerate;
 		if (pm->ps->movementDir == 2 || pm->ps->movementDir == 6) {
@@ -812,9 +839,15 @@ static void PM_WalkMove( void ) {
 	// clamp the speed lower if wading or walking on the bottom
 	if ( pm->waterlevel ) {
 		float	waterScale;
+		float	swimScale;
+
+		if ( pm->promode )
+			swimScale = (pm->waterlevel == 1) ? cpm_pm_swimscale_shallow : cpm_pm_swimscale_deep;
+		else
+			swimScale = pm_swimScale;
 
 		waterScale = pm->waterlevel / 3.0;
-		waterScale = 1.0 - ( 1.0 - pm_swimScale ) * waterScale;
+		waterScale = 1.0 - ( 1.0 - swimScale ) * waterScale;
 		if ( wishspeed > pm->ps->speed * waterScale ) {
 			wishspeed = pm->ps->speed * waterScale;
 		}
@@ -870,7 +903,7 @@ PM_DeadMove
 static void PM_DeadMove( void ) {
 	float	forward;
 
-	if ( !pml.walking ) {
+	if ( pml.walking ) { // DeFRaG (0x74cb): only decay speed when airborne
 		return;
 	}
 
@@ -1233,6 +1266,12 @@ static void PM_GroundTrace( void ) {
 
 		PM_CrashLand();
 
+		// DeFRaG: on landing, clip velocity against ground normal when OBS is suppressed
+		if ( (pm->ps->stats[STAT_DEFRAG_FLAGS] & DFLAG_OBS_DISABLED) || (pml.groundTrace.surfaceFlags & SURF_NOOB) ) {
+			PM_ClipVelocity( pm->ps->velocity, pml.groundTrace.plane.normal,
+			                 pm->ps->velocity, OVERCLIP );
+		}
+
 		// don't do landing time if we were just going down a slope
 		if ( pml.previous_velocity[2] < -200 ) {
 			// don't allow another jump for a little while
@@ -1244,7 +1283,7 @@ static void PM_GroundTrace( void ) {
 	pm->ps->groundEntityNum = trace.entityNum;
 
 	// OBS (overbounce) kill
-	if ( (pm->obs_disabled || (pml.groundTrace.surfaceFlags & SURF_NOOB)) &&
+	if ( ((pm->ps->stats[STAT_DEFRAG_FLAGS] & DFLAG_OBS_DISABLED) || (pml.groundTrace.surfaceFlags & SURF_NOOB)) &&
 	     trace.plane.normal[2] == 1.0f ) {
 		pm->ps->velocity[2] = 0;
 	}
@@ -1530,14 +1569,20 @@ static void PM_BeginWeaponChange( int weapon ) {
 	if ( !( pm->ps->stats[STAT_WEAPONS] & ( 1 << weapon ) ) ) {
 		return;
 	}
-	
+
+	// DeFRaG: grappling hook cannot be switched to via weapon change
+	if ( weapon == WP_GRAPPLING_HOOK ) {
+		return;
+	}
+
 	if ( pm->ps->weaponstate == WEAPON_DROPPING ) {
 		return;
 	}
 
 	PM_AddEvent( EV_CHANGE_WEAPON );
 	pm->ps->weaponstate = WEAPON_DROPPING;
-	pm->ps->weaponTime += 200;
+	if ( !pm->promode )
+		pm->ps->weaponTime += 200;
 	PM_StartTorsoAnim( TORSO_DROP );
 }
 
@@ -1561,7 +1606,8 @@ static void PM_FinishWeaponChange( void ) {
 
 	pm->ps->weapon = weapon;
 	pm->ps->weaponstate = WEAPON_RAISING;
-	pm->ps->weaponTime += 250;
+	if ( !pm->promode )
+		pm->ps->weaponTime += 250;
 	PM_StartTorsoAnim( TORSO_RAISE );
 }
 
@@ -1826,6 +1872,13 @@ static void PM_DropTimers( void ) {
 		}
 	}
 
+	// count down double jump window — promode only, matching Defrag (0x85c3-0x85ce)
+	if ( pm->promode && pm->ps->stats[STAT_DOUBLEJUMP_WINDOW] > 0 ) {
+		pm->ps->stats[STAT_DOUBLEJUMP_WINDOW] -= pml.msec;
+		if ( pm->ps->stats[STAT_DOUBLEJUMP_WINDOW] < 0 )
+			pm->ps->stats[STAT_DOUBLEJUMP_WINDOW] = 0;
+	}
+
 	// drop animation counter
 	if ( pm->ps->legsTimer > 0 ) {
 		pm->ps->legsTimer -= pml.msec;
@@ -1881,6 +1934,26 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 }
 
 
+static void PM_UpdateInputState( void ) {
+	pm->ps->stats[STAT_DEFRAG_INPUT] = 0;
+	if ( pm->cmd.forwardmove > 0 )
+		pm->ps->stats[STAT_DEFRAG_INPUT] |= DINPUT_FORWARD;
+	if ( pm->cmd.forwardmove < 0 )
+		pm->ps->stats[STAT_DEFRAG_INPUT] |= DINPUT_BACKWARD;
+	if ( pm->cmd.rightmove < 0 )
+		pm->ps->stats[STAT_DEFRAG_INPUT] |= DINPUT_LEFT;
+	if ( pm->cmd.rightmove > 0 )
+		pm->ps->stats[STAT_DEFRAG_INPUT] |= DINPUT_RIGHT;
+	if ( pm->cmd.upmove > 0 )
+		pm->ps->stats[STAT_DEFRAG_INPUT] |= DINPUT_UP;
+	if ( pm->cmd.upmove < 0 )
+		pm->ps->stats[STAT_DEFRAG_INPUT] |= DINPUT_DOWN;
+	if ( pm->cmd.buttons & BUTTON_ATTACK )
+		pm->ps->stats[STAT_DEFRAG_INPUT] |= DINPUT_ATTACK;
+	if ( abs( pm->cmd.forwardmove ) == 64 || abs( pm->cmd.rightmove ) == 64 )
+		pm->ps->stats[STAT_DEFRAG_INPUT] |= DINPUT_DIAGONAL;
+}
+
 /*
 ================
 PmoveSingle
@@ -1891,6 +1964,8 @@ void trap_SnapVector( float *v );
 
 void PmoveSingle (pmove_t *pmove) {
 	pm = pmove;
+
+	PM_UpdateInputState();
 
 	// this counter lets us debug movement problems with a journal
 	// by setting a conditional breakpoint fot the previous frame

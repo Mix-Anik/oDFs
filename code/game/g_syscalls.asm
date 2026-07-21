@@ -222,4 +222,8 @@ equ trap_BotLibLoadSource				-579
 equ trap_BotLibFreeSource				-580
 equ trap_BotLibReadToken				-581
 equ trap_BotLibSourceFileAndLine		-582
- 
+
+equ log							-601
+equ pow							-602
+equ vsnprintf					-603
+

@@ -224,6 +224,31 @@ typedef enum {
 	STAT_MAX_HEALTH					// health / armor limit, changeable by handicap
 } statIndex_t;
 
+// Defrag double jump state — indices matching original Defrag QVM (stats[10], stats[11])
+#define STAT_DOUBLEJUMP_WINDOW  10  // countdown in ms; > 0 means window open
+#define STAT_DOUBLEJUMP_USED    11  // set to 1 after double jump fires
+
+// DeFRaG per-player flags packed into stats[12] — matches DeFRaG QVM ps.stats[12]
+// Set each frame in ClientThink_real from cvar caches; read in bg_pmove.c physics.
+// Networked via playerState_t so client prediction sees the same values.
+#define STAT_DEFRAG_FLAGS       12
+#define DFLAG_OBS_DISABLED      0x200   // df_ob_KillOBs != 0 — suppress overbounce detection
+#define DFLAG_GRAPPLE_MODE_1    0x400   // grapple mode bit 1 (set by grapple cvar, not yet in oDFs)
+#define DFLAG_GRAPPLE_MODE_2    0x800   // grapple mode bit 2 (set by grapple cvar, not yet in oDFs)
+#define DFLAG_LG_KNOCKBACK      0x1000  // df_lg_Knockback != 0 — LG knockback enabled (not yet in oDFs)
+
+// DeFRaG per-frame input state packed into stats[13] — written in PmoveSingle (func_0x4152).
+// Client reads this each prediction frame to drive the key-indicator HUD.
+#define STAT_DEFRAG_INPUT       13
+#define DINPUT_FORWARD          0x001   // cmd.forwardmove > 0
+#define DINPUT_BACKWARD         0x002   // cmd.forwardmove < 0
+#define DINPUT_LEFT             0x008   // cmd.rightmove < 0
+#define DINPUT_RIGHT            0x010   // cmd.rightmove > 0
+#define DINPUT_UP               0x020   // cmd.upmove > 0
+#define DINPUT_DOWN             0x040   // cmd.upmove < 0
+#define DINPUT_ATTACK           0x100   // BUTTON_ATTACK held
+#define DINPUT_DIAGONAL         0x200   // abs(forward|right) == 64 (diagonal movement cap)
+
 
 // player_state->persistant[] indexes
 // these fields are the only part of player_state that isn't

@@ -261,11 +261,13 @@ void PM_StepSlideMove( qboolean gravity ) {
 	// never step up when you still have up velocity
 	if ( pm->ps->velocity[2] > 0 && (trace.fraction == 1.0 ||
 										DotProduct(trace.plane.normal, up) < 0.7)) {
-		return;
+		// CPM: allow step-up onto a ramp face mid-air when doublejump window is open
+		if ( !pm->promode ||
+			 pm->ps->velocity[2] > 370.0f ||
+			 pm->ps->stats[STAT_DOUBLEJUMP_WINDOW] <= 0 ) {
+			return;
+		}
 	}
-
-	//VectorCopy (pm->ps->origin, down_o);
-	//VectorCopy (pm->ps->velocity, down_v);
 
 	VectorCopy (start_o, up);
 	up[2] += STEPSIZE;
@@ -275,6 +277,9 @@ void PM_StepSlideMove( qboolean gravity ) {
 	if ( trace.allsolid ) {
 		if ( pm->debugLevel ) {
 			Com_Printf("%i:bend can't step\n", c_pmove);
+		}
+		if ( pm->promode ) {
+			VectorClear( pm->ps->velocity );
 		}
 		return;		// can't step up
 	}
@@ -295,6 +300,9 @@ void PM_StepSlideMove( qboolean gravity ) {
 	}
 	if ( trace.fraction < 1.0 ) {
 		PM_ClipVelocity( pm->ps->velocity, trace.plane.normal, pm->ps->velocity, OVERCLIP );
+		if ( pm->promode ) {
+			return;  // CPM: skip step sounds after push-down clip
+		}
 	}
 
 #if 0

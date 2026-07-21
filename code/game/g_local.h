@@ -956,3 +956,43 @@ int		trap_GeneticParentsAndChildSelection(int numranks, float *ranks, int *paren
 
 void	trap_SnapVector( float *v );
 
+// ─── DeFRaG race timer ───────────────────────────────────────────────────────
+
+typedef enum {
+	TIMER_IDLE       = 0,
+	TIMER_RUNNING    = 1,
+	TIMER_FINISHED   = 2,
+	TIMER_CHECKPOINT = 3,
+} timerState_t;
+
+typedef struct {
+	int          startTime;      // level.time when the race started
+	int          bestTime;       // best/last result in ms (level.time delta)
+	float        fracAccum;      // unused in oDFs (DeFRaG sub-ms precision field)
+	timerState_t state;          // current state
+	float        fracDelta;      // unused in oDFs (DeFRaG sub-ms precision field)
+	int          initialized;    // 1 = timer is live
+	int          checkpointBits; // bitmask of reached checkpoints
+	int          checkpointCount;// number of distinct checkpoints hit
+} raceTimer_t;
+
+extern raceTimer_t  g_raceTimers[MAX_CLIENTS];
+extern int          g_checkpointCount;
+extern qboolean     g_startTimerReady;
+extern qboolean     g_stopTimerReady;
+extern qboolean     g_checkpointReady;
+
+// g_defrag.c
+void          G_InitRaceMode( void );
+raceTimer_t  *G_GetTimerRecord( gclient_t *client );
+void          G_StartRace( gentity_t *ent );
+void          G_StopRace( gentity_t *ent );
+void          G_Checkpoint( gentity_t *ent, int idx );
+void          G_TimerTick( gentity_t *ent, int elapsed_ms );
+void          G_UpdateRacePs( gentity_t *ent );
+
+// g_trigger.c — race timer entities
+void SP_target_startTimer( gentity_t *ent );
+void SP_target_stopTimer( gentity_t *ent );
+void SP_target_checkpoint( gentity_t *ent );
+

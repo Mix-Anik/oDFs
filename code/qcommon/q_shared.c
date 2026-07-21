@@ -2256,3 +2256,16 @@ const char *Com_SkipTokens( const char *s, int numTokens, const char *sep )
 	else
 		return s;
 }
+
+#ifdef Q3_VM
+/* Com_Error for Q3VM modules (qagame, cgame, ui) */
+void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error(int level, const char *fmt, ...) {
+	va_list argptr;
+	char text[1024];
+	va_start(argptr, fmt);
+	Q_vsnprintf(text, sizeof(text), fmt, argptr);
+	va_end(argptr);
+	trap_Error(text);
+}
+#endif
+/* For DLL builds, Com_Error is defined in g_syscalls.c */

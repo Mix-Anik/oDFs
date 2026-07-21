@@ -30,6 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 
 #include "q_shared.h"
+#include "../game/bg_lib_math.h"
 
 const vec3_t	vec3_origin = {0,0,0};
 vec3_t	axisDefault[3] = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
@@ -1176,4 +1177,5 @@ float Q_acos(float c) {
 	}
 	return angle;
 }
+
 #endif

@@ -998,19 +998,19 @@ double strtod( const char *nptr, char **endptr )
 			int mantissa = strtol( &nptr[4], &end, 0 );
 			if( *end == ')' )
 			{
-				nan.ui = 0x7f800000 | ( mantissa & 0x7fffff );
+				nan.u = 0x7f800000 | ( mantissa & 0x7fffff );
 				if( endptr )
 					*endptr = &end[1];
 				return nan.f;
 			}
 		}
-		nan.ui = 0x7fffffff;
+		nan.u = 0x7fffffff;
 		return nan.f;
 	}
 	if( Q_stricmpn( nptr, "inf", 3 ) == 0 )
 	{
 		floatint_t inf;
-		inf.ui = 0x7f800000;
+		inf.u = 0x7f800000;
 		if( endptr == NULL )
 			return inf.f;
 		if( Q_stricmpn( &nptr[3], "inity", 5 ) == 0 )
@@ -2114,6 +2114,10 @@ int sscanf( const char *buffer, const char *fmt, ... ) {
 
 	va_end (ap);
 	return count;
+}
+
+int vsprintf(char *buffer, const char *fmt, va_list ap) {
+	return vsnprintf(buffer, 0x7fffffff, fmt, ap);
 }
 
 #endif

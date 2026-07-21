@@ -229,6 +229,11 @@ spawn_t	spawns[] = {
 	{"target_location", SP_target_location},
 	{"target_push", SP_target_push},
 
+	// DeFRaG race timer entities
+	{"target_startTimer",  SP_target_startTimer},
+	{"target_stopTimer",   SP_target_stopTimer},
+	{"target_checkpoint",  SP_target_checkpoint},
+
 	{"light", SP_light},
 	{"path_corner", SP_path_corner},
 
@@ -254,7 +259,7 @@ spawn_t	spawns[] = {
 #endif
 	{"item_botroam", SP_item_botroam},
 
-	{NULL, 0}
+	{NULL, NULL}
 };
 
 /*

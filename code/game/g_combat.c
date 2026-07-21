@@ -897,6 +897,15 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 
 		mass = 200;
 
+		// DeFRaG promode: self-inflicted rocket splash damage (rocket jumping)
+		// gets its horizontal (X/Y) knockback boosted 1.2x; vertical (Z) is
+		// unaffected. Confirmed from qagame.qvm disassembly (G_Damage,
+		// df_promode-conditional branch, targ==attacker && mod==MOD_ROCKET_SPLASH).
+		if ( df_promode.integer && targ == attacker && mod == MOD_ROCKET_SPLASH ) {
+			dir[0] *= 1.2f;
+			dir[1] *= 1.2f;
+		}
+
 		VectorScale (dir, g_knockback.value * (float)knockback / mass, kvel);
 		VectorAdd (targ->client->ps.velocity, kvel, targ->client->ps.velocity);
 

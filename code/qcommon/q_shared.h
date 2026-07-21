@@ -168,6 +168,17 @@ float FloatSwap( const float *f );
 
 #ifdef Q3_VM
 	typedef int intptr_t;
+	typedef int int32_t;
+	typedef unsigned int uint32_t;
+	typedef short int16_t;
+	typedef unsigned short uint16_t;
+	typedef signed char int8_t;
+	typedef unsigned char uint8_t;
+	typedef long long int64_t;
+	typedef unsigned long long uint64_t;
+	#define _Noreturn  /* q3lcc doesn't understand C11 _Noreturn */
+	#define Q_NO_RETURN  /* q3lcc doesn't understand GCC __attribute__((noreturn)) */
+	#define Q_PRINTF_FUNC(x,y)  /* q3lcc doesn't understand GCC __attribute__((format(printf,x,y))) */
 #else
 	#if defined (_MSC_VER) && !defined(__clang__)
 		typedef __int64 int64_t;
@@ -903,7 +914,7 @@ const char *Info_NextPair( const char *s, char *key, char *value );
 int Info_RemoveKey( char *s, const char *key );
 
 // this is only here so the functions in q_shared.c and bg_*.c can link
-void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t level, const char *fmt, ... );
+void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( int level, const char *fmt, ... );
 void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *msg, ... );
 
 

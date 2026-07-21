@@ -667,7 +667,13 @@ gentity_t *fire_rocket (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->s.pos.trType = TR_LINEAR;
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, bolt->s.pos.trBase );
-	VectorScale( dir, 900, bolt->s.pos.trDelta );
+	// DeFRaG: rocket speed is 1000 u/s under promode (CPM), 900 u/s otherwise (vanilla).
+	// Confirmed from qagame.qvm disassembly (fire_rocket, df_promode-conditional branch).
+	if ( df_promode.integer ) {
+		VectorScale( dir, 1000, bolt->s.pos.trDelta );
+	} else {
+		VectorScale( dir, 900, bolt->s.pos.trDelta );
+	}
 	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
 	VectorCopy (start, bolt->r.currentOrigin);
 

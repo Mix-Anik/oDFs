@@ -191,9 +191,16 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &df_promode,    	"df_promode",    	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_ob_killobs, 	"df_ob_killobs", 	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_mode,       	"df_mode",       	"1",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
-	{ NULL, 			"defrag_mode",     	"-1",   	 	CVAR_SERVERINFO, 0, qfalse },
-	{ NULL, 			"defrag_flags",    	"2",    	 	CVAR_SERVERINFO, 0, qfalse },
-	{ NULL, 			"defrag_gametype", 	"1",    	 	CVAR_SERVERINFO, 0, qfalse },
+	{ NULL, 			"defrag_mode",     		"-1",   	CVAR_SERVERINFO, 0, qfalse },
+	{ NULL, 			"defrag_flags",    		"2",    	CVAR_SERVERINFO, 0, qfalse },
+	{ NULL, 			"defrag_gametype", 		"1",    	CVAR_SERVERINFO, 0, qfalse },
+	// DeFRaG race entity cvars — read by the cgame to enable the timer HUD.
+	// The cgame checks if these start with "df" to decide which entities exist.
+	// Must be SERVERINFO so the cgame can read them via trap_CvarVariableStringBuffer.
+	{ NULL, 			"df_ndm_timer_start",      "",		CVAR_SERVERINFO, 0, qfalse },
+	{ NULL, 			"df_ndm_timer_stop",       "",		CVAR_SERVERINFO, 0, qfalse },
+	{ NULL, 			"df_ndm_timer_checkpoint", "",		CVAR_SERVERINFO, 0, qfalse },
+	{ NULL, 			"defrag_route",            "",		CVAR_SERVERINFO, 0, qfalse },
 };	
 
 static int gameCvarTableSize = ARRAY_LEN( gameCvarTable );
@@ -425,7 +432,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	G_Printf ("------- Game Initialization -------\n");
 	G_Printf ("gamename: %s\n", GAMEVERSION);
 	G_Printf ("gamedate: %s\n", __DATE__);
-	G_Printf ("^2[oDFs] qagame DLL loaded\n");
+	G_Printf ("^2[oDFs] qagame QVM loaded\n");
 
 	srand( randomSeed );
 
@@ -496,8 +503,21 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	ClearRegisteredItems();
 
+	// DeFRaG: reset race timer state before spawning entities.
+	// The SP_target_* functions then set the ready flags during spawn.
+	G_InitRaceMode();
+
 	// parse the key/value pairs and spawn gentities
 	G_SpawnEntitiesFromString();
+
+	// After spawning: build defrag_route from what entities were found.
+	// Format mirrors DeFRaG's G_InitRaceMode default-path: "df[-df][-df]"
+	// DeFRaG cgame also reads this to configure the timer display layout.
+	if ( g_startTimerReady ) {
+		trap_Cvar_Set( "defrag_route", va( "df%s%s",
+		    g_stopTimerReady   ? "-df" : "",
+		    g_checkpointReady  ? "-df" : "" ) );
+	}
 
 	// general initialization
 	G_FindTeams();
@@ -524,6 +544,8 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	G_RemapTeamShaders();
 
 	trap_SetConfigstring( CS_INTERMISSION, "" );
+
+	G_Printf ("^2[oDFs] Game initialization completed successfully\n");
 }
 
 
@@ -554,17 +576,6 @@ void G_ShutdownGame( int restart ) {
 
 
 //===================================================================
-
-void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error ( errorParm_t logLevel, const char *error, ... ) {
-	va_list		argptr;
-	char		text[1024];
-
-	va_start (argptr, error);
-	Q_vsnprintf (text, sizeof(text), error, argptr);
-	va_end (argptr);
-
-	trap_Error( text );
-}
 
 void QDECL Com_Printf( const char *msg, ... ) {
 	va_list		argptr;
@@ -1792,6 +1803,55 @@ void G_RunThink (gentity_t *ent) {
 
 /*
 ================
+G_MonitorDoorStates
+
+Prints door states in binary format (0=closed, 1=open)
+Order: func_door2, func_door12, func_door14, func_door16, func_door34, func_door28, func_door30, func_door32
+================
+*/
+void G_MonitorDoorStates( void ) {
+	static int prevState = -1;
+	int doorNumbers[] = {2, 12, 14, 16, 34, 28, 30, 32};
+	char doorNames[9][16];
+	int i, j, currentState = 0;
+	gentity_t *ent;
+	char buffer[16] = "";
+
+	for (i = 0; i < 8; i++) {
+		Com_sprintf(doorNames[i], sizeof(doorNames[i]), "func_door%d", doorNumbers[i]);
+	}
+
+	for (i = 0; i < level.num_entities; i++) {
+		ent = &g_entities[i];
+
+		if (!ent->inuse || !ent->classname)
+			continue;
+
+		if (Q_stricmp(ent->classname, "func_door") != 0)
+			continue;
+
+		for (j = 0; j < 8; j++) {
+			if (ent->targetname && Q_stricmp(ent->targetname, doorNames[j]) == 0) {
+				if (ent->moverState == MOVER_POS2 || ent->moverState == MOVER_1TO2) {
+					currentState |= (1 << j);
+				}
+				break;
+			}
+		}
+	}
+
+	if (currentState != prevState) {
+		for (i = 7; i >= 0; i--) {
+			buffer[7 - i] = (currentState & (1 << i)) ? '1' : '0';
+		}
+		buffer[8] = '\0';
+		G_Printf("^3[DOORS]^7 %s\n", buffer);
+		prevState = currentState;
+	}
+}
+
+/*
+================
 G_RunFrame
 
 Advances the non-player objects in the world
@@ -1909,4 +1969,6 @@ void G_RunFrame( int levelTime ) {
 		}
 		trap_Cvar_Set("g_listEntity", "0");
 	}
+
+	G_MonitorDoorStates();
 }

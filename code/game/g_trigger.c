@@ -461,4 +461,65 @@ void SP_func_timer( gentity_t *self ) {
 	self->r.svFlags = SVF_NOCLIENT;
 }
 
+// ─── DeFRaG race timer entities ──────────────────────────────────────────────
+//
+// Three point entities placed by mappers, fired via trigger_multiple:
+//   target_startTimer  — begins the player's race timer
+//   target_stopTimer   — stops the timer and records the result
+//   target_checkpoint  — registers a mid-run checkpoint passage
+//
+// Each entity only needs a USE callback; no model or bbox is needed.
+// The g_raceTimers state machine lives in g_defrag.c.
+
+static void use_startTimer( gentity_t *self, gentity_t *other, gentity_t *activator ) {
+	if ( !g_startTimerReady ) return;
+	if ( !activator || !activator->client ) return;
+	G_StartRace( activator );
+}
+
+static void use_stopTimer( gentity_t *self, gentity_t *other, gentity_t *activator ) {
+	if ( !g_stopTimerReady ) return;
+	if ( !activator || !activator->client ) return;
+	G_StopRace( activator );
+}
+
+static void use_checkpoint( gentity_t *self, gentity_t *other, gentity_t *activator ) {
+	if ( !g_checkpointReady ) return;
+	if ( !activator || !activator->client ) return;
+	G_Checkpoint( activator, self->count );
+}
+
+/*QUAKED target_startTimer (0 0.5 0) (-8 -8 -8) (8 8 8)
+DeFRaG race timer start entity. Place as target of a trigger_multiple brush.
+When fired, starts the player's race timer.
+*/
+void SP_target_startTimer( gentity_t *ent ) {
+	ent->use          = use_startTimer;
+	g_startTimerReady = qtrue;
+	// Signal to DeFRaG cgame that a start timer exists — cgame reads this
+	// SERVERINFO cvar via trap_CvarVariableStringBuffer; "df" prefix = active.
+	trap_Cvar_Set( "df_ndm_timer_start", "df" );
+}
+
+/*QUAKED target_stopTimer (0.5 0 0) (-8 -8 -8) (8 8 8)
+DeFRaG race timer stop entity. Place as target of a trigger_multiple brush.
+When fired, stops the player's timer and broadcasts the result.
+*/
+void SP_target_stopTimer( gentity_t *ent ) {
+	ent->use         = use_stopTimer;
+	g_stopTimerReady = qtrue;
+	trap_Cvar_Set( "df_ndm_timer_stop", "df" );
+}
+
+/*QUAKED target_checkpoint (0 0 0.5) (-8 -8 -8) (8 8 8)
+DeFRaG race checkpoint. Place as target of a trigger_multiple brush.
+Each entity gets a unique index stored in ent->count.
+*/
+void SP_target_checkpoint( gentity_t *ent ) {
+	ent->use          = use_checkpoint;
+	ent->count        = g_checkpointCount++;
+	g_checkpointReady = qtrue;
+	trap_Cvar_Set( "df_ndm_timer_checkpoint", "df" );
+}
+
 

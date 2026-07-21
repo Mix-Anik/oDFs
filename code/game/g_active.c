@@ -310,6 +310,91 @@ void	G_TouchTriggers( gentity_t *ent ) {
 }
 
 /*
+================
+DeFRaG_TouchTriggers
+
+Per-frame race trigger handler matching DeFRaG func_0x1a1b2 (0x1a866 section 13).
+Called from inside Pmove outer after physics, for alive non-noclip players only.
+Handles start/stop/checkpoint zone detection for the race timer system.
+
+Key differences from G_TouchTriggers:
+- Spectators skip entirely (no teleporter exception)
+- ET_TELEPORT_TRIGGER excluded (those go through G_TouchTriggers)
+- Player touch condition: DeFRaG uses ent->field_0x1a8 & 0x8 (unknown oDFs equivalent;
+  approximated with SVF_BOT here)
+- Called BEFORE ClientEvents/trap_LinkEntity, not after
+================
+*/
+void DeFRaG_TouchTriggers( gentity_t *ent ) {
+	int			i, num;
+	int			touch[MAX_GENTITIES];
+	gentity_t	*hit;
+	trace_t		trace;
+	vec3_t		mins, maxs;
+	static vec3_t	range = { 40, 40, 52 };	// DeFRaG data segment 0x232c-0x2334
+
+	if ( !ent->client ) {
+		return;
+	}
+
+	// dead clients don't trigger race zones
+	if ( ent->client->ps.stats[STAT_HEALTH] <= 0 ) {
+		return;
+	}
+
+	VectorSubtract( ent->client->ps.origin, range, mins );
+	VectorAdd( ent->client->ps.origin, range, maxs );
+
+	num = trap_EntitiesInBox( mins, maxs, touch, MAX_GENTITIES );
+
+	// exact player bounding box for per-entity overlap test
+	VectorAdd( ent->client->ps.origin, ent->r.mins, mins );
+	VectorAdd( ent->client->ps.origin, ent->r.maxs, maxs );
+
+	for ( i = 0; i < num; i++ ) {
+		hit = &g_entities[touch[i]];
+
+		if ( !hit->touch ) {
+			continue;
+		}
+		if ( !( hit->r.contents & CONTENTS_TRIGGER ) ) {
+			continue;
+		}
+
+		// DeFRaG: spectators skip entirely — no race triggers for spectators
+		if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+			continue;
+		}
+
+		// DeFRaG: skip ET_TELEPORT_TRIGGER (eType 9) — handled by G_TouchTriggers
+		if ( hit->s.eType == ET_TELEPORT_TRIGGER ) {
+			continue;
+		}
+
+		if ( hit->s.eType == ET_ITEM ) {
+			if ( !BG_PlayerTouchesItem( &ent->client->ps, &hit->s, level.time ) ) {
+				continue;
+			}
+		} else {
+			if ( !trap_EntityContact( mins, maxs, hit ) ) {
+				continue;
+			}
+		}
+
+		memset( &trace, 0, sizeof(trace) );
+
+		if ( hit->touch ) {
+			hit->touch( hit, ent, &trace );
+		}
+
+		// DeFRaG: ent->touch called when ent->field_0x1a8 & 0x8 — exact oDFs field unknown
+		if ( ( ent->r.svFlags & SVF_BOT ) && ent->touch ) {
+			ent->touch( ent, hit, &trace );
+		}
+	}
+}
+
+/*
 =================
 SpectatorThink
 =================
@@ -863,13 +948,7 @@ void ClientThink_real( gentity_t *ent ) {
 
 	memset (&pm, 0, sizeof(pm));
 
-	// check for the hit-scan gauntlet, don't let the action
-	// go through as an attack unless it actually hits something
-	if ( client->ps.weapon == WP_GAUNTLET && !( ucmd->buttons & BUTTON_TALK ) &&
-		( ucmd->buttons & BUTTON_ATTACK ) && client->ps.weaponTime <= 0 ) {
-		pm.gauntletHit = CheckGauntletAttack( ent );
-	}
-
+	// DeFRaG: gauntletHit is always 0 — no per-frame hit detection
 	if ( ent->flags & FL_FORCE_GESTURE ) {
 		ent->flags &= ~FL_FORCE_GESTURE;
 		ent->client->pers.cmd.buttons |= BUTTON_GESTURE;
@@ -915,12 +994,20 @@ void ClientThink_real( gentity_t *ent ) {
 	}
 	pm.trace = trap_Trace;
 	pm.pointcontents = trap_PointContents;
-	pm.debugLevel = g_debugMove.integer;
-	pm.noFootsteps = ( g_dmflags.integer & DF_NO_FOOTSTEPS ) > 0;
+	pm.debugLevel = 0;		// DeFRaG: always 0
+	pm.noFootsteps = 0;		// DeFRaG: DF_NO_FOOTSTEPS not supported
 
 	pm.pmove_fixed = pmove_fixed.integer | client->pers.pmoveFixed;
 	pm.pmove_msec = pmove_msec.integer;
 	pm.obs_disabled = df_ob_killobs.integer;
+
+	// DeFRaG: pack cvar state into ps.stats[STAT_DEFRAG_FLAGS] so client prediction
+	// reads the same values as the server. Grapple/LG knockback bits left 0 until
+	// corresponding cvars are implemented.
+	client->ps.stats[STAT_DEFRAG_FLAGS] &= ~(DFLAG_OBS_DISABLED | DFLAG_GRAPPLE_MODE_1 | DFLAG_GRAPPLE_MODE_2 | DFLAG_LG_KNOCKBACK);
+	if ( df_ob_killobs.integer )
+		client->ps.stats[STAT_DEFRAG_FLAGS] |= DFLAG_OBS_DISABLED;
+
 	pm.promode     = df_promode.integer;
 
 	VectorCopy( client->ps.origin, client->oldOrigin );
@@ -967,6 +1054,15 @@ void ClientThink_real( gentity_t *ent ) {
 
 	ent->waterlevel = pm.waterlevel;
 	ent->watertype = pm.watertype;
+
+	// DeFRaG: per-frame race trigger scan and timer tick.
+	// DeFRaG_TouchTriggers fires use callbacks on race trigger entities (func_0x1a1b2).
+	// G_TimerTick advances the per-player race timer and handles state transitions (func_0x37c7).
+	if ( !ent->client->noclip ) {
+		DeFRaG_TouchTriggers( ent );
+	}
+	G_TimerTick( ent, msec );
+	G_UpdateRacePs( ent );
 
 	// execute client events
 	ClientEvents( ent, oldEventSequence );
