@@ -56,3 +56,6 @@ dkms.conf
 
 # Other
 build
+build-dll
+build-qvm
+disasm
