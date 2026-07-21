@@ -1283,7 +1283,7 @@ static void PM_GroundTrace( void ) {
 	pm->ps->groundEntityNum = trace.entityNum;
 
 	// OBS (overbounce) kill
-	if ( ((pm->ps->stats[STAT_DEFRAG_FLAGS] & DFLAG_OBS_DISABLED) || (pml.groundTrace.surfaceFlags & SURF_NOOB)) &&
+	if ( (pm->obs_disabled || (pml.groundTrace.surfaceFlags & SURF_NOOB)) &&
 	     trace.plane.normal[2] == 1.0f ) {
 		pm->ps->velocity[2] = 0;
 	}
