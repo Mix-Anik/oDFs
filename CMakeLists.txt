@@ -12,6 +12,11 @@ else()
 endif()
 
 set(GAME_SOURCES_BASE
+    # g_main.c must come first: vmMain() must be the first function in the
+    # first compiled source file, since the QVM interpreter always calls
+    # address 0 as the entry point.
+    code/game/g_main.c
+
     # Background (shared physics/items/misc — no engine calls)
     code/game/bg_misc.c
     code/game/bg_pmove.c
@@ -26,7 +31,6 @@ set(GAME_SOURCES_BASE
     code/game/g_cmds.c
     code/game/g_combat.c
     code/game/g_items.c
-    code/game/g_main.c
     code/game/g_mem.c
     code/game/g_misc.c
     code/game/g_missile.c
@@ -149,13 +153,16 @@ if(BUILD_QVM)
 
     # Build ui.qvm
     set(UI_SOURCES
+        # ui_main.c must come first: vmMain() must be the first function in
+        # the first compiled source file, since the QVM interpreter always
+        # calls address 0 as the entry point.
+        code/ui/ui_main.c
         code/game/bg_misc.c
         code/game/bg_pmove.c
         code/game/bg_slidemove.c
         code/game/bg_lib.c
         code/ui/ui_atoms.c
         code/ui/ui_gameinfo.c
-        code/ui/ui_main.c
         code/ui/ui_players.c
         code/ui/ui_shared.c
         code/qcommon/q_shared.c

@@ -1678,6 +1678,57 @@ void Cmd_SetViewpos_f( gentity_t *ent ) {
 }
 
 
+/*
+=================
+Cmd_PlacePlayer_f
+
+Cheat-only command that places the player at an exact origin, view
+angles and velocity, with no teleport knockback/hold applied.
+
+argv(1..3) x y z		- origin
+argv(4..6) p y r		- view angles
+argv(7..9) v0 v1 v2		- velocity (X Y Z)
+=================
+*/
+void Cmd_PlacePlayer_f( gentity_t *ent ) {
+	vec3_t		origin, angles, velocity;
+	char		buffer[MAX_TOKEN_CHARS];
+	int			i;
+
+	if ( !CheatsOk( ent ) ) {
+		return;
+	}
+	if ( trap_Argc() != 10 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: placeplayer x y z p y r v0 v1 v2\n\"");
+		return;
+	}
+
+	for ( i = 0 ; i < 3 ; i++ ) {
+		trap_Argv( i + 1, buffer, sizeof( buffer ) );
+		origin[i] = atof( buffer );
+	}
+	for ( i = 0 ; i < 3 ; i++ ) {
+		trap_Argv( i + 4, buffer, sizeof( buffer ) );
+		angles[i] = atof( buffer );
+	}
+	for ( i = 0 ; i < 3 ; i++ ) {
+		trap_Argv( i + 7, buffer, sizeof( buffer ) );
+		velocity[i] = atof( buffer );
+	}
+
+	// unlink to make sure it can't possibly interfere with G_KillBox
+	trap_UnlinkEntity( ent );
+
+	VectorCopy( origin, ent->client->ps.origin );
+	VectorCopy( velocity, ent->client->ps.velocity );
+	SetClientViewAngle( ent, angles );
+
+	// toggle the teleport bit so the client knows to not lerp
+	ent->client->ps.eFlags ^= EF_TELEPORT_BIT;
+
+	trap_LinkEntity( ent );
+}
+
 
 /*
 =================
@@ -1815,6 +1866,8 @@ void ClientCommand( int clientNum ) {
 		Cmd_GameCommand_f( ent );
 	else if (Q_stricmp (cmd, "setviewpos") == 0)
 		Cmd_SetViewpos_f( ent );
+	else if (Q_stricmp (cmd, "placeplayer") == 0)
+		Cmd_PlacePlayer_f( ent );
 	else if (Q_stricmp (cmd, "stats") == 0)
 		Cmd_Stats_f( ent );
 	else

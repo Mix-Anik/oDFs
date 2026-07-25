@@ -1,9 +1,12 @@
 .PHONY: qvm dll clean help
 
+QVM_PK3 := zz-defrag_vm_191_custom.pk3
+
 help:
 	@echo "Available targets:"
-	@echo "  make qvm   - Build qagame as Q3VM bytecode"
+	@echo "  make qvm   - Build qagame/cgame/ui as Q3VM bytecode and pack into $(QVM_PK3)"
 	@echo "  make dll   - Build qagame as native DLL"
+	@echo "  make test  - Build and run the testing/ standalone diagnostics"
 	@echo "  make clean - Remove build directories"
 
 qvm:
@@ -13,6 +16,8 @@ qvm:
 	@echo "Building qagame.qvm..."
 	@cmake --build build-qvm
 	@echo "✓ Built: build-qvm/vm/qagame.qvm"
+	@python3 scripts/create_pk3.py build-qvm/vm build-qvm/$(QVM_PK3)
+	@echo "✓ Packed: build-qvm/$(QVM_PK3)"
 
 dll:
 	@mkdir -p build-dll
