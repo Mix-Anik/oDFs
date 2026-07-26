@@ -306,6 +306,17 @@ struct gclient_s {
 
 	int			switchTeamTime;		// time the player switched teams
 
+	// DeFRaG "LAG CHEAT DETECTED" anti-exploit gate: level.time of the last
+	// accepted fire for each of these weapons. A new fire is blocked (without
+	// updating the timestamp) if level.time <= lastFireTime, i.e. only when
+	// the same weapon is fired more than once within the same server frame
+	// (duplicated/replayed usercmd exploit) — this is not a real cooldown.
+	// Confirmed from qagame.qvm disassembly; see disasm/G_WEAPON/WeaponFireRateLimit.md
+	int			lastBFGFireTime;
+	int			lastRocketFireTime;
+	int			lastGrenadeFireTime;
+	int			lastGrappleFireTime;
+
 	// timeResidual is used to handle events that happen every second
 	// like health / armor countdowns and regeneration
 	int			timeResidual;
@@ -519,6 +530,7 @@ gentity_t *fire_grenade (gentity_t *self, vec3_t start, vec3_t aimdir);
 gentity_t *fire_rocket (gentity_t *self, vec3_t start, vec3_t dir);
 gentity_t *fire_bfg (gentity_t *self, vec3_t start, vec3_t dir);
 gentity_t *fire_grapple (gentity_t *self, vec3_t start, vec3_t dir);
+gentity_t *fire_lg_knockback (gentity_t *self, vec3_t start, vec3_t dir);
 #ifdef MISSIONPACK
 gentity_t *fire_nail( gentity_t *self, vec3_t start, vec3_t forward, vec3_t right, vec3_t up );
 gentity_t *fire_prox( gentity_t *self, vec3_t start, vec3_t aimdir );
@@ -750,6 +762,8 @@ extern	vmCvar_t	g_localTeamPref;
 extern	vmCvar_t	df_promode;
 extern	vmCvar_t	df_ob_killobs;
 extern	vmCvar_t	df_mode;
+extern	vmCvar_t	df_hook_type;
+extern	vmCvar_t	df_lg_knockback;
 
 void	trap_Print( const char *text );
 _Noreturn void	trap_Error( const char *text );

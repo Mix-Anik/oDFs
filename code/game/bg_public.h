@@ -233,9 +233,9 @@ typedef enum {
 // Networked via playerState_t so client prediction sees the same values.
 #define STAT_DEFRAG_FLAGS       12
 #define DFLAG_OBS_DISABLED      0x200   // df_ob_KillOBs != 0 — suppress overbounce detection
-#define DFLAG_GRAPPLE_MODE_1    0x400   // grapple mode bit 1 (set by grapple cvar, not yet in oDFs)
-#define DFLAG_GRAPPLE_MODE_2    0x800   // grapple mode bit 2 (set by grapple cvar, not yet in oDFs)
-#define DFLAG_LG_KNOCKBACK      0x1000  // df_lg_Knockback != 0 — LG knockback enabled (not yet in oDFs)
+#define DFLAG_GRAPPLE_MODE_1    0x400   // df_hook_Type bit 0 — grapple swing-physics mode (0-3), see disasm/G_ACTIVE/GrappleMode.md
+#define DFLAG_GRAPPLE_MODE_2    0x800   // df_hook_Type bit 1
+#define DFLAG_LG_KNOCKBACK      0x1000  // df_lg_Knockback != 0 — LG hits spawn a splash-knockback "phantom rocket", see disasm/G_ACTIVE/LG_Knockback.md
 
 // DeFRaG per-frame input state packed into stats[13] — written in PmoveSingle (func_0x4152).
 // Client reads this each prediction frame to drive the key-indicator HUD.

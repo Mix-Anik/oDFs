@@ -137,18 +137,17 @@ velocity, but the player hears no step sounds during CPM ramp steps. Implemented
 
 ## oDFs implementation
 
-In `code/game/bg_slidemove.c`, `PM_StepSlideMove`:
+**Verified current** (`code/game/bg_slidemove.c:260-270`) — matches Defrag exactly,
+using post-SlideMove `ps->velocity[2]`:
 
 ```c
 VectorSet(up, 0, 0, 1);
 // never step up when you still have up velocity
 if ( pm->ps->velocity[2] > 0 && (trace.fraction == 1.0 ||
                                     DotProduct(trace.plane.normal, up) < 0.7)) {
-    // CPM: allow step-up when doublejump window is open and not launched too high.
-    // Use start_v[2] (pre-SlideMove) — high horizontal speed hitting a shallow ramp
-    // would otherwise amplify post-SlideMove velocity[2] past 370 and falsely block the step.
+    // CPM: allow step-up onto a ramp face mid-air when doublejump window is open
     if ( !pm->promode ||
-         start_v[2] > 370.0f ||
+         pm->ps->velocity[2] > 370.0f ||
          pm->ps->stats[STAT_DOUBLEJUMP_WINDOW] <= 0 ) {
         return;
     }
@@ -157,4 +156,7 @@ if ( pm->ps->velocity[2] > 0 && (trace.fraction == 1.0 ||
 
 `STAT_DOUBLEJUMP_WINDOW = 10` — defined in `bg_public.h`.
 
-Note: QVM uses `ps->velocity[2]` (post-SlideMove); oDFs uses `start_v[2]` (pre-SlideMove). See "oDFs deviation" section above.
+The "oDFs deviation" section above (using `start_v[2]`) describes a **past, no-longer-current**
+state — the code was reverted to `ps->velocity[2]` (matching the QVM) at some point and this
+file's implementation section was not updated to match until now. Confirmed via direct read of
+the current source, not just grep.

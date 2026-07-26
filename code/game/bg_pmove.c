@@ -763,6 +763,152 @@ static void PM_GrappleMove( void ) {
 	pml.groundPlane = qfalse;
 }
 
+static void PM_WalkMove( void );	// forward declaration — defined later in this file
+
+/*
+===================
+PM_GrappleSpeed
+
+DeFRaG df_hook_Type shared helper (func_0x7033): base grapple pull speed 800,
+boosted 1.3x under Haste. Confirmed from qagame.qvm disassembly — see
+disasm/G_ACTIVE/GrappleMode.md.
+===================
+*/
+static float PM_GrappleSpeed( void ) {
+	float speed = 800;
+	if ( pm->ps->powerups[PW_HASTE] )
+		speed *= 1.3f;
+	return speed;
+}
+
+/*
+===================
+PM_GrappleMove1
+
+DeFRaG df_hook_Type mode 1: PM_Accelerate-based smooth swing toward the raw
+grapple point (no view-offset probe), haste-aware, breaks ground contact and
+plays a jump animation when the swing pulls the player upward while grounded.
+===================
+*/
+static void PM_GrappleMove1( void ) {
+	vec3_t dir;
+	float wishspeed, dist;
+
+	wishspeed = PM_GrappleSpeed();
+
+	VectorSubtract( pm->ps->grapplePoint, pm->ps->origin, dir );
+	dist = VectorLength( dir );
+	VectorNormalize( dir );
+
+	if ( dist / 2.0f >= wishspeed ) {
+		PM_Accelerate( dir, 2.0f * dist, dist * 40.0f / wishspeed );
+	} else {
+		PM_Accelerate( dir, wishspeed, 13.0f );
+	}
+
+	if ( dir[2] > 0.5f && pml.walking ) {
+		pml.walking = qfalse;
+		PM_ForceLegsAnim( LEGS_JUMP );
+	}
+
+	pml.groundPlane = qfalse;
+}
+
+/*
+===================
+PM_GrappleMove2
+
+DeFRaG df_hook_Type mode 2: elastic/spring-like pull — the wishdir passed to
+PM_Accelerate is deliberately left un-normalized (magnitude = distance to the
+hook), so the effective pull strength scales with distance from the attachment
+point instead of staying constant like mode 1.
+===================
+*/
+static void PM_GrappleMove2( void ) {
+	vec3_t dir;
+
+	VectorSubtract( pm->ps->grapplePoint, pm->ps->origin, dir );
+	// NOTE: dir is intentionally not normalized here (confirmed from disassembly)
+	PM_Accelerate( dir, 1.0f, 5.0f );
+
+	if ( dir[2] > 0.5f && pml.walking ) {
+		pml.walking = qfalse;
+		PM_ForceLegsAnim( LEGS_JUMP );
+	}
+
+	pml.groundPlane = qfalse;
+}
+
+/*
+===================
+PM_GrappleMove3
+
+DeFRaG df_hook_Type mode 3: direct velocity-snap pull like mode 0, but
+haste-aware and aiming at a point offset by the player's eye height + 64 units
+above the raw grapple point, with pull speed ramping smoothly from 0 up to
+full speed over the first 100 units instead of mode 0's flat 10*dist.
+===================
+*/
+static void PM_GrappleMove3( void ) {
+	vec3_t probe, dir;
+	float speed, dist, finalSpeed;
+
+	speed = PM_GrappleSpeed();
+
+	VectorScale( pml.forward, -16, probe );
+	VectorAdd( pm->ps->grapplePoint, probe, probe );
+	probe[0] -= pm->ps->origin[0];
+	probe[1] -= pm->ps->origin[1];
+	probe[2] -= pm->ps->origin[2] + pm->ps->viewheight + 64.0f;
+	VectorCopy( probe, dir );
+
+	dist = VectorLength( dir );
+	VectorNormalize( dir );
+
+	finalSpeed = (dist > 100.0f) ? speed : ((speed / 100.0f) * dist);
+	VectorScale( dir, finalSpeed, pm->ps->velocity );
+
+	pml.groundPlane = qfalse;
+}
+
+/*
+===================
+PM_GrappleModeMove
+
+DeFRaG df_hook_Type dispatcher (func_0x7208): selects between the four grapple
+swing-physics modes via DFLAG_GRAPPLE_MODE_1/2 (ps.stats[STAT_DEFRAG_FLAGS]),
+then falls through to the normal walk/air move — modes 1/2 allow the swing to
+interact with ground movement if already grounded, modes 0/3 always treat the
+player as airborne while swinging. Confirmed from qagame.qvm disassembly — see
+disasm/G_ACTIVE/GrappleMode.md.
+===================
+*/
+static void PM_GrappleModeMove( void ) {
+	int mode = 0;
+
+	if ( pm->ps->stats[STAT_DEFRAG_FLAGS] & DFLAG_GRAPPLE_MODE_1 ) mode += 1;
+	if ( pm->ps->stats[STAT_DEFRAG_FLAGS] & DFLAG_GRAPPLE_MODE_2 ) mode += 2;
+
+	switch ( mode ) {
+	case 1:
+		PM_GrappleMove1();
+		if ( pml.walking ) PM_WalkMove(); else PM_AirMove();
+		break;
+	case 2:
+		PM_GrappleMove2();
+		if ( pml.walking ) PM_WalkMove(); else PM_AirMove();
+		break;
+	case 3:
+		PM_GrappleMove3();
+		PM_AirMove();
+		break;
+	default:
+		PM_GrappleMove();
+		PM_AirMove();
+		break;
+	}
+}
+
 /*
 ===================
 PM_WalkMove
@@ -2108,9 +2254,9 @@ void PmoveSingle (pmove_t *pmove) {
 		// flight powerup doesn't allow jump and has different friction
 		PM_FlyMove();
 	} else if (pm->ps->pm_flags & PMF_GRAPPLE_PULL) {
-		PM_GrappleMove();
-		// We can wiggle a bit
-		PM_AirMove();
+		// DeFRaG df_hook_Type: dispatches to one of four swing-physics modes,
+		// then falls through to walk/air move itself — see PM_GrappleModeMove.
+		PM_GrappleModeMove();
 	} else if (pm->ps->pm_flags & PMF_TIME_WATERJUMP) {
 		PM_WaterJumpMove();
 	} else if ( pm->waterlevel > 1 ) {

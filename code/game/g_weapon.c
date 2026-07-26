@@ -85,9 +85,10 @@ qboolean CheckGauntletAttack( gentity_t *ent ) {
 		return qfalse;
 	}
 
-	if ( ent->client->noclip ) {
-		return qfalse;
-	}
+	// DeFRaG removed vanilla's "ent->client->noclip -> return qfalse" guard
+	// here (confirmed absent via exhaustive instruction-level read) — a
+	// noclipping player can still deal Gauntlet melee damage. Confirmed from
+	// qagame.qvm disassembly; see disasm/G_WEAPON/CheckGauntletAttack.md
 
 	traceEnt = &g_entities[ tr.entityNum ];
 
@@ -105,7 +106,10 @@ qboolean CheckGauntletAttack( gentity_t *ent ) {
 
 	if (ent->client->ps.powerups[PW_QUAD] ) {
 		G_AddEvent( ent, EV_POWERUP_QUAD, 0 );
-		s_quadFactor = g_quadfactor.value;
+		// DeFRaG hardcodes the quad damage multiplier to 3.0 rather than
+		// reading the g_quadfactor cvar. Confirmed from qagame.qvm
+		// disassembly; see disasm/G_WEAPON/CheckGauntletAttack.md
+		s_quadFactor = 3.0f;
 	} else {
 		s_quadFactor = 1;
 	}
@@ -247,6 +251,15 @@ BFG
 void BFG_Fire ( gentity_t *ent ) {
 	gentity_t	*m;
 
+	// DeFRaG "LAG CHEAT DETECTED" anti-exploit gate: blocks firing the same
+	// weapon twice within the same server frame (duplicated/replayed usercmd).
+	// Confirmed from qagame.qvm disassembly; see disasm/G_WEAPON/WeaponFireRateLimit.md
+	if ( ent->client->lastBFGFireTime > 0 && level.time <= ent->client->lastBFGFireTime ) {
+		G_LogPrintf( "LAG CHEAT DETECTED: %s (bfg)\n", ent->client->pers.netname );
+		return;
+	}
+	ent->client->lastBFGFireTime = level.time;
+
 	m = fire_bfg (ent, muzzle, forward);
 	m->damage *= s_quadFactor;
 	m->splashDamage *= s_quadFactor;
@@ -306,10 +319,15 @@ qboolean ShotgunPellet( vec3_t start, vec3_t end, gentity_t *ent ) {
 				continue;
 			}
 #endif
+			// DeFRaG calls G_Damage before LogAccuracyHit (vanilla does the
+			// reverse). Confirmed from qagame.qvm disassembly; see
+			// disasm/G_WEAPON/ShotgunPellet.md. Behavioral consequence: a
+			// pellet that drops the target to <=0 health is NOT counted
+			// toward accuracy_hits (LogAccuracyHit sees post-damage health).
+			G_Damage( traceEnt, ent, ent, forward, tr.endpos, damage, 0, MOD_SHOTGUN);
 			if( LogAccuracyHit( traceEnt, ent ) ) {
 				hitClient = qtrue;
 			}
-			G_Damage( traceEnt, ent, ent, forward, tr.endpos, damage, 0, MOD_SHOTGUN);
 			return hitClient;
 		}
 		return qfalse;
@@ -371,6 +389,15 @@ GRENADE LAUNCHER
 void weapon_grenadelauncher_fire (gentity_t *ent) {
 	gentity_t	*m;
 
+	// DeFRaG "LAG CHEAT DETECTED" anti-exploit gate: blocks firing the same
+	// weapon twice within the same server frame (duplicated/replayed usercmd).
+	// Confirmed from qagame.qvm disassembly; see disasm/G_WEAPON/WeaponFireRateLimit.md
+	if ( ent->client->lastGrenadeFireTime > 0 && level.time <= ent->client->lastGrenadeFireTime ) {
+		G_LogPrintf( "LAG CHEAT DETECTED: %s (grenade)\n", ent->client->pers.netname );
+		return;
+	}
+	ent->client->lastGrenadeFireTime = level.time;
+
 	// extra vertical velocity
 	forward[2] += 0.2f;
 	VectorNormalize( forward );
@@ -392,6 +419,15 @@ ROCKET
 
 void Weapon_RocketLauncher_Fire (gentity_t *ent) {
 	gentity_t	*m;
+
+	// DeFRaG "LAG CHEAT DETECTED" anti-exploit gate: blocks firing the same
+	// weapon twice within the same server frame (duplicated/replayed usercmd).
+	// Confirmed from qagame.qvm disassembly; see disasm/G_WEAPON/WeaponFireRateLimit.md
+	if ( ent->client->lastRocketFireTime > 0 && level.time <= ent->client->lastRocketFireTime ) {
+		G_LogPrintf( "LAG CHEAT DETECTED: %s (rocket)\n", ent->client->pers.netname );
+		return;
+	}
+	ent->client->lastRocketFireTime = level.time;
 
 	m = fire_rocket (ent, muzzle, forward);
 	m->damage *= s_quadFactor;
@@ -567,8 +603,26 @@ GRAPPLING HOOK
 
 void Weapon_GrapplingHook_Fire (gentity_t *ent)
 {
+	vec3_t	hookForward, hookRight, hookUp, hookMuzzle;
+
+	// DeFRaG "LAG CHEAT DETECTED" anti-exploit gate: blocks firing the same
+	// weapon twice within the same server frame (duplicated/replayed usercmd).
+	// Confirmed from qagame.qvm disassembly; see disasm/G_WEAPON/WeaponFireRateLimit.md
+	if ( ent->client->lastGrappleFireTime > 0 && level.time <= ent->client->lastGrappleFireTime ) {
+		G_LogPrintf( "LAG CHEAT DETECTED: %s (grapple)\n", ent->client->pers.netname );
+		return;
+	}
+	ent->client->lastGrappleFireTime = level.time;
+
+	// DeFRaG independently recomputes aim/muzzle here using the entity's
+	// *current* origin (CalcMuzzlePoint), rather than reusing FireWeapon's
+	// CalcMuzzlePointOrigin(oldOrigin) result used for every other weapon.
+	// Confirmed from qagame.qvm disassembly; see disasm/G_WEAPON/Weapon_GrapplingHook_Fire.md
+	AngleVectors( ent->client->ps.viewangles, hookForward, hookRight, hookUp );
+	CalcMuzzlePoint( ent, hookForward, hookRight, hookUp, hookMuzzle );
+
 	if (!ent->client->fireHeld && !ent->client->hook)
-		fire_grapple (ent, muzzle, forward);
+		fire_grapple (ent, hookMuzzle, hookForward);
 
 	ent->client->fireHeld = qtrue;
 }
@@ -615,6 +669,18 @@ void Weapon_LightningFire( gentity_t *ent ) {
 	int			damage, i, passent;
 
 	damage = 8 * s_quadFactor;
+
+	// DeFRaG df_lg_Knockback: fire an invisible splash-knockback "phantom rocket"
+	// along the beam, independent of whether the hitscan trace below connects.
+	// Confirmed from qagame.qvm disassembly — see disasm/G_ACTIVE/LG_Knockback.md.
+	if ( df_lg_knockback.integer ) {
+		gentity_t *bolt;
+		vec3_t lgDir;
+
+		VectorCopy( forward, lgDir );
+		bolt = fire_lg_knockback( ent, muzzle, lgDir );
+		bolt->splashDamage *= s_quadFactor;
+	}
 
 	passent = ent->s.number;
 	for (i = 0; i < 10; i++) {
@@ -801,7 +867,10 @@ FireWeapon
 */
 void FireWeapon( gentity_t *ent ) {
 	if (ent->client->ps.powerups[PW_QUAD] ) {
-		s_quadFactor = g_quadfactor.value;
+		// DeFRaG hardcodes the quad damage multiplier to 3.0 rather than
+		// reading the g_quadfactor cvar. Confirmed from qagame.qvm
+		// disassembly; see disasm/G_WEAPON/FireWeapon.md
+		s_quadFactor = 3.0f;
 	} else {
 		s_quadFactor = 1;
 	}

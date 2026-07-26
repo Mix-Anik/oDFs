@@ -110,9 +110,9 @@ PM_WalkMove exits immediately after calling PM_AirMove on jump. The friction, Cl
 | `0x72fa–0x7323` | Build wishvel loop |
 | `0x7323–0x7336` | Normalize wishvel, multiply by scale |
 | `0x7337–0x7359` | Duck speed clamp |
-| `0x735a–0x73e5` | Acceleration (promode: 15.0, non-promode: pm_accelerate) |
-| `0x73e6–0x7413` | PM_Accelerate call |
-| `0x7414–0x741e` | PM_Accelerate call (second, uses wishspeed2 in promode) |
+| `0x735a–0x73e5` | CPM water speed clamp (waterScale/swimScale, see section above) — **not** acceleration selection, corrected from earlier mislabel |
+| `0x73e6–0x7413` | Acceleration selection (promode: 15.0 unconditional; non-promode: pm_airaccelerate if slick/knockback else pm_accelerate) |
+| `0x7414–0x741e` | The (single) PM_Accelerate call — earlier "second call" note was wrong; there is only one call here, verified against raw disassembly |
 | `0x7422–0x744e` | Gravity for slick/knockback; velocity[2] subtraction |
 | `0x7464–0x7470` | ClipVelocity velocity against ground normal |
 | `0x7477–0x7479` | VectorNormalize velocity |

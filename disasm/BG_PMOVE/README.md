@@ -44,7 +44,7 @@ Functions verified against disassembly and implemented in oDFs:
 | PM_CheckDuck | `0x7bb5` | ✅ Full match — all box constants confirmed |
 | PM_Footsteps | `0x7d06` | ✅ Full match |
 | PM_WaterEvents | `0x7e78` | ✅ Full match |
-| PM_Weapon | `0x7fb8` | ⚠️ Mostly matched — WP_GRAPPLING_HOOK guard added; gauntlet check (pm+0x2c) unresolved |
+| PM_Weapon | `0x7fb8` | ✅ Full match — WP_GRAPPLING_HOOK guard added; gauntlet check (pm+0x2c) resolved — always 0, see below |
 | PM_TorsoAnimation | `0x7f99` | ✅ Full match |
 | PM_Animate | `0x81de` | ✅ Full match |
 | PM_DropTimers | `0x8203` | ✅ Full match — doublejump countdown inline in PmoveSingle |
@@ -57,7 +57,10 @@ Functions verified against disassembly and implemented in oDFs:
 | PM_ContinueLegsAnim | `0x6617` | ✅ Full match |
 | PM_ContinueTorsoAnim | `0x6637` | ✅ Full match |
 | PM_ForceLegsAnim | `0x6657` | ✅ Full match |
-| PmoveSingle / Pmove | `0x8331` / `0x1a866` | ✅ Structure confirmed — Pmove adds pmove_msec validation (8–33) |
+| PmoveSingle / Pmove | `0x8331` / `0x1a866` | ✅ Full match — Pmove adds pmove_msec validation (8–33); all PmoveSingle call targets now identified (see below) |
+| func_0x4152 (stats[13] input bitfield) | `0x4152` | ✅ Fully decoded — non-physics, see [PmoveSingle.md](PmoveSingle.md) |
+| func_0x828d = **PM_UpdateViewAngles** | `0x828d` | ✅ Full match — one DeFRaG pm_type addition, no velocity effect |
+| func_0xa186 = **AngleVectors** | `0xa186` | ✅ Full match — generic utility, 23 call sites QVM-wide |
 
 ---
 
@@ -116,7 +119,7 @@ Functions verified against disassembly and implemented in oDFs:
 - **CPM water friction**: 0.5f in promode, 1.0f stock
 - **CPM instant weapon switch**: no weaponTime delay in promode (+200ms drop / +250ms raise skipped)
 - **WP_GRAPPLING_HOOK blocked**: BeginWeaponChange (0x7eef) returns early for weapon == 10
-- **Gauntlet check unresolved**: PM_Weapon reads `pm + 0x2c` for gauntlet check; oDFs has `gauntletHit` at pm+0x28 and `framecount` at pm+0x2c — layout difference unresolved
+- **Gauntlet check resolved**: PM_Weapon reads `pm + 0x2c` for gauntlet check; pm struct is memset to 0 every frame in `func_0x1a394` and no code path ever writes `pm+0x2c` (no `CheckGauntletAttack` call exists) — the read is always 0 regardless of which field oDFs's layout puts there, so gauntlet always fires in continuous/animation-only mode. oDFs already matches (never sets `pm.gauntletHit`). See [../G_ACTIVE/func_0x1a394.md](../G_ACTIVE/func_0x1a394.md#resolved-gauntlethit-always-0) and [PM_Weapon.md](PM_Weapon.md#gauntlet-check-0x80ec--resolved)
 - **Movement dispatch order**: FlyMove → PMF_GRAPPLE_PULL(grapple mode) → PMF_TIME_WATERJUMP(WaterJumpMove) → waterlevel>1(WaterMove) → walking(WalkMove) → AirMove — matches oDFs for cases 3–6
 - **0x74cb misidentification corrected**: is PM_DeadMove (not PM_DropTimers); 0x7544 is PM_NoclipMove (not PM_DropTimers)
 - **All physics globals confirmed**: stopspeed=100, duckScale=0.25, swimScale=0.5, accelerate=10, airaccelerate=1, wateraccelerate=4, flyaccelerate=8, friction=6, waterfriction=1, flightfriction=3, spectatorfriction=5
@@ -130,6 +133,11 @@ Functions verified against disassembly and implemented in oDFs:
 
 | Issue | Details |
 |-------|---------|
-| Gauntlet check | PM_Weapon at 0x80ec reads `pm+0x2c`; unclear if this is `framecount` (always-true) or `gauntletHit` shifted by a DeFRaG pmove_t insertion |
-| stats[12] & 0x200 origin | Where this OBS-disable bit is written per-frame has not been located |
-| func_0x2575 source file | Address 0x2575 is outside bg_pmove.c range; likely DeFRaG-specific file |
+| stats[12] & 0x200 origin | ✅ Resolved (see [../G_ACTIVE/README.md](../G_ACTIVE/README.md)) — set by func_0x426b called from func_0x421b, called from ClientThink_real |
+| func_0x2575 source file | Address 0x2575 is outside bg_pmove.c range; arg0 confirmed as `client` pointer (not `pm`) but this doesn't pin down the compilation unit; likely DeFRaG-specific file — no further evidence available, not behavior-relevant |
+| `0x828d` identity (called from PmoveSingle, step 5) | ✅ Resolved — **is `PM_UpdateViewAngles`** (prior "likely PM_SetWaterLevel" label was wrong). Full decode: [PmoveSingle.md#func_0x828d--pm_updateviewangles](PmoveSingle.md#func_0x828d--pm_updateviewangles). One confirmed DeFRaG addition: early-return gate checks pm_type-like field against two values (5 **and** 6) vs vanilla's one (5=PM_INTERMISSION); the extra type-6 case isn't named. No velocity/knockback effect. |
+| `0xa186` identity (called from PmoveSingle, step 6) | ✅ Resolved — **is `AngleVectors`** (prior "likely PM_CheckDuck" label was wrong). Full decode: [PmoveSingle.md#func_0xa186--anglevectors](PmoveSingle.md#func_0xa186--anglevectors). 23 call sites across the whole QVM. No CPM/DeFRaG modification found. |
+| `0x4152` identity (called from PmoveSingle, step 2) | ✅ Resolved — **not `PM_UpdateViewAngles`** (prior "likely" label was wrong, by position only). Builds `ps->stats[13]`, the already-documented "DeFRaG input state bitfield (non-physics)", from the signs/magnitude of `cmd.forwardmove`/`rightmove`/`upmove`. Full decode, including its two sub-calls (`func_0x4122`, `func_0x6061`=generic `abs()`): [PmoveSingle.md#func_0x4152--stats13-input-bitfield-builder](PmoveSingle.md#func_0x4152--stats13-input-bitfield-builder). One field (`pm+0x14`) and one magic constant (`64` in `func_0x4122`) remain unnamed — flagged, not guessed. Write-only, never read back in `bg_pmove.c`; no velocity/knockback effect. |
+| Step-14 call order in PmoveSingle | `PM_Weapon (0x7fb8)`, `PM_TorsoAnimation (0x7f99)`, `PM_Footsteps (0x7d06)`, `PM_WaterEvents (0x7e78)` are each individually confirmed correct (own table rows above), but their **relative call order** within PmoveSingle was never pinned down — cosmetic/non-behavioral unless call order itself matters (not expected to, each is self-contained). |
+
+Gauntlet check, stats[12]&0x200 origin, and all three previously-mislabeled `PmoveSingle` call targets (`0x828d`, `0xa186`, `0x4152`) are now resolved. Every function called from anywhere in `bg_pmove.c`'s reachable graph has been identified. Remaining open items in this table are either genuinely inert (func_0x2575's source file) or cosmetic (step-14 ordering, two unnamed minor sub-details inside `func_0x4152`/`func_0x828d` noted above) — none affect movement/velocity/knockback behavior.

@@ -1,8 +1,20 @@
 # Pmove outer — Defrag QVM disassembly analysis
 
+> **Identity clarified — this function is DeFRaG's actual `ClientThink_real`,
+> not merely a "Pmove wrapper".** See [ClientThink.md](ClientThink.md): the real
+> per-command dispatcher is `0x1ac8f` (= vanilla's `ClientThink(clientNum)`,
+> confirmed structurally), and it calls **this function** in exactly the position
+> vanilla calls `ClientThink_real(ent)`. `0x1d27b` (elsewhere mislabeled
+> "ClientThink_real") is actually `ClientSpawn` — see
+> [ClientThink_real.md](ClientThink_real.md)'s correction note. Everything decoded
+> below remains accurate; only the "Pmove wrapper" framing in the old "Called from"
+> line was incomplete.
+
 **Source file:** `D:\Other\Reverse Engineering\q3vm\qagame.dis`  
 **Function address:** `0x0001a866`  
-**Called from:** `0x1ac8f` (Pmove wrapper, called from ClientThink_real 0x1d27b)
+**Called from:** `0x1ac8f` — this **is** `ClientThink` (the real per-command
+dispatcher, called directly by the engine), not a mere "Pmove wrapper" as
+previously described. See [ClientThink.md](ClientThink.md).
 
 **Signature:** `void Pmove(gentity_t *ent)` — takes entity pointer, NOT pmove_t pointer.
 
@@ -21,11 +33,22 @@ In DeFRaG, `Pmove(gentity_t *ent)` builds the pm struct internally from entity d
 
 ```
 local104 = ent->client   (ent+0x204 = gclient_t*)
-if *(client + 0x1d4) == 2:   ; spectator with SCOREBOARD state
+if *(client + 0x1d4) != 2:
     return   ; skip Pmove entirely
+; else fall through to normal Pmove path
 ```
 
-`client + 0x1d4` = some spectator state field in gclient_t.
+**Correction:** the branch direction was previously documented backwards. The actual
+bytecode (`eq -2 0x1a877` branches to the *continue* path on match, and falls through
+to the early-return jump on mismatch — see qagame.dis:183543-183546) means Pmove
+proceeds only when the comparison is **true**, and returns early when it's **false**.
+
+`client + 0x1d4` = **`pers.connected`**, confirmed via [PickTeam.md](PickTeam.md)'s
+`TeamCount` helper (same offset, checked as `!= 0` to skip disconnected clients) —
+struct-layout-consistent since `pers.cmd` is confirmed at `client+0x1d8` (`= pers+0x4`),
+placing `connected` (`clientPersistant_t`'s first field) at `pers+0x0 = client+0x1d4`.
+So this guard is: **`if (client->pers.connected != CON_CONNECTED) return;`** — only run
+Pmove for fully-connected clients (skips CON_DISCONNECTED=0 and CON_CONNECTING=1).
 
 ### 2. Cmd pointer setup (0x1a877–0x1a879)
 
@@ -197,7 +220,7 @@ leave 0x160
 |---------|-------------|
 | `0x1a866` | Function entry |
 | `0x1a86e` | Load ent->client (ent+0x204) |
-| `0x1a873` | Spectator scoreboard check → early return 0x1ac8d |
+| `0x1a873` | `pers.connected != CON_CONNECTED` → early return 0x1ac8d (corrected; was mislabeled as a spectator-scoreboard check) |
 | `0x1a877` | local108 = client+0x1d8 = cmd pointer |
 | `0x1a880–0x1a8a9` | forwardmove/rightmove/upmove clamp to -127 |
 | `0x1a8ad` | Call func_0x2575(client) — promode flag setter |
@@ -226,11 +249,18 @@ Called from ClientThink_real (0x1d27b) with clientNum.
 
 ```
 ent = clientNum * 0x43c + 0x1b2f0   ; compute gentity_t* from clientNum
-call trap −0x25 (arg: clientNum, client+0x1d8)   ; unknown DeFRaG trap
+call trap −0x25 (arg: clientNum, client+0x1d8)   ; = trap_GetUsercmd(clientNum, &client->pers.cmd)
 *(client+0x2c4) = level.time        ; store level time to client field
 if ent->flag & 0x8: call Pmove(ent)
 else: call 0x3d7e                   ; alternate path (dead/inactive?)
 ```
+
+**Correction:** trap `-0x25` (`-37`) is `trap_GetUsercmd`, not an unknown DeFRaG trap
+(confirmed against `g_syscalls.asm`). This means **the usercmd fetch happens here**,
+inside the Pmove wrapper — not in "ClientThink" (`0x1cb0b`) the way oDFs's
+`ClientThink()` fetches it before calling `ClientThink_real()`. See
+[README.md](README.md#clientthink--g_runclient-investigation) for what this implies
+about `0x1cb0b`'s actual structure.
 
 `0x43c` = sizeof(gentity_t) in DeFRaG.  
 `0x1b2f0` = base address of g_entities array.

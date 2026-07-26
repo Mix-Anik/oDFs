@@ -106,13 +106,19 @@ the numeric result for the specific test case that prompted the investigation.
   function. See
   [G_MISSILE/G_MissileImpact.md](../G_MISSILE/G_MissileImpact.md).
 
-### Still unresolved / not pursued
+### Resolved (later pass)
 
-- `gclient_t + 0xd0` — an unidentified per-client field used to scale incoming
-  damage by `field/100` for non-self damage. Purpose unconfirmed; does not
-  affect self-splash knockback (explicitly skipped when `attacker == targ`).
-- `G_RunMissile` — grepped for the `df_promode` cache address (zero matches);
-  not otherwise instruction-decoded.
+- `G_RunMissile` — **fully decoded** in a later pass (this row was stale): no
+  `df_promode` reference, no knockback/velocity involvement. See
+  [../G_MISSILE/G_RunMissile.md](../G_MISSILE/G_RunMissile.md).
+
+- `gclient_t + 0xd0` — **is `ps.stats[STAT_MAX_HEALTH]`** (the handicap value,
+  1-100). Confirmed via the `stats[n]=0xb8+4n` offset formula and by tracing
+  `ClientUserinfoChanged`'s handicap-parsing/clamping code writing it. This is
+  **vanilla Q3's own** "reduce damage by attacker's handicap unless rocket
+  jumping" mechanic (`attacker != targ` guard), not a DeFRaG addition — oDFs
+  already has this exact code (`g_combat.c:856-866`). See
+  [G_Damage.md](G_Damage.md#2-damage-scale-by-attacker-stat-block-0x201e90x20230--resolved-is-vanilla).
 
 ## Pass 2: whole-QVM `ps.velocity` write sweep (see RocketJump_ExtraVelocity_Search_Pass2.md)
 

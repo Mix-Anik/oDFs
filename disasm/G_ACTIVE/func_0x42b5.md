@@ -58,3 +58,8 @@ when the picked-up weapon is `WP_GRAPPLING_HOOK` (0xa). Fully decoded,
 confirmed to contain zero floating-point instructions and zero references to
 `ps.velocity` or the `df_promode` cache — unrelated to knockback/velocity. See
 [func_0x20d2d.md](func_0x20d2d.md).
+
+**Consumer fully decoded — see [GrappleMode.md](GrappleMode.md).** The
+`DFLAG_GRAPPLE_MODE_1`/`_2` bits this function sets select between four structurally
+distinct grapple-swing physics implementations (`func_0x6f7c`/`0x711b`/`0x71a7`/`0x704a`),
+dispatched from `func_0x7208` while `PMF_GRAPPLE_PULL` is active.

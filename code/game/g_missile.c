@@ -46,7 +46,10 @@ void G_BounceMissile( gentity_t *ent, trace_t *trace ) {
 		// check for stop
 		if ( trace->plane.normal[2] > 0.2 && VectorLength( ent->s.pos.trDelta ) < 40 ) {
 			G_SetOrigin( ent, trace->endpos );
-			ent->s.time = level.time / 4;
+			// DeFRaG's compiled G_BounceMissile omits this vanilla write.
+			// Confirmed absent from qagame.qvm disassembly; see
+			// disasm/G_MISSILE/G_BounceMissile.md
+			// ent->s.time = level.time / 4;
 			return;
 		}
 	}
@@ -549,8 +552,13 @@ gentity_t *fire_plasma (gentity_t *self, vec3_t start, vec3_t dir) {
 
 	VectorCopy (start, bolt->r.currentOrigin);
 
+	// DeFRaG: sets s.clientNum to the shooter's entity number on missiles
+	// (vanilla never does this). Confirmed from qagame.qvm disassembly;
+	// downstream purpose (e.g. a cgame-side effect) unconfirmed.
+	bolt->s.clientNum = self->s.number;
+
 	return bolt;
-}	
+}
 
 //=============================================================================
 
@@ -591,6 +599,11 @@ gentity_t *fire_grenade (gentity_t *self, vec3_t start, vec3_t dir) {
 
 	VectorCopy (start, bolt->r.currentOrigin);
 
+	// DeFRaG: sets s.clientNum to the shooter's entity number on missiles
+	// (vanilla never does this). Confirmed from qagame.qvm disassembly;
+	// downstream purpose (e.g. a cgame-side effect) unconfirmed.
+	bolt->s.clientNum = self->s.number;
+
 	return bolt;
 }
 
@@ -630,6 +643,11 @@ gentity_t *fire_bfg (gentity_t *self, vec3_t start, vec3_t dir) {
 	VectorScale( dir, 2000, bolt->s.pos.trDelta );
 	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
 	VectorCopy (start, bolt->r.currentOrigin);
+
+	// DeFRaG: sets s.clientNum to the shooter's entity number on missiles
+	// (vanilla never does this). Confirmed from qagame.qvm disassembly;
+	// downstream purpose (e.g. a cgame-side effect) unconfirmed.
+	bolt->s.clientNum = self->s.number;
 
 	return bolt;
 }
@@ -676,6 +694,56 @@ gentity_t *fire_rocket (gentity_t *self, vec3_t start, vec3_t dir) {
 	}
 	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
 	VectorCopy (start, bolt->r.currentOrigin);
+
+	// DeFRaG: sets s.clientNum to the shooter's entity number on missiles
+	// (vanilla never does this). Confirmed from qagame.qvm disassembly;
+	// downstream purpose (e.g. a cgame-side effect) unconfirmed.
+	bolt->s.clientNum = self->s.number;
+
+	return bolt;
+}
+
+/*
+=================
+fire_lg_knockback
+
+DeFRaG df_lg_Knockback: spawns an invisible, zero-direct-damage "phantom rocket"
+along the Lightning Gun beam so LG hits also detonate through the normal
+rocket-style splash-damage/knockback pipeline (G_RunMissile -> G_MissileImpact ->
+G_ExplodeMissile -> G_RadiusDamage). Confirmed from qagame.qvm disassembly
+(func_0x22880, called from func_0x291f4 when DFLAG_LG_KNOCKBACK is set) — see
+disasm/G_ACTIVE/LG_Knockback.md. classname is literally "rocket" in the original
+QVM so it takes the normal (non-grapple-special-case) impact path.
+=================
+*/
+gentity_t *fire_lg_knockback (gentity_t *self, vec3_t start, vec3_t dir) {
+	gentity_t	*bolt;
+
+	VectorNormalize (dir);
+
+	bolt = G_Spawn();
+	bolt->classname = "rocket";
+	bolt->nextthink = level.time + 10;
+	bolt->think = G_FreeEntity;
+	bolt->s.eType = ET_MISSILE;
+	bolt->r.svFlags = SVF_USE_CURRENT_ORIGIN;
+	bolt->s.weapon = WP_LIGHTNING;
+	bolt->r.ownerNum = self->s.number;
+	bolt->parent = self;
+	bolt->damage = 0;
+	bolt->splashDamage = 45;	// caller scales by s_quadFactor, matching fire_nail/fire_prox's pattern
+	bolt->splashRadius = 46;
+	bolt->methodOfDeath = MOD_LIGHTNING;
+	bolt->clipmask = MASK_SHOT;
+	bolt->target_ent = NULL;
+
+	bolt->s.pos.trType = TR_LINEAR;
+	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;
+	bolt->s.otherEntityNum = self->s.number;
+	VectorCopy( start, bolt->s.pos.trBase );
+	VectorScale( dir, 10000, bolt->s.pos.trDelta );	// confirmed constant (0x461c4000) — fast enough to reach the beam's hit point almost instantly
+	SnapVector( bolt->s.pos.trDelta );
+	VectorCopy( start, bolt->r.currentOrigin );
 
 	return bolt;
 }

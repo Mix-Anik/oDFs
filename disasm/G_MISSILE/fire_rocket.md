@@ -152,6 +152,32 @@ bolt->r.currentOrigin)`.
 
 ---
 
+## Addendum — the `+49` delta decomposes into a common `+9` and a rocket-specific `+40`
+
+A later pass decoding the sibling functions `fire_plasma`/`fire_grenade`/
+`fire_bfg` (see [fire_plasma.md](fire_plasma.md),
+[fire_grenade.md](fire_grenade.md), [fire_bfg.md](fire_bfg.md)) found that
+**`fire_rocket` also contains the same 8-instruction unconditional write**
+found in all three siblings, at `0x2286a`–`0x22871` (right after
+`VectorCopy(start, bolt->r.currentOrigin)` and before `return bolt`):
+
+```c
+bolt->s.clientNum = self->s.number;   // NOT present in vanilla
+```
+
+This was not called out separately in the original analysis above (it isn't
+damage/knockback-relevant, so the re-verification pass correctly noted "no
+subsequent write to damage/splashDamage/splashRadius" without flagging this
+unrelated field). It means `fire_rocket`'s `+49`-instruction delta vs vanilla
+cleanly decomposes as: **+9 for this common `clientNum` write** (shared by
+all four `fire_*` spawners) **+ ~40 for the rocket-specific `df_promode`
+speed branch** described above. The `clientNum` write is unconditional (no
+`df_promode` or other gating) in all four functions, and its downstream
+purpose is not confirmed — see [G_MISSILE/README.md](README.md) for the
+cross-function summary.
+
+---
+
 ## oDFs implementation notes
 
 **Confirmed difference — FIXED.** oDFs's `fire_rocket`
@@ -168,3 +194,6 @@ if ( df_promode.integer ) {
 
 `damage = 100`, `splashDamage = 100`, `splashRadius = 120` were already correct
 in oDFs and required no change.
+
+**Also implemented** (this pass, matching `fire_plasma`/`fire_grenade`/`fire_bfg`):
+`bolt->s.clientNum = self->s.number;` added right before `return bolt;`.

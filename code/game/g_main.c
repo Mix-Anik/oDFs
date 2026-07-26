@@ -86,6 +86,8 @@ vmCvar_t	g_localTeamPref;
 vmCvar_t	df_promode;
 vmCvar_t	df_ob_killobs;
 vmCvar_t	df_mode;
+vmCvar_t	df_hook_type;
+vmCvar_t	df_lg_knockback;
 #ifdef MISSIONPACK
 vmCvar_t	g_obeliskHealth;
 vmCvar_t	g_obeliskRegenPeriod;
@@ -191,6 +193,8 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &df_promode,    	"df_promode",    	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_ob_killobs, 	"df_ob_killobs", 	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_mode,       	"df_mode",       	"1",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
+	{ &df_hook_type,  	"df_hook_Type",  	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
+	{ &df_lg_knockback,	"df_lg_Knockback",	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ NULL, 			"defrag_mode",     		"-1",   	CVAR_SERVERINFO, 0, qfalse },
 	{ NULL, 			"defrag_flags",    		"2",    	CVAR_SERVERINFO, 0, qfalse },
 	{ NULL, 			"defrag_gametype", 		"1",    	CVAR_SERVERINFO, 0, qfalse },

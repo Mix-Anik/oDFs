@@ -232,21 +232,37 @@ is `0` in any normal live game and has **no effect on knockback magnitude**.
 Ruled out as a source of the reported knockback discrepancy. Not present in
 vanilla `G_Damage`. Not implemented in oDFs (no confirmed gameplay effect).
 
-### 2. Damage-scale-by-attacker-stat block (`0x201e9`–`0x20230`)
+### 2. Damage-scale-by-attacker-stat block (`0x201e9`–`0x20230`) — RESOLVED, is vanilla
 
 ```
 if (attacker->client != NULL && attacker != targ):
-    scale = attacker->client_ptr + 0xd0        ; unidentified per-client field
+    scale = attacker->client_ptr + 0xd0        ; = ps.stats[STAT_MAX_HEALTH]
     damage = damage * scale / 100
 ```
 
-Another DeFRaG-only addition: scales incoming `damage` by a percentage stored at
-`gclient_t + 0xd0` (offset not in the confirmed struct table — **unknown
-field**), but **only when `attacker != targ`**, i.e. it is skipped entirely for
-self-damage. This means rocket-jump self-splash damage is **not** affected by
-this multiplier — noted for completeness, out of scope for the knockback
-question. Not implemented in oDFs (unknown field, no confirmed purpose — left
-unmodified per CRITICAL RULE).
+**`gclient_t+0xd0` = `ps.stats[STAT_MAX_HEALTH]` (index 6), confirmed by two
+independent lines of evidence:**
+1. **Arithmetic**: the already-confirmed `stats[n] = 0xb8 + 4n` formula (verified
+   independently at `n=7,10,11,12,13`) gives `stats[6] = 0xd0` exactly.
+2. **Data flow, traced in full**: `ClientUserinfoChanged` (`0x1ccdf`) parses the
+   `"handicap"` userinfo key (string literal `0x7fe3`), clamps it to `[1,100]`
+   (`0x1ce8b`-`0x1ce95`: `<1 → 100`, `>100 → 100`), stores the clamped value at
+   `client+0x224`, then copies `client+0x224` → `client+0xd0` (`0x1ce96`-`0x1ce9f`)
+   — this is vanilla's `client->pers.maxHealth` → `client->ps.stats[STAT_MAX_HEALTH]`
+   assignment, byte-for-byte. Independently, `ClientSpawn` (`0x1d27b`, see
+   [../G_ACTIVE/ClientRespawn.md](../G_ACTIVE/ClientRespawn.md)) sets
+   `ent->health` (`ent+0x2dc`, already confirmed) from this same `client+0xd0`
+   field when no userinfo `"health"` override is present — exactly vanilla's
+   `ent->health = client->ps.stats[STAT_MAX_HEALTH]`.
+
+**This is NOT a DeFRaG-specific addition — it is vanilla Q3's own "reduce
+damage by the attacker's handicap value unless they are rocket jumping" block**
+(the exact vanilla comment, confirming this by construction: `attacker != targ`
+excludes rocket-jump self-splash from the scale, matching the DeFRaG behavior
+observed). **oDFs already has this exact code**
+([g_combat.c:856-866](../../code/game/g_combat.c#L856)) — no change needed.
+Previous revisions of this doc incorrectly flagged this as an "unidentified
+field... not implemented in oDFs"; that was wrong on both counts.
 
 ### 3. `dir` normalization / DAMAGE_NO_KNOCKBACK setup (`0x20230`–`0x20263`)
 
@@ -405,9 +421,8 @@ not the *value itself* (still 1000) for that specific test. It is nonetheless
 an important correction for the general case (any oDFs server admin who sets a
 non-default `g_knockback` with `sv_cheats 0` would see DeFRaG silently ignore
 it and use 1000 — oDFs currently does not replicate this cheat-gating and
-would honor the custom value). Not implemented in oDFs pending a decision on
-whether to replicate the cheat-gating (out of scope for this pass — flagged
-for follow-up).
+would honor the custom value). **Implemented in oDFs** — see the "oDFs
+implementation notes" section below.
 
 ### `func_0x1b675` — generic "cvar as float" helper (RESOLVED)
 
@@ -469,7 +484,7 @@ Confirmed **not** relevant to knockback magnitude — it only ever clamps
 | `0x1317c4` | `df_promode` cvar cache (confirmed, matches README) |
 | `0x132660` | Debug/developer flags bitmask — **fully traced (8 sites), resolved** this pass (see section 1 above); no effect on knockback |
 | `0x132100` | **NEW this pass** — cached `sv_cheats` integer (confirmed via cvar name string bytes at its writer, `0x3d7e`) |
-| `gclient_t + 0xd0` | Unknown per-client field; used as a `damage *= field/100` scale for non-self damage — **unconfirmed purpose** |
+| `gclient_t + 0xd0` | **Resolved: `ps.stats[STAT_MAX_HEALTH]`** (handicap value, 1-100). Used as a `damage *= field/100` scale for non-self damage — this is vanilla Q3's own handicap-damage mechanic, already present in oDFs |
 
 ---
 
@@ -488,15 +503,18 @@ if ( df_promode.integer && targ == attacker && mod == MOD_ROCKET_SPLASH ) {
 placed immediately before the existing `VectorScale (dir, g_knockback.value *
 (float)knockback / mass, kvel);` line, matching the disassembled order (scale
 `dir` in place before it feeds into the shared knockback formula). `mass = 200`
-and the `g_knockback.value` cvar read were already correct in oDFs and required
-no change.
+was already correct in oDFs and required no change.
+
+**Also implemented — `sv_cheats`-gated `g_knockback` (`func_0x3ec7`):**
+```c
+VectorScale (dir, ( g_cheats.integer ? g_knockback.value : 1000.0f ) * (float)knockback / mass, kvel);
+```
+replacing the bare `g_knockback.value` read. `g_cheats` was already declared in
+oDFs (maps to the `sv_cheats` cvar) — no new cvar needed.
 
 **Not implemented (deliberately, per CRITICAL RULE):**
 - The entity-pointer validation block gated by global `0x132660` (section 1) —
   purpose unconfirmed, likely a defensive/debug check with no gameplay effect.
-- The `gclient_t+0xd0` damage-scale-by-attacker-stat block (section 2) — field
-  identity unconfirmed; also does not apply to self-damage so it's irrelevant to
-  the rocket-jump knockback question regardless.
 - The `pm_flags |= 0x40` value: oDFs's `bg_public.h` already defines
   `PMF_TIME_KNOCKBACK` as `64` (`0x40`), which **matches DeFRaG exactly** (not
   vanilla Q3's `0x8`) — no change needed here, this was already correct.

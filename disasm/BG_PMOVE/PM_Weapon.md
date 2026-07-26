@@ -104,17 +104,22 @@ No promode modification to fire delay. ✓
 
 ---
 
-## Gauntlet check (0x80ec) — uncertain
+## Gauntlet check (0x80ec) — resolved
 
 At 0x80ec: loads `*(pm + 0x2c)` and checks `!= 0` (branch to TORSO_ATTACK2 vs WEAPON_READY+return).
 
-In oDFs, `pm + 0x2c = pm->framecount` (always > 0 after first frame), while `pm->gauntletHit` is at `pm + 0x28`. The disasm never accesses `pm + 0x28` in PM_Weapon.
+**Resolved via [../G_ACTIVE/func_0x1a394.md](../G_ACTIVE/func_0x1a394.md#resolved-gauntlethit-always-0):**
+the pm struct is `memset(pm, 0, 0xec)` at the top of every frame in `func_0x1a394` (the pm-struct
+builder called from Pmove outer), and no DeFRaG code path ever writes to `pm+0x2c` afterward — there
+is no `CheckGauntletAttack` call anywhere in the QVM. So regardless of which field actually lives at
+`pm+0x2c` (whichever of oDFs's `gauntletHit`/`framecount` DeFRaG's layout puts there), the read is
+**always 0**. Gauntlet therefore always drops into the `weaponTime=0, weaponstate=WEAPON_READY, return`
+branch instead of firing — i.e. it fires in continuous/animation-only mode with no per-frame hit
+detection, matching Q3's "gauntlet only fires when it actually hits something" being permanently false.
 
-**Two interpretations:**
-- If Defrag's pmove_t is identical to Q3's: checking `framecount` (always true) = gauntlet always fires.
-- If Defrag inserted a field at pm+0x28, shifting `gauntletHit` to pm+0x2c: behavior unchanged from Q3.
-
-**Not yet resolved.** Would require DeFRaG source or checking whether `pm + 0x28` is set from game-side code before Pmove is called.
+oDFs already matches this: `g_active.c` never calls `CheckGauntletAttack`/sets `pm.gauntletHit`
+(memset default `qfalse`), so `bg_pmove.c`'s `if (!pm->gauntletHit)` guard at PM_Weapon always takes
+the same early-return path DeFRaG does. No code change needed — this was fixed in a prior pass.
 
 ---
 

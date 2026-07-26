@@ -18,23 +18,27 @@ For general disassembly methodology, struct layouts, and global addresses see [.
 
 | Function | Address | Status |
 |----------|---------|--------|
-| Pmove outer (+ ClientEndFrame merged) | `0x1a866` | ✅ Analyzed — see [Pmove_outer.md](Pmove_outer.md) |
+| **`ClientThink_real`** (was "Pmove outer") | `0x1a866` | ✅ Analyzed — see [Pmove_outer.md](Pmove_outer.md); identity corrected, see [ClientThink.md](ClientThink.md). The real `ClientEndFrame` is a separate function, `0x1adc9` — see below; the "ClientEndFrame merged into Pmove outer" claim in this file's Unresolved table is superseded, though `0x1a866` may still contain its own P_WorldEffects-shaped call (`0x1ab6a`) independent of the per-server-frame `ClientEndFrame` — not reconciled this pass. |
+| **`ClientThink`** (real per-command dispatcher) | `0x1ac8f` | ✅ Resolved this pass — see [ClientThink.md](ClientThink.md) |
 | func_0x1a394 (pm struct builder) | `0x1a394` | ✅ Analyzed — see [func_0x1a394.md](func_0x1a394.md) |
 | func_0x1a1b2 (touch trigger handler) | `0x1a1b2` | ✅ Analyzed — see [func_0x1a1b2.md](func_0x1a1b2.md) |
 | P_WorldEffects | `0x19f04` | ✅ Analyzed — see [P_WorldEffects.md](P_WorldEffects.md) |
-| ClientThink_real | `0x1d27b` | ✅ Substantially analyzed — see [ClientThink_real.md](ClientThink_real.md) |
+| **`ClientSpawn`** (was misidentified as "ClientThink_real") | `0x1d27b` | ✅ Substantially analyzed — see [ClientThink_real.md](ClientThink_real.md) (identity corrected — this is `ClientSpawn`, see [ClientThink.md](ClientThink.md)) |
 | func_0x4152 (DeFRaG input state tracker) | `0x4152` | ✅ Analyzed — see [func_0x4152.md](func_0x4152.md) |
 | func_0x421b (per-frame ps flags updater) | `0x421b` | ✅ Analyzed — see [func_0x421b.md](func_0x421b.md) |
 | func_0x426b (SetOBS) | `0x426b` | ✅ Analyzed — see [func_0x426b.md](func_0x426b.md) |
-| func_0x42b5 (SetGrappleMode) | `0x42b5` | ✅ Analyzed — see [func_0x42b5.md](func_0x42b5.md) |
-| func_0x4290 (SetLGKnockback) | `0x4290` | ✅ Analyzed — see [func_0x4290.md](func_0x4290.md) |
-| Pmove wrapper | `0x1ac8f` | ✅ Analyzed (inline in Pmove_outer.md) |
+| func_0x42b5 (SetGrappleMode) | `0x42b5` | ✅ Analyzed — see [func_0x42b5.md](func_0x42b5.md); consumer fully decoded, see [GrappleMode.md](GrappleMode.md) |
+| func_0x4290 (SetLGKnockback) | `0x4290` | ✅ Analyzed — see [func_0x4290.md](func_0x4290.md); consumer fully decoded, see [LG_Knockback.md](LG_Knockback.md) |
 | Spectator Pmove wrapper | `0x1accd` | ✅ Analyzed (inline in Pmove_outer.md) |
 | func_0x1a44a (inactivity kick handler) | `0x1a44a` | ✅ Analyzed — see [func_0x1a44a.md](func_0x1a44a.md) |
-| SpectatorThink / follow loop | `0x1adc9` | 🔍 Identified only |
-| G_TouchTriggers | `0x1bda5` | 🔍 Identified — iterates trigger list |
-| ClientThink | `0x1cb0b` | 🔍 Identified — calls 0x1c937 (cmd fetch) then ClientThink_real |
-| G_RunClient | `0x1cbbd` area | 🔍 Identified — synchronous client runner |
+| **`ClientEndFrame`** (was "SpectatorThink / follow loop") | `0x1adc9` | ✅ Resolved this pass — see [ClientEndFrame.md](ClientEndFrame.md) |
+| **`SpectatorClientEndFrame`** | `func_0x1acf4` | ✅ Resolved this pass — see [ClientEndFrame.md](ClientEndFrame.md) |
+| G_TouchTriggers | ⚠️ **`0x1bda5` was wrong; correction below** | The old label is incorrect — `0x1bda5` is a tiny 16-entry table-clear loop with no `EntitiesInBox`/trigger-touch content at all. **Correction (later pass): `0x1a223` is NOT an "unrelated debug utility"** as this row previously stated — it's the `trap_EntitiesInBox` call inside `func_0x1a1b2`, which was independently and thoroughly decoded in [func_0x1a1b2.md](func_0x1a1b2.md) (missed here because this row's earlier pass only checked the trap call site itself, not its enclosing function). `func_0x1a1b2`'s box-construction is byte-for-byte vanilla `G_TouchTriggers` (range vector `{40.0, 40.0, 52.0}` around `ps.origin`, `EntitiesInBox(mins,maxs,touch,MAX_GENTITIES)`), but it also applies extra exclusion filters (`eType==9`/teleporter, an entity-flag bit `0x40000000`) that `func_0x1a1b2.md` interprets as scoping it to **race triggers only** — already implemented in oDFs as `DeFRaG_TouchTriggers` (`g_active.c`). `func_0x1a1b2` explicitly excludes `eType==9` (`ET_TELEPORT_TRIGGER`) — so it structurally cannot be the only trigger scanner (teleporters/items must be touched somewhere), supporting oDFs's existing two-function split (generic `G_TouchTriggers` + race-only `DeFRaG_TouchTriggers`) as the right shape. The actual DeFRaG address for the generic scanner was **not re-located this pass** — `0x23158` (candidate, `SpectatorThink`-embedded) and `0x285b2` (unexamined) remain open per `func_0x1a1b2.md`. Not behavior-relevant to movement/knockback either way. |
+| ClientRespawn | `0x1cb0b` | ✅ Confirmed — **corrects prior wrong guess of "ClientThink"**, see [ClientRespawn.md](ClientRespawn.md) |
+| CopyToBodyQue | `func_0x1c937` | ✅ Strong match — **corrects prior wrong guess of "cmd fetch"**, see [ClientRespawn.md](ClientRespawn.md) |
+| ClientBegin | `0x1d18b` | ✅ Confirmed via debug strings — see [ClientRespawn.md](ClientRespawn.md) |
+| TeamCount | `0x1cb3b` | ✅ Confirmed — see [PickTeam.md](PickTeam.md) |
+| PickTeam | `0x1cbbd` | ✅ Confirmed — **corrects prior wrong guess of "G_RunClient"**, see [PickTeam.md](PickTeam.md) |
 
 ---
 
@@ -44,7 +48,7 @@ For general disassembly methodology, struct layouts, and global addresses see [.
 
 - **pm is a static global**: `0x132900` permanently holds a pointer to the pm struct. It is never reassigned. PmoveSingle stores this pointer at function entry (`*(0x132900) = arg0`).
 - **`Pmove` takes `gentity_t*`**: DeFRaG's `Pmove(0x1a866)` takes an entity pointer, not a pmove_t pointer. All pm struct setup is done inside Pmove outer and func_0x1a394.
-- **Pmove call chain**: `ClientThink_real (0x1d27b)` → `Pmove wrapper (0x1ac8f)` → `Pmove outer (0x1a866)` → `func_0x1a394` → `subdivision loop (0x8653)` → `PmoveSingle (0x8331)`
+- **Corrected call chain** (see [ClientThink.md](ClientThink.md)): `ClientThink (0x1ac8f)` → `ClientThink_real (0x1a866, "Pmove outer")` → `func_0x1a394` → `subdivision loop (0x8653)` → `PmoveSingle (0x8331)`. Separately, `ClientSpawn (0x1d27b)` (called from `ClientBegin`/`ClientRespawn`) ends by calling `ClientThink (0x1ac8f)` for an immediate post-spawn think cycle.
 
 ### pm struct setup (func_0x1a394)
 
@@ -123,9 +127,11 @@ DeFRaG's pm struct offsets shift watertype/waterlevel/xyspeed by +8 compared to 
 | client+0x2c0 | client->noclip (DeFRaG per-client flag) |
 | client+0x340 | client->airOutTime |
 | client+0x378 | client->pain_debounce_time |
+| client+0x1d4 | client->pers.connected (int: DISCONNECTED=0/CONNECTING=1/CONNECTED=2) — confirmed via [PickTeam.md](PickTeam.md) |
 | client+0x1d8 | client->pers.cmd (usercmd_t) |
 | client+0x2ec | Previous-frame velocity (vec3, saved after each Pmove) |
 | client+0x284 | sess.sessionTeam (3 = TEAM_SPECTATOR) |
+| `0x12a308` | level.maxclients — confirmed via [PickTeam.md](PickTeam.md)'s `TeamCount` loop bound |
 | ent+0x4 | s.eType (entity state type field) |
 | ent+0x1a8 | entity flags (bit 0x8 = player has active touch function) |
 | ent+0x1cc | entity flags (bit 0x40000000 = excluded from race trigger check) |
@@ -138,12 +144,64 @@ DeFRaG's pm struct offsets shift watertype/waterlevel/xyspeed by +8 compared to 
 
 ---
 
+## ClientThink / G_RunClient investigation
+
+Went looking for oDFs's `ClientThink(clientNum)` / `G_RunClient(ent)` equivalents to
+close out plumbing feeding `usercmd_t` into Pmove. This turned into a larger
+correction pass — full details and evidence in [ClientRespawn.md](ClientRespawn.md)
+and [PickTeam.md](PickTeam.md). Summary of what changed:
+
+- **`0x1cbbd` is not `G_RunClient`** — it's **`PickTeam`** (team-balance autojoin
+  helper), and its helper `0x1cb3b` is **`TeamCount`** — both structurally identical
+  to vanilla Q3's `g_utils.c`.
+- **`0x1cb0b` is not "ClientThink"** — it's **`ClientRespawn`**, called from two sites
+  *inside Pmove outer* (gated on `health <= 0`), matching oDFs's forcerespawn-timer
+  and attack/use-button respawn logic exactly. This is DeFRaG relocating
+  `ClientThink_real`'s dead-player-respawn block into Pmove outer — the same pattern
+  already seen with `ClientEndFrame` being absorbed into Pmove outer.
+- **`func_0x1c937` is not "cmd fetch"** — it's a strong structural match for
+  **`CopyToBodyQue`** (spawns the corpse into an 8-slot body-queue pool, matching
+  vanilla's `BODY_QUEUE_SIZE = 8` exactly).
+- **`0x1d18b` is `ClientBegin`**, confirmed via two decoded debug strings
+  (`"ClientBegin: %i"`, `"%s entered the game."`) and the classic
+  eFlags-preserving `ps` memset idiom. It calls `0x1d27b` exactly where vanilla
+  calls `ClientSpawn`.
+- **Real usercmd fetch happens in the Pmove wrapper** (`0x1ac8f`, trap `-0x25` =
+  `trap_GetUsercmd`, previously mislabeled "unknown DeFRaG trap") — not in
+  `0x1cb0b`/`ClientRespawn` as originally guessed. This means DeFRaG's usercmd
+  fetch happens deep inside whatever `0x1d27b` is, not in a `ClientThink()`-shaped
+  wrapper the way oDFs does it.
+- **Resolved (later pass):** `0x1d27b` (documented at length as `ClientThink_real`)
+  is actually **`ClientSpawn`** — its only two callers (`ClientBegin`,
+  `ClientRespawn`) are both spawn-related, and it finishes by calling the real
+  `ClientThink` (`0x1ac8f`) as an immediate post-spawn think cycle, rather than being
+  a merge of the two functions. See [ClientThink.md](ClientThink.md).
+- **Resolved (later pass): the real per-command `ClientThink` dispatcher is
+  `0x1ac8f`** — structurally an exact match for vanilla's `ClientThink(clientNum)`
+  (`trap_GetUsercmd`, `lastCmdTime`, bot/synchronous-clients gate), called directly
+  by the engine (shown as caller `0x0` in the disassembly, i.e. outside the QVM via
+  `vmMain`'s `GAME_CLIENT_THINK`). It calls `0x1a866` — meaning **"Pmove outer" is
+  actually DeFRaG's `ClientThink_real`**, not merely a Pmove wrapper. See
+  [ClientThink.md](ClientThink.md) for the full corrected call graph.
+- Also fixed two pre-existing doc bugs found along the way: Pmove outer's entry
+  guard had its branch direction backwards (see
+  [Pmove_outer.md](Pmove_outer.md#1-initialization-0x1a8660x1a876), now confirmed
+  to be a `pers.connected == CON_CONNECTED` check), and trap `-0x25` in the Pmove
+  wrapper was mislabeled "unknown" when it's `trap_GetUsercmd`.
+
+---
+
 ## Unresolved
 
 | Issue | Details |
 |-------|---------|
 | stats[12] & 0x200 origin | ✅ Resolved — set by func_0x426b called from func_0x421b, called from ClientThink_real; implemented in g_active.c |
-| gauntletHit PM_Weapon check | pm+0x2c: whether it's shifted gauntletHit or framecount — always 0 either way |
+| gauntletHit PM_Weapon check | ✅ Resolved — always 0 (pm struct memset every frame, never written); see [func_0x1a394.md](func_0x1a394.md#resolved-gauntlethit-always-0) |
 | ClientEvents address | 0x273f → calls 0x3a5f(client) → clears 32 bytes of per-client array at 0x1318dc; purpose unclear (DeFRaG-specific?) |
-| ClientEndFrame | **No separate function** — merged into 0x1a866 (sections 12–17); P_WorldEffects at 0x1ab6a |
+| ClientEndFrame | ✅ Resolved — is a separate function, `0x1adc9`, see [ClientEndFrame.md](ClientEndFrame.md). Supersedes the earlier "merged into 0x1a866" claim; `0x1a866` may still separately contain its own P_WorldEffects-shaped call (`0x1ab6a`) — not reconciled with `0x1adc9`'s `func_0x19e41` call this pass. |
 | func_0x1a1b2 purpose | ✅ Identified: **per-frame touch trigger handler** — detects start/finish/checkpoint zone entry each physics tick |
+| func_0x1c937 purpose | ✅ Resolved (strong match) — `CopyToBodyQue`, see [ClientRespawn.md](ClientRespawn.md) |
+| Real `G_RunClient` location | Not found — `0x1cbbd` (the prior guess) is actually `PickTeam` |
+| Real per-command "ClientThink" dispatcher location | Not found — `0x1d27b` (`ClientThink_real`'s address) has no per-command caller, only spawn-related callers |
+| `0x1d27b` identity: `ClientThink_real`, `ClientSpawn`, or a merge of both | Not determined — see [open question](ClientRespawn.md#open-question-what-is-0x1d27b) |
+| Why DeFRaG fetches usercmd inside the Pmove wrapper instead of in a `ClientThink()`-shaped wrapper | Architectural difference from oDFs noted, not explained |

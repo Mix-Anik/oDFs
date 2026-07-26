@@ -1002,11 +1002,18 @@ void ClientThink_real( gentity_t *ent ) {
 	pm.obs_disabled = df_ob_killobs.integer;
 
 	// DeFRaG: pack cvar state into ps.stats[STAT_DEFRAG_FLAGS] so client prediction
-	// reads the same values as the server. Grapple/LG knockback bits left 0 until
-	// corresponding cvars are implemented.
+	// reads the same values as the server.
 	client->ps.stats[STAT_DEFRAG_FLAGS] &= ~(DFLAG_OBS_DISABLED | DFLAG_GRAPPLE_MODE_1 | DFLAG_GRAPPLE_MODE_2 | DFLAG_LG_KNOCKBACK);
 	if ( df_ob_killobs.integer )
 		client->ps.stats[STAT_DEFRAG_FLAGS] |= DFLAG_OBS_DISABLED;
+	// df_hook_Type (0-3) encodes into two bits the same way DeFRaG's qagame does:
+	// bit 0x400 = mode & 1, bit 0x800 = mode & 2 (see disasm/G_ACTIVE/GrappleMode.md)
+	if ( df_hook_type.integer & 1 )
+		client->ps.stats[STAT_DEFRAG_FLAGS] |= DFLAG_GRAPPLE_MODE_1;
+	if ( df_hook_type.integer & 2 )
+		client->ps.stats[STAT_DEFRAG_FLAGS] |= DFLAG_GRAPPLE_MODE_2;
+	if ( df_lg_knockback.integer )
+		client->ps.stats[STAT_DEFRAG_FLAGS] |= DFLAG_LG_KNOCKBACK;
 
 	pm.promode     = df_promode.integer;
 

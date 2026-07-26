@@ -1,9 +1,23 @@
+> **Identity resolved — this function is actually `ClientSpawn`, not `ClientThink_real`.**
+> See [ClientThink.md](ClientThink.md) for the full resolution: the genuine
+> per-command `ClientThink` is `0x1ac8f`, which calls `0x1a866` ("Pmove outer",
+> documented in [Pmove_outer.md](Pmove_outer.md)) as the real `ClientThink_real`.
+> This function's instruction-level decoding below is still accurate; only the name
+> in the title and headers is wrong. Kept as-is (not renamed/moved) to preserve the
+> address-indexed history — treat every "ClientThink_real" below as "ClientSpawn".
+
 # ClientThink_real — Defrag QVM disassembly analysis
 
 **Source file:** `D:\Other\Reverse Engineering\q3vm\qagame.dis`  
 **Function address:** `0x0001d27b`  
 **Stack frame:** `enter 0x5b0` (1456 bytes — very large)  
-**Called from:** ClientThink (`0x1cb0b`) which calls `0x1c937` first (cmd fetch), then this function  
+**Called from:** **corrected** — `0x1cb0b` is `ClientRespawn` (not "ClientThink"), and it
+calls `func_0x1c937` = `CopyToBodyQue` first (not "cmd fetch"), then this function. This
+function is also called from `0x1d18b` = `ClientBegin` (confirmed via debug strings).
+**These are `0x1d27b`'s only two callers in the entire QVM** — see the open identity
+question in [ClientRespawn.md](ClientRespawn.md#open-question-what-is-0x1d27b) before
+trusting the "ClientThink_real" name below; it may actually be `ClientSpawn`
+(DeFRaG-extended to run an initial physics tick), or a genuine merge of the two.  
 **Ends at:** `0x1d6db` (`leave 0x5b0`)
 
 ---
@@ -17,10 +31,8 @@ The `G_TouchTriggers` and `ClientEvents` calls documented in the old analysis ar
 ## Call chain
 
 ```
-G_RunClient / GameTick
-    → ClientThink (0x1cb0b)
-        → [cmd fetch 0x1c937]
-        → ClientThink_real (0x1d27b)
+ClientBegin (0x1d18b) / ClientRespawn (0x1cb0b, after CopyToBodyQue)
+    → this function (0x1d27b) — identity uncertain, see header
             → 0x2830 (client state manager)
             → [cmd acquisition: 0x44bc / 0x1c6be / 0x1c8c5 / 0x1c860 / 0x270ee]
             → [spawn block if needed]
@@ -409,8 +421,8 @@ when following a player, SpectatorThink is skipped.
 | client+0xf8 | ps.stats[16] start (DeFRaG extended stats, 16 entries) |
 | client+0x104 | Unknown ps stats field — receives sess.sessionTeam copy |
 | client+0x108 | Spawn counter (incremented each spawn) |
-| client+0x1d4 | pers start (0xb0 bytes of pers, then sess at 0x284) |
-| client+0x1ec | pers.connected? (byte field accessed at 0x1ec) |
+| client+0x1d4 | pers start; **pers.connected confirmed** (pers+0x0, int: CON_DISCONNECTED=0/CONNECTING=1/CONNECTED=2) — via [PickTeam.md](PickTeam.md)'s `TeamCount` helper, which checks `*(client+0x1d4) != 0` to skip disconnected clients; struct-layout-consistent since pers.cmd is confirmed at client+0x1d8 (=pers+0x4), and `connected` is `clientPersistant_t`'s first field in Q3 |
+| client+0x1ec | Field within `pers.cmd` (pers+0x18, i.e. cmd+0x14) — **not** pers.connected (superseded, see above); exact cmd sub-field not identified |
 | client+0x1f0 | Unknown pers flag (cmd acquisition gate) |
 | client+0x1f4 | Unknown pers flag (cmd acquisition gate) |
 | client+0x218 | Spawn condition flags (bits 0x2000, 0x4000) |
