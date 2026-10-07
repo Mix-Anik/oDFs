@@ -87,12 +87,18 @@ void G_Checkpoint( gentity_t *ent, int idx ) {
 
 // ─── per-frame race HUD update ───────────────────────────────────────────────
 //
-// Mirrors DeFRaG func_0x274b: writes race-state values into ps fields that
-// the DeFRaG cgame reads to show/hide the timer HUD.
-//
-// In DeFRaG, ps+0x178 onwards (where oDFs has ammo[]) is the DeFRaG-extended
-// race HUD communication area — DeFRaG removed ammo[] from its ps layout.
-// We repurpose those same byte offsets since oDFs is a movement mod.
+// CORRECTION: this does NOT mirror qagame's func_0x274b as originally claimed
+// here — 0x274b is confirmed to be a one-time spawn-time weapon/ammo/health
+// loadout initializer (DeFRaG's ClientSpawn-equivalent), not a per-frame
+// race-HUD toggle; see disasm/G_TRIGGER/func_0x274b.md. The field VALUES
+// below were instead independently derived from the actual cgame.qvm
+// disassembly's HUD-draw consumption logic — see
+// disasm/CGAME/cgame_timer_hud.md's "What oDFs must set in server ps" table,
+// which they match exactly. Being called every frame (rather than once at
+// spawn like 0x274b) is intentional and believed harmless: DeFRaG removed
+// ammo[] from its ps layout for these slots (repurposed as the race-HUD
+// communication area), so oDFs repurposing the same byte offsets and
+// rewriting them idempotently every frame has no observed downside.
 //
 //   ps.ammo[1]   (ps+0x17c) = -1            always (sentinel)
 //   ps.ammo[2]   (ps+0x180) = 100/200       100 = race on this map
@@ -123,6 +129,17 @@ void G_UpdateRacePs( gentity_t *ent ) {
 }
 
 // ─── per-frame tick (called from ClientThink_real after Pmove) ───────────────
+//
+// NOTE on bit 0x4 (STAT_DEFRAG_FLAGS "running" bit): DeFRaG's real qagame
+// (func_0x37c7) XOR-toggles this bit every single frame while running,
+// producing a blink rather than a level signal, and never explicitly clears
+// it when the race stops (see disasm/G_TRIGGER/func_0x37c7.md). Below,
+// oDFs deliberately does NOT replicate that — it SETs the bit once and
+// explicitly CLEARs it on stop/finish instead. This is intentional and
+// confirmed correct against the actual cgame.qvm consumption logic (see
+// disasm/CGAME/cgame_timer_hud.md: "the cgame detects STATE CHANGES... XOR
+// toggling every frame was wrong — it caused startTime to reset each
+// snapshot"). Do not "fix" this to match the qagame bytecode literally.
 
 void G_TimerTick( gentity_t *ent, int elapsed_ms ) {
 	raceTimer_t  *t      = G_GetTimerRecord( ent->client );

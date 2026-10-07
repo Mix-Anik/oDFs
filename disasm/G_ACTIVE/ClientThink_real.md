@@ -461,5 +461,6 @@ when following a player, SpectatorThink is skipped.
 - `0x1317bc` OBS bit-scan logic — needs further trace; currently marked uncertain
 - Trap -0x1f identity (probably `trap_LinkEntity` but not 100% confirmed)
 - Trap -0x25 purpose (DeFRaG custom trap)
-- Functions 0x274b, 0x286ad, 0x28534, 0x1cab3 — spawn helpers, not yet analyzed
+- `0x274b` — ✅ Analyzed, see [../G_TRIGGER/func_0x274b.md](../G_TRIGGER/func_0x274b.md). It is DeFRaG's spawn-time weapon/ammo/health/armor loadout setup (analogue of vanilla `ClientSpawn`'s ammo-init loop) — **not** a race-HUD function, correcting oDFs's `g_defrag.c` header comment which claims `G_UpdateRacePs` "mirrors" it (oDFs's `G_UpdateRacePs` is called every frame; `0x274b` is called once per spawn).
+- Functions 0x286ad, 0x28534, 0x1cab3 — spawn helpers, not yet analyzed
 - `0x19ecc` cvar multiplier identity

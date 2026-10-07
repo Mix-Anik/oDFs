@@ -141,6 +141,20 @@ void StartRace(gentity_t *ent) {
 }
 ```
 
+**Re-verified byte-for-byte against raw disassembly (2026 pass):** confirmed exact.
+The comparison is `gei -2 0x3950` against `const 1 0x2ee` — **`0x2ee` = 750 decimal,
+confirmed exactly** (not approximated). The only two field reads are
+`t->initialized` (+0x14) and `t->ms` (+0x00); the only write is `t->state = 1`
+(+0x0c). No other field is touched by this function.
+
+**oDFs comparison (`G_StartRace` in `g_defrag.c`):** matches in gate structure
+(`t->initialized == 0 || elapsed >= 750`) and the `750` constant is exact. oDFs
+additionally sets `t->startTime = level.time` in the same branch, which the raw
+DeFRaG bytecode does not do here — this is a necessary and already-documented
+consequence of oDFs's intentional `level.time`-based redesign (see "oDFs
+simplification" note below), not a bug. **Verdict: matches given the documented
+architectural substitution.**
+
 ### `StopRace` — `0x3958`
 
 ```c
@@ -151,6 +165,11 @@ void StopRace(gentity_t *ent) {
     }
 }
 ```
+
+**Re-verified byte-for-byte against raw disassembly (2026 pass):** confirmed
+exact, no other fields touched. **oDFs's `G_StopRace` matches exactly**,
+instruction for instruction (accounting for the `raceTimer_t` field-name
+mapping).
 
 ### `Checkpoint` — `0x3978`
 
@@ -164,6 +183,22 @@ void Checkpoint(gentity_t *ent, int idx) {
     t->state = TIMER_CHECKPOINT;    // 3
 }
 ```
+
+**Re-verified byte-for-byte against raw disassembly (2026 pass):** confirmed
+exact — every field offset, the `1 << idx` bit-test/set, the increment, and the
+final `state = 3` all match precisely, in the same order, with no additional
+side effects. **oDFs's `G_Checkpoint` matches exactly.**
+
+**Caveat found during this pass (see `func_0x37c7.md` update):** whether
+`t->checkpointBits`/`t->checkpointCount` actually *persist* usefully across
+frames in the real DeFRaG binary is now in question — `func_0x37c7`'s
+RUNNING-state branch calls a helper (`0x3597`) that appears to `memset` the
+entire `raceTimer_t` (including these two fields) to zero every single frame
+while `state == RUNNING`, before restoring only `state` and `fracDelta`. This
+doesn't change the verdict on `Checkpoint` itself (which is confirmed correct
+against the disassembly), but it means the real-world "already hit" duplicate
+suppression this function performs may not behave the way its own code alone
+suggests. Flagged, not resolved — see `func_0x37c7.md`.
 
 ---
 
@@ -285,5 +320,6 @@ qboolean    g_checkpointReady;           // guards use_checkpoint
 | `func_0x85a` — freeze player at race start | Partially analyzed in ClientThink_real.md |
 | `func_0x2919` — stopTimer entity lookup | Partially analyzed |
 | `raceTimer_t` fields at +0x04, +0x08, +0x10 | Purpose unknown |
-| What `0x3a5f` (called from ClientEvents) clears | Unknown — partial or full clear of raceTimer_t? |
+| What `0x3a5f` (called from ClientEvents) clears | Unknown — partial or full clear of raceTimer_t? Note: a **different** function, `0x3597`, was previously mislabeled "StartNotify" in `func_0x37c7.md`; it is actually confirmed to be `memset(&raceTimer_t, 0, 0x20)` with `state`+`fracDelta` saved/restored around it. See correction in [func_0x37c7.md](func_0x37c7.md). Whether `0x3a5f` and `0x3597` are redundant or serve different call sites is unresolved. |
 | How `0x12c698` gets set during gameplay | Unknown — set at 0x946 on init, cleared at reset |
+| `func_0x274b` — previously assumed (in oDFs's `g_defrag.c`) to be a per-frame "race HUD" ps-writer (`G_UpdateRacePs`) | ✅ **Corrected — this identification is wrong.** `0x274b` is called exactly **once per client spawn/respawn** (from the spawn block inside `0x1d27b`, not from any per-frame path), and its writes are DeFRaG's spawn-time weapon/ammo/health/armor loadout setup (the DeFRaG analogue of vanilla Q3's `ClientSpawn` ammo-init loop), not a race-active HUD signal. Full decode in the new [func_0x274b.md](func_0x274b.md). |

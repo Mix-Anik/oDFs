@@ -769,6 +769,44 @@ static float CG_DrawFPS( float y ) {
 
 /*
 =================
+CG_ConvertDistance / CG_ConvertSpeed
+
+DeFRaG df_unit [0-2]: converts a raw quake-units (distance) or
+quake-units-per-second (speed) value into the unit selected by df_unit.
+0 = unchanged (quake units / units-per-second)
+1 = meters / km-per-hour
+2 = miles / miles-per-hour
+
+Formula confirmed from cgame.qvm disassembly (doubly-verified against both
+the HUD speed-meter widget and a developer "Stats" debug dump whose format
+strings spell out "Km/h"/"miles/h"/"meters"/"miles" explicitly) — see
+disasm/CGAME/df_unit.md. Not yet called anywhere: oDFs has no speed-meter or
+distance/jump-meter HUD element yet, so this is a ready-to-use conversion
+utility for whenever one is added, not a wired-up end-to-end feature.
+=================
+*/
+float CG_ConvertDistance( float quakeUnits ) {
+	if ( df_unit.integer == 1 ) {
+		return quakeUnits * 0.027f;			// meters
+	}
+	if ( df_unit.integer == 2 ) {
+		return quakeUnits * 0.000016f;			// miles
+	}
+	return quakeUnits;
+}
+
+float CG_ConvertSpeed( float unitsPerSecond ) {
+	if ( df_unit.integer == 1 ) {
+		return ( unitsPerSecond * 3.6f ) * 0.027f;			// km/h
+	}
+	if ( df_unit.integer == 2 ) {
+		return ( unitsPerSecond * 3600.0f ) * 0.000016f;	// miles/h
+	}
+	return unitsPerSecond;
+}
+
+/*
+=================
 CG_DrawTimer
 =================
 */

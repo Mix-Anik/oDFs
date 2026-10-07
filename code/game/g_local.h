@@ -126,6 +126,15 @@ struct gentity_s {
 	char		*targetShaderNewName;
 	gentity_t	*target_ent;
 
+	// DeFRaG G_UseTargets once-per-server-frame de-duplication guard: an
+	// entity's target chain cannot be re-fired by the same activator more
+	// than once within the same server frame. Confirmed from qagame.qvm
+	// disassembly; see disasm/G_UTILS/G_UseTargets.md
+	int			useTargetsTime;		// level.time these masks were last reset
+	unsigned int useTargetsMaskA;		// "already used this frame" bitmask, clientNum 0-31
+	unsigned int useTargetsMaskB;		// "already used this frame" bitmask, clientNum 32-63
+	qboolean	useTargetsNonClient;	// "already used this frame" flag for non-client activators
+
 	float		speed;
 	vec3_t		movedir;
 
@@ -175,6 +184,14 @@ struct gentity_s {
 	float		random;
 
 	gitem_t		*item;			// for bonus items
+
+	// DeFRaG: per-client item pickup cooldown. Each client has their own
+	// slot, so an item taken by one player stays fully visible/grabbable
+	// for every other player — there is no global hide-on-pickup. 0 =
+	// available now; a future level.time = blocked for that client until
+	// then; -1 = never again for that client (non-respawning pickup).
+	// Confirmed from qagame.qvm disassembly; see disasm/G_ITEMS/Touch_Item.md
+	int			perClientPickupTime[MAX_CLIENTS];
 };
 
 

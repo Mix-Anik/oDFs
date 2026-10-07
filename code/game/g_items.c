@@ -434,6 +434,17 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 	if (other->health < 1)
 		return;		// dead people can't pickup
 
+	// DeFRaG: per-client pickup cooldown gate. An item taken by one player
+	// stays fully visible/grabbable for everyone else — there is no global
+	// hide-on-pickup in DeFRaG, unlike vanilla. Confirmed from qagame.qvm
+	// disassembly; see disasm/G_ITEMS/Touch_Item.md
+	if ( ent->perClientPickupTime[ other->s.number ] < 0 ) {
+		return;
+	}
+	if ( level.time < ent->perClientPickupTime[ other->s.number ] ) {
+		return;
+	}
+
 	// the same pickup rules are used for client side and server side
 	if ( !BG_CanItemBeGrabbed( g_gametype.integer, &ent->s, &other->client->ps ) ) {
 		return;
@@ -512,16 +523,10 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 	// fire item targets
 	G_UseTargets (ent, other);
 
-	// wait of -1 will not respawn
-	if ( ent->wait == -1 ) {
-		ent->r.svFlags |= SVF_NOCLIENT;
-		ent->s.eFlags |= EF_NODRAW;
-		ent->r.contents = 0;
-		ent->unlinkAfterEvent = qtrue;
-		return;
-	}
-
-	// non zero wait overrides respawn time
+	// non zero wait overrides respawn time ("wait -1" no longer means
+	// "hide forever" under the per-client model below — it just means
+	// "this client may never pick this up again", same as any other
+	// respawn<=0 value)
 	if ( ent->wait ) {
 		respawn = ent->wait;
 	}
@@ -534,30 +539,16 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 		}
 	}
 
-	// dropped items will not respawn
-	if ( ent->flags & FL_DROPPED_ITEM ) {
-		ent->freeAfterEvent = qtrue;
-	}
-
-	// picked up items still stay around, they just don't
-	// draw anything.  This allows respawnable items
-	// to be placed on movers.
-	ent->r.svFlags |= SVF_NOCLIENT;
-	ent->s.eFlags |= EF_NODRAW;
-	ent->r.contents = 0;
-
-	// ZOID
-	// A negative respawn times means to never respawn this item (but don't 
-	// delete it).  This is used by items that are respawned by third party 
-	// events such as ctf flags
-	if ( respawn <= 0 ) {
-		ent->nextthink = 0;
-		ent->think = 0;
+	// DeFRaG: no global hide/respawn-timer here — the item entity itself
+	// is never unlinked, hidden (SVF_NOCLIENT/EF_NODRAW), or scheduled to
+	// respawn via think/nextthink. Pickup eligibility is tracked per
+	// client instead, via the gate at the top of this function. Confirmed
+	// from qagame.qvm disassembly; see disasm/G_ITEMS/Touch_Item.md
+	if ( respawn > 0 ) {
+		ent->perClientPickupTime[ other->s.number ] = level.time + respawn * 1000;
 	} else {
-		ent->nextthink = level.time + respawn * 1000;
-		ent->think = RespawnItem;
+		ent->perClientPickupTime[ other->s.number ] = -1;
 	}
-	trap_LinkEntity( ent );
 }
 
 
@@ -640,11 +631,15 @@ gentity_t *Drop_Item( gentity_t *ent, gitem_t *item, float angle ) {
 ================
 Use_Item
 
-Respawn the item
+DeFRaG: resets only the activator's own pickup cooldown (not a global
+respawn) — confirmed from qagame.qvm disassembly; see
+disasm/G_ITEMS/RespawnItem.md
 ================
 */
 void Use_Item( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
-	RespawnItem( ent );
+	if ( activator && activator->client ) {
+		ent->perClientPickupTime[ activator->s.number ] = 0;
+	}
 }
 
 //======================================================================

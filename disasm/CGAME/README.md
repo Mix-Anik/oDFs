@@ -11,6 +11,9 @@ For general methodology and background, see [../README.md](../README.md).
 | Module | File | Status |
 |--------|------|--------|
 | Race timer HUD system | [cgame_timer_hud.md](cgame_timer_hud.md) | ✅ Analyzed |
+| `df_unit` distance/velocity conversion | [df_unit.md](df_unit.md) | ✅ Analyzed — formula doubly-confirmed; implemented in oDFs (cvar + helper, no HUD widget consumes it yet) |
+| Batch cvar-registration table (cgame/ui) | [cgame_cvar_table.md](cgame_cvar_table.md) | ✅ Methodology documented — needed to find ANY cvar's storage address in cgame.dis/ui.dis |
+| "Stats" debug dump (`func_0x4388`) | [cgame_stats_dump.md](cgame_stats_dump.md) | ✅ Analyzed — trigger mechanism unresolved, not gameplay-relevant |
 
 ---
 

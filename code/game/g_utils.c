@@ -249,6 +249,35 @@ void G_UseTargets( gentity_t *ent, gentity_t *activator ) {
 		return;
 	}
 
+	// DeFRaG: an entity's target chain cannot be re-fired by the same
+	// activator more than once within the same server frame. Confirmed from
+	// qagame.qvm disassembly; see disasm/G_UTILS/G_UseTargets.md
+	if ( ent->useTargetsTime != level.time ) {
+		ent->useTargetsTime = level.time;
+		ent->useTargetsMaskA = 0;
+		ent->useTargetsMaskB = 0;
+		ent->useTargetsNonClient = qfalse;
+	}
+	if ( !activator->client ) {
+		if ( ent->useTargetsNonClient ) {
+			return;
+		}
+		ent->useTargetsNonClient = qtrue;
+	} else {
+		int clientNum = activator - g_entities;
+		if ( clientNum < 32 ) {
+			if ( ent->useTargetsMaskA & ( 1u << clientNum ) ) {
+				return;
+			}
+			ent->useTargetsMaskA |= ( 1u << clientNum );
+		} else if ( clientNum < 64 ) {
+			if ( ent->useTargetsMaskB & ( 1u << ( clientNum - 32 ) ) ) {
+				return;
+			}
+			ent->useTargetsMaskB |= ( 1u << ( clientNum - 32 ) );
+		}
+	}
+
 	t = NULL;
 	while ( (t = G_Find (t, FOFS(targetname), ent->target)) != NULL ) {
 		if ( t == ent ) {
