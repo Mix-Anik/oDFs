@@ -107,7 +107,19 @@ using the hook).
 
 ### `0x22b82`/`0x22eb4` — grapple-swing physics (fully decoded)
 
-Reached only via the call chain `0x23429` → `0x232f6` → `0x22fe6` → `0x22b82`, and
+**Update (later pass):** `0x22fe6` itself has since been fully decoded
+end-to-end (this section only covered its first ~90 instructions at the
+time) — see [`../G_ACTIVE/GrappleHookMover.md`](../G_ACTIVE/GrappleHookMover.md).
+It turns out to be a push/crush/carry mover for the hook entity: besides the
+angle/position-teleport path described below, it also unlinks/moves the hook,
+runs `trap_EntitiesInBox` over its new bounding box, and either crushes
+(`G_Damage`, `MOD_CRUSH`) or carries (relinks via a separate linked list)
+entities caught by the move. That pass also confirms `0x22b82` is called a
+*second* way: inside `0x22fe6`'s own per-candidate loop as
+`helper_0x22b82(candidate, ent, delta1, delta2)`, a boolean-ish filter — not
+fully reconciled yet with the single-call, hook-self-targeting description
+below; flagged for a future pass. This investigation originally reached
+`0x22fe6` via the call chain `0x23429` → `0x232f6` → `0x22fe6` → `0x22b82`, and
 `0x22fe6` → `0x22eb4`'s sibling. Traced every gate on this chain:
 
 - `0x23429` (entry point of the chain) immediately checks

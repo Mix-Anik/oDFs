@@ -77,3 +77,15 @@ Q3 movement, needing more vertical slack for airborne item pickups
 control flow, and the `BG_EvaluateTrajectory` call are unchanged) — the
 entire size delta is this one added promode-conditional branch relaxing the
 upper Z pickup tolerance from 36 to 66 units.
+
+## oDFs implementation notes
+
+**Implemented.** This required networking promode first: oDFs's `pm->promode`
+was only a local field set from `df_promode.integer` right before `Pmove()`
+runs (`g_active.c`), with no way for cgame's own copy of this `BG_` function
+(used for client-side pickup prediction, `cg_predict.c:267`) to see it, since
+oDFs's server/cgame are separate native modules, unlike DeFRaG's single QVM
+address space. Added `PMF_PROMODE` (`0x8000`, previously unused bit,
+`bg_public.h`), set/cleared it alongside `pm.promode` in `g_active.c`, and
+changed the Z-upper check in `bg_misc.c` to
+`(ps->pm_flags & PMF_PROMODE) ? 66 : 36`.

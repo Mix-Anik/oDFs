@@ -88,6 +88,11 @@ vmCvar_t	df_ob_killobs;
 vmCvar_t	df_mode;
 vmCvar_t	df_hook_type;
 vmCvar_t	df_lg_knockback;
+vmCvar_t	df_ndm_damage;
+vmCvar_t	df_ndm_weaponsSet;
+vmCvar_t	df_ndm_weaponsPickup;
+vmCvar_t	df_ndm_nopad;
+vmCvar_t	df_ndm_noteleport;
 #ifdef MISSIONPACK
 vmCvar_t	g_obeliskHealth;
 vmCvar_t	g_obeliskRegenPeriod;
@@ -205,7 +210,17 @@ static cvarTable_t		gameCvarTable[] = {
 	{ NULL, 			"df_ndm_timer_stop",       "",		CVAR_SERVERINFO, 0, qfalse },
 	{ NULL, 			"df_ndm_timer_checkpoint", "",		CVAR_SERVERINFO, 0, qfalse },
 	{ NULL, 			"defrag_route",            "",		CVAR_SERVERINFO, 0, qfalse },
-};	
+
+	// DeFRaG "no damage mode" cluster — confirmed from qagame.qvm disassembly
+	// (func_0x1e60/G_InitRaceMode reads these via trap_Cvar_VariableIntegerValue
+	// into 0x131820/0x131824/0x131830; defaults confirmed from the cvar
+	// registration table's string pool). See disasm/G_TRIGGER/func_0x1e60.md.
+	{ &df_ndm_damage,        "df_ndm_damage",        "0",    CVAR_SERVERINFO, 0, qfalse },
+	{ &df_ndm_weaponsSet,    "df_ndm_weaponsSet",    "1022", CVAR_SERVERINFO, 0, qfalse },
+	{ &df_ndm_weaponsPickup, "df_ndm_weaponsPickup", "0",    CVAR_SERVERINFO, 0, qfalse },
+	{ &df_ndm_nopad,         "df_ndm_nopad",         "0",    CVAR_SERVERINFO, 0, qfalse },
+	{ &df_ndm_noteleport,    "df_ndm_noteleport",    "0",    CVAR_SERVERINFO, 0, qfalse },
+};
 
 static int gameCvarTableSize = ARRAY_LEN( gameCvarTable );
 

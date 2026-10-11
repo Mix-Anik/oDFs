@@ -161,6 +161,11 @@ typedef enum {
 #define PMF_FOLLOW			4096	// spectate following another player
 #define PMF_SCOREBOARD		8192	// spectate as a scoreboard
 #define PMF_INVULEXPAND		16384	// invulnerability sphere set to full size
+#define	PMF_PROMODE			32768	// DeFRaG: promode active, networked so BG_
+								// (both-game) functions like BG_PlayerTouchesItem
+								// can see it without direct cvar access (e.g. from
+								// cgame prediction). Confirmed from qagame.qvm
+								// disassembly; see disasm/BG_MISC/BG_PlayerTouchesItem.md
 
 #define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)
 

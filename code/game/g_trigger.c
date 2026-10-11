@@ -146,6 +146,17 @@ void trigger_push_touch (gentity_t *self, gentity_t *other, trace_t *trace ) {
 		return;
 	}
 
+	// DeFRaG "no jump pads" map restriction: when "df_ndm_nopad" is set to a
+	// value other than 0 or 1 (typically by a map wanting to forbid pad use
+	// entirely, e.g. for a no-pad race category), touching any jump pad
+	// instantly kills the player instead of launching them. Confirmed from
+	// qagame.qvm disassembly (trigger_push_touch, 0x278ef, calling G_Damage
+	// at 0x2015b with these exact arguments). See
+	// disasm/BG_MISC/BG_TouchJumpPad.md.
+	if ( df_ndm_nopad.integer != 0 && df_ndm_nopad.integer != 1 ) {
+		G_Damage( other, self, self, NULL, NULL, 9999, DAMAGE_NO_PROTECTION, MOD_TRIGGER_HURT );
+	}
+
 	BG_TouchJumpPad( &other->client->ps, &self->s );
 }
 
@@ -209,6 +220,41 @@ void SP_trigger_push( gentity_t *self ) {
 	self->touch = trigger_push_touch;
 	self->think = AimAtTarget;
 	self->nextthink = level.time + FRAMETIME;
+	trap_LinkEntity (self);
+}
+
+
+/*QUAKED trigger_push_velocity (.5 .5 .5) ?
+DeFRaG addition. Identical to trigger_push (must point at a target_position),
+except the entity's "Spawnflags" checkboxes, "random" key, and "count" key
+configure BG_TouchJumpPad's custom push-direction/velocity modes instead of
+relying solely on the fixed AimAtTarget trajectory vector. Confirmed from
+qagame.qvm disassembly (SP_trigger_push_velocity, 0x27a76) — see
+disasm/BG_MISC/BG_TouchJumpPad.md for the full bit-by-bit semantics consumed
+on the client/prediction side.
+*/
+void SP_trigger_push_velocity( gentity_t *self ) {
+	InitTrigger (self);
+
+	// unlike other triggers, we need to send this one to the client
+	self->r.svFlags &= ~SVF_NOCLIENT;
+
+	// make sure the client precaches this sound
+	G_SoundIndex("sound/world/jumppad.wav");
+
+	self->s.eType = ET_PUSH_TRIGGER;
+	self->touch = trigger_push_touch;
+	self->think = AimAtTarget;
+	self->nextthink = level.time + FRAMETIME;
+
+	// DeFRaG custom jumppad mode config, consumed by BG_TouchJumpPad:
+	// spawnflags -> weapon (mode bitmask), random -> angles2[0]/[1],
+	// count -> angles2[2] (int-to-float)
+	self->s.weapon = self->spawnflags;
+	self->s.angles2[0] = self->random;
+	self->s.angles2[1] = self->random;
+	self->s.angles2[2] = (float)self->count;
+
 	trap_LinkEntity (self);
 }
 
@@ -278,11 +324,26 @@ void trigger_teleporter_touch (gentity_t *self, gentity_t *other, trace_t *trace
 		return;
 	}
 	// Spectators only?
-	if ( ( self->spawnflags & 1 ) && 
+	if ( ( self->spawnflags & 1 ) &&
 		other->client->sess.sessionTeam != TEAM_SPECTATOR ) {
 		return;
 	}
 
+	// DeFRaG "no teleporters" map restriction, parallel to trigger_push_touch's
+	// "df_ndm_nopad" gate (see disasm/G_TRIGGER/trigger_push_touch.md):
+	// "df_ndm_noteleport" == 1 disables the teleporter entirely (touching it
+	// does nothing); >= 2 (or negative) instantly kills the toucher instead of
+	// teleporting them. Unlike the jump pad case, the kill here REPLACES the
+	// teleport rather than preceding it. Confirmed from qagame.qvm
+	// disassembly (trigger_teleporter_touch, 0x27bf9). See
+	// disasm/G_TRIGGER/trigger_teleporter_touch.md.
+	if ( df_ndm_noteleport.integer == 1 ) {
+		return;
+	}
+	if ( df_ndm_noteleport.integer != 0 ) {
+		G_Damage( other, self, self, NULL, NULL, 9999, DAMAGE_NO_PROTECTION, MOD_TRIGGER_HURT );
+		return;
+	}
 
 	dest = 	G_PickTarget( self->target );
 	if (!dest) {

@@ -313,16 +313,30 @@ void	G_TouchTriggers( gentity_t *ent ) {
 ================
 DeFRaG_TouchTriggers
 
-Per-frame race trigger handler matching DeFRaG func_0x1a1b2 (0x1a866 section 13).
-Called from inside Pmove outer after physics, for alive non-noclip players only.
-Handles start/stop/checkpoint zone detection for the race timer system.
+Matches DeFRaG func_0x1a1b2 (0x1a866 section 13), which is a complete,
+self-contained G_TouchTriggers — see disasm/G_ACTIVE/func_0x1a1b2.md for
+the full resolution. It is NOT race-trigger-specific; it processes every
+trigger (items, push triggers, doors, race triggers) through the same
+filters, with a spectator exception matching vanilla G_TouchTriggers's own
+(ET_TELEPORT_TRIGGER / Touch_DoorTrigger exempted for spectators only), and
+ends with the same jumppad_frame/jumppad_ent reset vanilla G_TouchTriggers
+has. Called from inside Pmove outer (ClientThink_real) after physics, for
+alive non-noclip players only — this call site can never see a spectator
+ent (ClientThink_real returns via SpectatorThink before reaching this
+point), so the spectator branch below is effectively dead code here, same
+as in the real game; kept for fidelity with the decoded bytecode.
 
-Key differences from G_TouchTriggers:
-- Spectators skip entirely (no teleporter exception)
-- ET_TELEPORT_TRIGGER excluded (those go through G_TouchTriggers)
-- Player touch condition: DeFRaG uses ent->field_0x1a8 & 0x8 (unknown oDFs equivalent;
-  approximated with SVF_BOT here)
-- Called BEFORE ClientEvents/trap_LinkEntity, not after
+Because this is a complete G_TouchTriggers, the separate G_TouchTriggers()
+call that used to also run every frame from ClientThink_real has been
+removed (see below) to avoid double-touching every non-exempt trigger.
+G_TouchTriggers() itself is kept — it's still used by SpectatorThink's own,
+genuinely separate per-spectator-physics call.
+
+One remaining unconfirmed detail: DeFRaG checks an additional
+`trigger->flags & 0x40000000`-shaped exclusion that has no known spawn-time
+writer and no identified purpose (see the doc). Not ported — flagged here
+in case it turns out to matter and something starts getting touched that
+shouldn't be.
 ================
 */
 void DeFRaG_TouchTriggers( gentity_t *ent ) {
@@ -337,7 +351,7 @@ void DeFRaG_TouchTriggers( gentity_t *ent ) {
 		return;
 	}
 
-	// dead clients don't trigger race zones
+	// dead clients don't trigger
 	if ( ent->client->ps.stats[STAT_HEALTH] <= 0 ) {
 		return;
 	}
@@ -354,21 +368,20 @@ void DeFRaG_TouchTriggers( gentity_t *ent ) {
 	for ( i = 0; i < num; i++ ) {
 		hit = &g_entities[touch[i]];
 
-		if ( !hit->touch ) {
+		if ( !hit->touch && !ent->touch ) {
 			continue;
 		}
 		if ( !( hit->r.contents & CONTENTS_TRIGGER ) ) {
 			continue;
 		}
 
-		// DeFRaG: spectators skip entirely — no race triggers for spectators
+		// ignore most entities if a spectator (matches func_0x1a1b2's own
+		// spectator exception exactly; unreachable at this call site today
+		// since ent can never be a spectator here, same as in real DeFRaG)
 		if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
-			continue;
-		}
-
-		// DeFRaG: skip ET_TELEPORT_TRIGGER (eType 9) — handled by G_TouchTriggers
-		if ( hit->s.eType == ET_TELEPORT_TRIGGER ) {
-			continue;
+			if ( hit->s.eType != ET_TELEPORT_TRIGGER && hit->touch != Touch_DoorTrigger ) {
+				continue;
+			}
 		}
 
 		if ( hit->s.eType == ET_ITEM ) {
@@ -391,6 +404,13 @@ void DeFRaG_TouchTriggers( gentity_t *ent ) {
 		if ( ( ent->r.svFlags & SVF_BOT ) && ent->touch ) {
 			ent->touch( ent, hit, &trace );
 		}
+	}
+
+	// if we didn't touch a jump pad this pmove frame (matches func_0x1a1b2's
+	// own tail exactly, cross-validated against disasm/BG_MISC/BG_TouchJumpPad.md)
+	if ( ent->client->ps.jumppad_frame != ent->client->ps.pmove_framecount ) {
+		ent->client->ps.jumppad_frame = 0;
+		ent->client->ps.jumppad_ent = 0;
 	}
 }
 
@@ -1017,6 +1037,16 @@ void ClientThink_real( gentity_t *ent ) {
 
 	pm.promode     = df_promode.integer;
 
+	// DeFRaG: network the promode state so BG_ (both-game) functions like
+	// BG_PlayerTouchesItem can see it from cgame prediction too, not just
+	// the server. Confirmed from qagame.qvm disassembly; see
+	// disasm/BG_MISC/BG_PlayerTouchesItem.md
+	if ( df_promode.integer ) {
+		client->ps.pm_flags |= PMF_PROMODE;
+	} else {
+		client->ps.pm_flags &= ~PMF_PROMODE;
+	}
+
 	VectorCopy( client->ps.origin, client->oldOrigin );
 
 #ifdef MISSIONPACK
@@ -1062,9 +1092,10 @@ void ClientThink_real( gentity_t *ent ) {
 	ent->waterlevel = pm.waterlevel;
 	ent->watertype = pm.watertype;
 
-	// DeFRaG: per-frame race trigger scan and timer tick.
-	// DeFRaG_TouchTriggers fires use callbacks on race trigger entities (func_0x1a1b2).
-	// G_TimerTick advances the per-player race timer and handles state transitions (func_0x37c7).
+	// DeFRaG_TouchTriggers is DeFRaG's complete G_TouchTriggers (func_0x1a1b2,
+	// see disasm/G_ACTIVE/func_0x1a1b2.md) — handles items, push triggers,
+	// doors, and race triggers alike. G_TimerTick advances the per-player
+	// race timer and handles state transitions (func_0x37c7).
 	if ( !ent->client->noclip ) {
 		DeFRaG_TouchTriggers( ent );
 	}
@@ -1076,9 +1107,6 @@ void ClientThink_real( gentity_t *ent ) {
 
 	// link entity now, after any personal teleporters have been used
 	trap_LinkEntity (ent);
-	if ( !ent->client->noclip ) {
-		G_TouchTriggers( ent );
-	}
 
 	// NOTE: now copy the exact origin over otherwise clients can be snapped into solid
 	VectorCopy( ent->client->ps.origin, ent->r.currentOrigin );

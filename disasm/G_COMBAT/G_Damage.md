@@ -212,14 +212,19 @@ game-side bytecode in this module). Its bits gate:
   alternate `trap_Trace`-based tracing path inside a helper called from
   `G_RunMissile` (function at `0x43c3`) — i.e. bit `0x2` swaps in a different
   (presumably debug) collision-trace call.
-- bit `0x1` — gates (a) a large-stack-frame (`0x1048` bytes) function at
-  `0x1c56f` that is a no-op returning `0`/false when the bit is clear (called
-  from 4 sites, shape consistent with a debug-print/log formatter that's
-  compiled in but inert unless the bit is set), and (b) two similar bit-gated
-  blocks inside missile-entity-type checks (`0x1d5bb`, `0x2196b`) whose
-  gated bodies were not further decoded (no `store4` to any velocity/damage/
-  knockback-related field was found in the immediately following instructions
-  at either site).
+- bit `0x1` — gates a large-stack-frame (`0x1048` bytes) function at
+  `0x1c56f`. **Correction (later pass, see
+  [`func_0x1c56f.md`](func_0x1c56f.md) for the full decode): the earlier
+  characterization here was backwards.** It is a no-op returning `0` only
+  when the bit is **set**; the real work (an `EntitiesInBox`-based "is
+  another player nearby" proximity check, no touch dispatch, no damage/
+  knockback involvement) runs when the bit is **clear** — the normal case,
+  since `0x132660` is never written anywhere in game bytecode. Confirmed to
+  have no effect on damage/knockback math either way. Also gates (b) two
+  similar bit-gated blocks inside missile-entity-type checks (`0x1d5bb`,
+  `0x2196b`) whose gated bodies were not further decoded (no `store4` to any
+  velocity/damage/knockback-related field was found in the immediately
+  following instructions at either site).
 - `0x3686` and `0x1aa55` pass the raw value as a plain function argument
   (not band-tested at the call site itself).
 

@@ -761,6 +761,26 @@ void ClientUserinfoChanged( int clientNum ) {
 		}
 	}
 
+	// DeFRaG: per-client configurable respawn delay (default 250ms, clamped
+	// [50,1700]). Confirmed from qagame.qvm disassembly; see
+	// disasm/G_CLIENT/README.md
+	s = Info_ValueForKey( userinfo, "df_cl_respawnMsec" );
+	if ( !*s ) {
+		client->respawnMsec = 250;
+	} else {
+		client->respawnMsec = atoi( s );
+		if ( client->respawnMsec < 50 ) {
+			client->respawnMsec = 50;
+		} else if ( client->respawnMsec > 1700 ) {
+			client->respawnMsec = 1700;
+		}
+	}
+
+	// DeFRaG: per-client "demo name", distinct from netname. Confirmed
+	// from qagame.qvm disassembly; see disasm/G_CLIENT/README.md
+	s = Info_ValueForKey( userinfo, "df_name" );
+	ClientCleanName( s, client->demoName, sizeof( client->demoName ) );
+
 	if ( client->pers.connected == CON_CONNECTED ) {
 		if ( strcmp( oldname, client->pers.netname ) ) {
 			trap_SendServerCommand( -1, va("print \"%s" S_COLOR_WHITE " renamed to %s\n\"", oldname, 
@@ -921,6 +941,25 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	value = Info_ValueForKey (userinfo, "ip");
 	if ( G_FilterPacket( value ) ) {
 		return "You are banned from this server.";
+	}
+
+	// DeFRaG: on a non-dedicated (listen) server, only ever allow the very
+	// first connection, and only if it's local — every connection after
+	// that, local or remote, is rejected. This keeps a local/offline
+	// practice session from ever becoming a shared multiplayer game.
+	// Dedicated servers are unaffected. Confirmed from qagame.qvm
+	// disassembly; see disasm/G_CLIENT/README.md
+	if ( !g_dedicated.integer ) {
+		int i;
+
+		if ( value[0] && Q_stricmp( value, "localhost" ) != 0 ) {
+			return "Remote clients are not allowed in this game mode.";
+		}
+		for ( i = 0; i < level.maxclients; i++ ) {
+			if ( level.clients[i].pers.connected != CON_DISCONNECTED ) {
+				return "Remote clients are not allowed in this game mode.";
+			}
+		}
 	}
 
   // we don't check password for bots and local client
@@ -1180,19 +1219,53 @@ void ClientSpawn(gentity_t *ent) {
 
 	client->ps.clientNum = index;
 
-	client->ps.stats[STAT_WEAPONS] = ( 1 << WP_MACHINEGUN );
-	if ( g_gametype.integer == GT_TEAM ) {
-		client->ps.ammo[WP_MACHINEGUN] = 50;
-	} else {
-		client->ps.ammo[WP_MACHINEGUN] = 100;
-	}
-
-	client->ps.stats[STAT_WEAPONS] |= ( 1 << WP_GAUNTLET );
+	// DeFRaG spawn loadout (confirmed from qagame.qvm disassembly, func_0x274b
+	// at 0x274b): the starting weapon set comes from the "df_ndm_weaponsSet"
+	// cvar (a bitmask, same encoding as STAT_WEAPONS) rather than vanilla's
+	// hardcoded gauntlet+machinegun. Gauntlet stays at -1/infinite (matches
+	// both vanilla and the confirmed bytecode). Grappling hook is
+	// deliberately kept at -1/infinite here instead of matching the
+	// confirmed bytecode's quirk of overwriting it to 200 (an apparent
+	// off-by-one in the original ammo-init loop's bounds, not an intentional
+	// value) — -1 is strictly more sensible if a server ever grants the hook
+	// via weaponsSet, and the hook is excluded from the default weaponsSet
+	// mask anyway. See disasm/G_TRIGGER/func_0x274b.md.
+	client->ps.stats[STAT_WEAPONS] = df_ndm_weaponsSet.integer;
 	client->ps.ammo[WP_GAUNTLET] = -1;
 	client->ps.ammo[WP_GRAPPLING_HOOK] = -1;
 
+	// "df_ndm_weaponsPickup" (0 by default): machinegun ammo is 100 instead
+	// of 200, and every other weapon's starting ammo comes from that
+	// weapon's own item quantity (BG_FindItemForWeapon — confirmed as the
+	// decoded func_0x4b6a via its exact "Couldn't find item for weapon %i"
+	// error string and matching gitem_t field offsets) instead of a flat
+	// 200, but only for weapons actually present in weaponsSet. Confirmed
+	// formula: real bytecode tests "(0x13182c & 0x6) != 0", and 0x13182c's
+	// bit 0x6 is set unconditionally whenever df_ndm_weaponsPickup != 0 (and
+	// never otherwise) — i.e. a plain boolean gate, not a real bitmask.
+	client->ps.ammo[WP_MACHINEGUN] = df_ndm_weaponsPickup.integer ? 100 : 200;
+	for ( i = WP_SHOTGUN; i < WP_GRAPPLING_HOOK; i++ ) {
+		if ( df_ndm_weaponsPickup.integer && ( df_ndm_weaponsSet.integer & ( 1 << i ) ) ) {
+			client->ps.ammo[i] = BG_FindItemForWeapon( (weapon_t)i )->quantity;
+		} else {
+			client->ps.ammo[i] = 200;
+		}
+	}
+
 	// health will count down towards max_health
-	ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH] + 25;
+	// DeFRaG addition: "df_ndm_damage" (0 by default) selects between a flat
+	// 200/200 health+armor spawn (default — matches DeFRaG's usual
+	// movement-practice behavior, where combat damage doesn't matter) and a
+	// handicap-based health with no armor (df_ndm_damage != 0, vanilla-style
+	// "damage matters" mode). Confirmed from qagame.qvm disassembly
+	// (func_0x274b); see disasm/G_TRIGGER/func_0x274b.md.
+	if ( df_ndm_damage.integer != 0 ) {
+		ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH] + 25;
+		client->ps.stats[STAT_ARMOR] = 0;
+	} else {
+		ent->health = client->ps.stats[STAT_HEALTH] = 200;
+		client->ps.stats[STAT_ARMOR] = 200;
+	}
 
 	G_SetOrigin( ent, spawn_origin );
 	VectorCopy( spawn_origin, client->ps.origin );

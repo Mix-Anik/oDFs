@@ -149,16 +149,107 @@ Only value **1** enables the USE callbacks (`use_startTimer`, `use_stopTimer`,
 
 | Address | Description |
 |---------|-------------|
-| `0x131820` | Extra ready flag (set to 1 in mode 1) |
-| `0x131824` | Config value (set to 6 in mode 1) |
+| `0x131820` | Extra ready flag (set to 1 in mode 1) — **now resolved, see below** |
+| `0x131824` | Config value (set to 6 in mode 1) — **now resolved, see below** |
 | `0x131828` | Timer config (set to 126 / 0x7e in mode 1; 0x100 OR'd in mode 3) |
 | `0x13182c` | Timer config (same as 0x131828) |
-| `0x131830` | Cleared to 0 in mode 1 |
+| `0x131830` | Cleared to 0 in mode 1 — **now resolved, see below** |
 | `0x131834` | Cleared to 0 in mode 1 |
 | `0x131838` | Init-complete flag (set to 1 at end of mode 1 init) |
 | `0x1317c8` | Set to -1 in mode 1 (unknown purpose) |
 | `0x12c6f0` | Shared 256-byte cvar string buffer (reused by ReadCvarBuf) |
 | `0x19ecc` | Inactivity timeout cvar cache (referenced in func_0x1a44a) |
+
+## `df_ndm_*` cvar cluster — RESOLVED
+
+A later pass (investigating `trigger_push_touch`'s DeFRaG addition — see
+[`trigger_push_touch.md`](trigger_push_touch.md)) traced this function's
+tail (after the per-mode switch covered above, at the shared label where
+every switch case converges, `0x200a` onward) and found it **overwrites**
+`0x131820`/`0x131824`/`0x131830` again, unconditionally, right after the
+switch — making the switch's own per-case values for these three addresses
+only short-lived defaults, immediately replaced by real cvar reads:
+
+```c
+*(int*)0x131820 = trap_Cvar_VariableIntegerValue( "df_ndm_damage" );      // 0x2021-0x202a
+*(int*)0x131824 = trap_Cvar_VariableIntegerValue( "df_ndm_weaponsSet" );  // 0x202b-0x2034
+*(int*)0x131830 = trap_Cvar_VariableIntegerValue( "df_ndm_nopad" );       // 0x2035-0x203e
+```
+
+Confirmed via the string literals ("df_ndm_damage" at `0x4108`,
+"df_ndm_weaponsSet" at `0x40f6`, "df_ndm_nopad" at `0x40e9`) immediately
+preceding each `trap -7` (`trap_Cvar_VariableIntegerValue`, previously
+established in this project) call, each result stored directly into the
+named global with no further transformation.
+
+**Registered cvar defaults** — read from the cvar-registration table's
+string pool (`0x2f00`–`0x2fb1`), where a numeric literal immediately
+*preceding* a cvar's name string in the pool is that cvar's own default
+(cross-checked against 3 known-correct vanilla defaults found the same way:
+`g_knockback`→`"1000"`, `g_gravity`→`"800"`, `g_speed`→`"320"`, all
+confirmed matching real vanilla values, validating the pairing convention):
+
+| Cvar | Global | Default | Confidence |
+|------|--------|---------|------------|
+| `df_ndm_weaponsSet` | `0x131824` | `"1022"` (`0b1111111110`= all weapons except `WP_GAUNTLET` and `WP_GRAPPLING_HOOK`) | High — literal found directly adjacent in the pool |
+| `df_ndm_damage` | `0x131820` | `"0"` | Medium-high — no distinct literal adjacent (likely a dedup'd shared `"0"` string); inferred from semantics (func_0x274b's gating, see below) rather than read directly |
+| `df_ndm_nopad` | `0x131830` | `"0"` | Medium-high — same reasoning as `df_ndm_damage` |
+
+The same tail also sets two more addresses from two more `df_ndm_*` cvars,
+confirmed the identical way (string literal immediately preceding a
+`trap -7` call, result stored with no transformation):
+
+- `0x131834` = cached integer value of cvar **`df_ndm_noteleport`** — see
+  [`trigger_teleporter_touch.md`](trigger_teleporter_touch.md).
+- `0x131838` — **correction to this doc's earlier entry** ("Init-complete
+  flag, set to 1 at end of mode 1 init"): that was only the switch's
+  *default* value for mode 1, immediately overwritten right after, same as
+  `0x131820`/`0x131824`/`0x131830`. The real final value is
+  **`(df_ndm_nomover == 0) ? 1 : 0`** — i.e. it is the *inverse* of
+  "nomover is enabled", not an init-complete flag at all. Confirmed consumed
+  by a separate, NOT-yet-decoded level-init entity sweep — see
+  "Unresolved: entity-culling sweep" below.
+
+This also resolves two previously-blocked findings elsewhere in this
+project:
+
+1. **`func_0x274b`'s health/armor override** (see
+   [`func_0x274b.md`](func_0x274b.md)) — the gating global `0x131820` is
+   **`df_ndm_damage`**. `df_ndm_damage == 0` (default) → flat 200
+   health/armor; `!= 0` → handicap-based health, armor = 0. This is the
+   "no damage mode" semantics the cvar's name implies: damage doesn't matter
+   by default on DeFRaG movement maps, so health/armor are maxed out; a map
+   or server can opt back into "damage matters" by setting this cvar.
+2. **`trigger_push_touch`'s instant-kill gate** (see
+   [`trigger_push_touch.md`](trigger_push_touch.md)) — the gating global
+   `0x131830` is **`df_ndm_nopad`**.
+
+`0x131824` (`df_ndm_weaponsSet`) is also the source of `func_0x274b`'s
+`ps.stats[STAT_WEAPONS]` assignment — see that doc.
+
+Also confirmed in this same function's tail: `df_hook_Type` → `0x13183c`,
+`df_lg_Knockback` → `0x131840` (both already existing oDFs cvars,
+`df_hook_type`/`df_lg_knockback` — this just confirms their qagame-side cache
+addresses, no new behavior to port), and `df_ndm_powerups` /
+`df_ndm_weaponsPickup` / `df_ndm_itemsSpawn` all feed bits into a combined
+bitmask at `0x13182c` (which turns out to be the same global `func_0x274b`'s
+ammo-loop tests via `& 0x6` — the `0x6` bits specifically come from
+`df_ndm_weaponsPickup`, resolving what that gate actually means, though
+`func_0x4b6a` itself is still unidentified). `df_ndm_itemsSpawn` additionally
+drives `0x131828` (a related bitmask, OR'd with either a constant `0x7e` or
+the `0x13182c` bitmask depending on its value) — not traced further, no
+known consumer located in this pass.
+
+## Level-init entity-culling sweep (`func_0x20e0`) — RESOLVED, see dedicated doc
+
+`0x131838`'s consumer turned out to be part of a much larger, now mostly
+decoded feature: a per-entity gametype/mode exclusion system spanning three
+functions (`func_0x1c9c`, `func_0x24b2a`/`G_SpawnGEntityFromSpawnVars`, and
+this sweep, `func_0x20e0`). Moved to its own module writeup —
+see [`../G_SPAWN/entity_mode_exclusion.md`](../G_SPAWN/entity_mode_exclusion.md)
+for the full decode, the ~13 `not<mode>` spawn-key table, and what's still
+genuinely open (the bit-polarity oddity, and the unidentified `df_gametype`
+mode-number meanings). **Not ported** — see that doc for why.
 
 ---
 

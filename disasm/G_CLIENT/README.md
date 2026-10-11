@@ -3,6 +3,22 @@
 Analysis of `g_client.c`-equivalent functions from the Defrag qagame.qvm —
 client connect/spawn/disconnect lifecycle and userinfo handling.
 
+**Update (later pass): the five per-function docs now actually exist** —
+[`ClientUserinfoChanged.md`](ClientUserinfoChanged.md),
+[`ClientConnect.md`](ClientConnect.md), [`ClientBegin.md`](ClientBegin.md),
+[`ClientSpawn.md`](ClientSpawn.md) (a pointer to the full decode, which
+lives in `../G_ACTIVE/ClientThink_real.md` under this address's corrected
+identity), and [`ClientDisconnect.md`](ClientDisconnect.md) (fully
+re-decoded fresh this pass, independently of this README, then
+cross-referenced against it). `ClientConnect.md` and `ClientBegin.md` were
+independently re-verified/re-decoded against the raw bytecode this pass;
+`ClientUserinfoChanged.md` carries over an earlier pass's own
+re-verification (see that doc). Findings below not covered by one of those
+five docs have **not** been independently re-checked and should be treated
+with appropriate caution. Two branch-polarity errors from the original
+pass (headline findings 2 and 4) were already corrected in place below in
+an earlier revision of this README.
+
 For general disassembly methodology, struct layouts, and global addresses see
 [../README.md](../README.md). `ClientBegin`/`ClientSpawn`/`ClientRespawn`/
 `CopyToBodyQue` were already located by a prior pass — see
@@ -41,21 +57,76 @@ enough for a pure position walk (see headline finding 5 below).
    for the full trace that resolved this.
 2. **The real `ent->health = maxHealth + 25` assignment does not live in
    `ClientSpawn`'s own body.** It's inside a separate helper, `func_0x274b`,
-   called once from `ClientSpawn`. That helper implements a **server-global
-   "debug/noclip mode" override**: when a global noclip flag (`0x131820`) is
-   set, every spawning player gets a flat **200 health / 200 armor / 200
-   ammo (all weapons)** instead of the normal handicap-based health and zero
-   armor/default ammo. This is gated by server-side globals, **not** by any
-   userinfo key. See [ClientSpawn.md](ClientSpawn.md#func_0x274b).
+   called once from `ClientSpawn` — already fully decoded in an earlier,
+   independently-careful pass this session, see
+   [`../G_TRIGGER/func_0x274b.md`](../G_TRIGGER/func_0x274b.md).
+   **Correction**: the original summary here had the polarity backwards.
+   The confirmed behavior is `if (*(int*)0x131820 != 0) health =
+   handicap+25, armor=0; else health=200, armor=200` — i.e. the flat
+   **200/200 override is the DEFAULT (flag clear)** state, and the
+   handicap-based calculation is what happens when the flag is **set**, not
+   the other way around. **`0x131820`'s identity is now resolved**: a later
+   pass (investigating `trigger_push_touch`, see
+   [`../G_TRIGGER/trigger_push_touch.md`](../G_TRIGGER/trigger_push_touch.md))
+   traced `func_0x1e60`/`G_InitRaceMode` and found `0x131820` is the cached
+   integer value of cvar **`df_ndm_damage`** (default `"0"`), re-read once
+   per map init via `trap_Cvar_VariableIntegerValue`. **Implemented**: see
+   [`../G_TRIGGER/func_0x274b.md`](../G_TRIGGER/func_0x274b.md)'s
+   "Implemented" section — `ClientSpawn` now gates health/armor on
+   `df_ndm_damage.integer`, and also now sets the starting weapon bitmask
+   from the sibling cvar `df_ndm_weaponsSet` (same pass, same resolution).
 3. **Two genuinely new userinfo keys were found in `ClientUserinfoChanged`**:
-   `"df_cl_respawnMsec"` (per-client configurable respawn delay, 50–1700ms,
-   replacing vanilla's hardcoded 1700ms in `player_die`) and `"df_name"` (a
-   separate 20-byte "demo name" distinct from the netname, broadcast to
-   other clients via a new `\dfn\` configstring token). See
-   [ClientUserinfoChanged.md](ClientUserinfoChanged.md).
-4. **`ClientConnect` gained a "reject remote clients on an empty server"
-   check** — a local/solo-practice-server protection not present in
-   vanilla/oDFs. See [ClientConnect.md](ClientConnect.md).
+   `"df_cl_respawnMsec"` (per-client configurable respawn delay) and
+   `"df_name"` (a separate "demo name" distinct from the netname).
+   **Re-verified independently** (this doc's individual detail files were
+   never actually written by the originating pass — only this README
+   existed — so these two were re-confirmed directly against the bytecode
+   before porting, at `0x1cd50`-`0x1cd92` and `0x1ce0d`-`0x1ce34`):
+   - `df_cl_respawnMsec`: parsed via `Info_ValueForKey`+`atoi`, clamped to
+     `[50, 1700]` (confirmed literals `0x32`/`0x6a4`), **default `250`
+     (`0xfa`) when the key is empty/unset** — not vanilla's hardcoded 1700,
+     and not `oDFs`'s own prior hardcoded `500` in `player_die`
+     (`g_combat.c`) either. **Implemented**: added `gclient_t.respawnMsec`,
+     parsed in `ClientUserinfoChanged`, used in `player_die` in place of the
+     literal `500`.
+   - `df_name`: parsed, sanitized through the same cleaning helper used for
+     `name` (`func_0x12e3`), and stored in a confirmed **20-byte** field
+     (`client+0x268`, copy length `0x14` confirmed). **The claimed `\dfn\`
+     configstring broadcast could not be confirmed** — no such token string
+     was found anywhere in the QVM, and no code consuming `client+0x268`
+     afterward (e.g. building an outgoing configstring) was located in this
+     pass. **Implemented storage only** (`gclient_t.demoName[21]`,
+     parsed/cleaned in `ClientUserinfoChanged`), with no broadcast — the
+     original README's broadcast claim is corrected here as unconfirmed,
+     not ported.
+4. **`ClientConnect` gained a listen-server lockout check** —
+   **re-decoded in full this pass** (the referenced `ClientConnect.md` was
+   never actually written; the mechanism required correcting the original
+   summary's framing, see below). Confirmed via `func_0x3db9`
+   (`0x3db9`-`0x3e09`), called right after the ban check, string literal
+   `"Remote clients are not allowed in this game mode."` at `0x7e6b`:
+   ```c
+   qboolean CanConnect( int clientNum ) {
+       if ( Cvar_VariableIntegerValue("dedicated") != 0 )
+           return qtrue;   // dedicated servers: unaffected
+       // (df_gametype remapping of raw values 5/6/7 -> 1/2/3 also forces
+       // this same bypass — exact semantic meaning of those values not
+       // identified, not ported)
+       ip = Info_ValueForKey(userinfo, "ip");
+       if ( ip[0] && Q_stricmp(ip, "localhost") != 0 )
+           return qfalse;  // genuinely remote IP on a non-dedicated (listen) server -> reject
+       for ( i = 0; i < sv_maxclients; i++ )
+           if ( g_clients[i].pers.connected != CON_DISCONNECTED )
+               return qfalse;  // someone (even local) is already connected -> reject
+       return qtrue;  // server is completely empty -> allow (the very first/host connection)
+   }
+   ```
+   Net effect: on a non-dedicated listen server, only the very first
+   connection is ever permitted, and only if local — every connection
+   after that (local or remote) is rejected. Dedicated servers are
+   unaffected. **Implemented** in `ClientConnect` (`g_client.c`), using
+   oDFs's existing `g_dedicated` cvar; the `df_gametype` remapping nuance
+   was not ported (values 5/6/7's meaning unconfirmed).
 5. **`ClientDisconnect` does *not* reset any `g_raceTimers[MAX_CLIENTS]`-style
    per-client race-timing state.** The only race/speedrun-adjacent cleanup
    found is resetting a *global* (not per-client) "max speed achieved this
@@ -74,14 +145,18 @@ enough for a pure position walk (see headline finding 5 below).
    previously described as "Max speed reset flag (1 byte)". `ClientDisconnect`
    shows it is actually the destination of a 20-byte `Q_strncpyz` copy (a
    name-display buffer for the max-speed record holder), not a 1-byte flag.
-8. Resolves the previously-flagged-uncertain global `0x1317bc`
-   (`G_ACTIVE/README.md`: "controls weapon selection behavior in
-   ClientThink_real spawn path — exact purpose uncertain") — it gates a
-   **"keep weapon across respawn"** feature in `ClientSpawn`: when set to
-   `1`, and the player still owns the weapon cached in a persistent
-   per-client byte (`client+0x1ec`, inside `pers`, survives the respawn
-   wipe), spawn with that weapon instead of running the normal
-   highest-owned-weapon auto-select loop.
+8. Re-confirmed directly (`0x1d627`-`0x1d679`): global `0x1317bc` gates a
+   **"keep weapon across respawn"** feature in `ClientSpawn` — when
+   `*(0x1317bc) == 1` and the player still owns the weapon cached in a
+   persistent per-client byte (`client+0x1ec`, byte-tested against the
+   `STAT_WEAPONS` bitmask), spawn with that weapon instead of running the
+   normal highest-owned-weapon auto-select loop (which starts at `0x1d651`
+   on the `else`/fallthrough path). **Not ported**: what `0x1317bc` actually
+   represents (a gametype value? a `df_mode`-style setting?) was not
+   identified in this or the prior pass — porting a gate without knowing
+   its real trigger condition risks enabling DeFRaG-specific behavior for
+   the wrong oDFs gametypes/settings, so this was deliberately left
+   un-implemented pending that identification.
 
 ## Not attempted this pass
 
@@ -100,5 +175,8 @@ enough for a pure position walk (see headline finding 5 below).
   `ClientDisconnect`) — already flagged purpose-unclear in
   `G_ACTIVE/README.md`; not re-examined this pass.
 - `ClientBegin`'s new `func_0x26e8` call and the team-change stat-reset
-  block (`client+0x2a4`/`0x2a8`/`0x2ac`) — existence confirmed, fields not
-  individually identified.
+  block (`client+0x288`/`0x2a4`/`0x2a8`/`0x2ac`) — **now fully decoded**,
+  see [`ClientBegin.md`](ClientBegin.md). The gating condition (skip unless
+  team actually changed and wasn't from spectator) is now confirmed; the
+  individual fields' identities and `func_0x26e8`/`func_0x3a47`'s exact
+  purpose are still not identified.

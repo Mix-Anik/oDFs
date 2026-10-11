@@ -103,9 +103,8 @@ void func_0x274b(gentity_t *ent) {
         } else if ((*(int*)0x131824 & (1 << i)) == 0) {
             ent->client->ps.ammo[i] = 200;
         } else {
-            void *item = func_0x4b6a(i);           // NOT identified — takes the loop
-                                                    // index, returns a pointer
-            ent->client->ps.ammo[i] = *(int*)((char*)item + 0x20);
+            gitem_t *item = BG_FindItemForWeapon(i); // func_0x4b6a — RESOLVED, see below
+            ent->client->ps.ammo[i] = item->quantity; // +0x20
         }
     }
 }
@@ -160,18 +159,109 @@ for the project owner to decide how to act on.
 
 ---
 
+## RESOLVED — `0x131820` and `0x131824` cvar identities
+
+A later pass (`func_0x1e60.md`'s "`df_ndm_*` cvar cluster" section)
+confirmed `0x131820`/`0x131824` are not static mode-config constants but
+live cvar caches, re-read every `G_InitRaceMode` (map init):
+
+- `0x131820` = cached integer value of cvar **`df_ndm_damage`** (default
+  `"0"`). This resolves the gate above: `df_ndm_damage == 0` (default) →
+  flat 200 health, 200 armor; `!= 0` → handicap-based health (`maxHealth +
+  25`, matching oDFs's own existing vanilla formula), armor = 0.
+- `0x131824` = cached integer value of cvar **`df_ndm_weaponsSet`** (default
+  `"1022"`, confirmed from the cvar-registration string pool). This resolves
+  the unconditional `ps.stats[STAT_WEAPONS] = *(0x131824)` write: the
+  starting weapon bitmask comes directly from this cvar.
+
+`ent->client + 0x224`'s identity (used in the handicap branch) is still not
+independently confirmed, but mapping it to oDFs's own
+`client->ps.stats[STAT_MAX_HEALTH]` (itself derived from the `"handicap"`
+userinfo key, same `+25` formula vanilla/oDFs already uses) is a direct,
+low-risk equivalence rather than a guess — the formula and the field's
+documented purpose (`STAT_MAX_HEALTH`: "health/armor limit, changeable by
+handicap", `code/game/bg_public.h`) already match exactly.
+
+## `func_0x4b6a` — RESOLVED: `BG_FindItemForWeapon`
+
+Full decode confirms this beyond doubt: it walks the item list looking for
+`item->giType == 1` (`IT_WEAPON`) and `item->giTag == arg0` (the weapon
+number), returning that item — and its error path references the literal
+string **`"Couldn't find item for weapon %i"`** (data address `0x4c86`).
+This is vanilla's `BG_FindItemForWeapon` byte-for-byte:
+```c
+gitem_t *BG_FindItemForWeapon( weapon_t weapon ) {
+	gitem_t	*it;
+	for ( it = bg_itemlist + 1 ; it->classname ; it++) {
+		if ( it->giType == IT_WEAPON && it->giTag == weapon ) {
+			return it;
+		}
+	}
+	Com_Error( ERR_DROP, "Couldn't find item for weapon %i", weapon);
+	return NULL;
+}
+```
+oDFs's own `BG_FindItemForWeapon` (`code/game/bg_misc.c:973`) is this exact
+function, unmodified. The field offsets match too: `gitem_t.giType` sits at
+`+0x24` and `giTag` at `+0x28` in oDFs's own `gitem_t` layout (computed from
+`code/game/bg_public.h`'s field declarations: `classname`(+0)/
+`pickup_sound`(+4)/`world_model[4]`(+8..+0x18)/`icon`(+0x18)/
+`pickup_name`(+0x1c)/`quantity`(+0x20)/`giType`(+0x24)/`giTag`(+0x28)) —
+exactly matching the bytecode's `+0x24`/`+0x28` checks, and `quantity` at
+`+0x20` exactly matching what `func_0x274b` reads from the returned
+pointer. So `func_0x274b`'s rarer branch is simply:
+`ps.ammo[i] = BG_FindItemForWeapon(i)->quantity` — use the weapon's own
+default pickup-ammo quantity instead of a flat `200`.
+
+### The `*(0x13182c) & 0x6` gate — RESOLVED
+
+Traced to `func_0x1e60` (`G_InitRaceMode`)'s body past where earlier passes
+stopped reading (`0x2097`–`0x20ab`): confirmed to be a plain boolean gate,
+not a real bitmask —
+```c
+if ( trap_Cvar_VariableIntegerValue( "df_ndm_weaponsPickup" ) != 0 )
+    *(int*)0x13182c |= 0x6;
+```
+Nothing else in the QVM sets these two bits. So
+`(*(0x13182c) & 0x6) != 0` is exactly `df_ndm_weaponsPickup.integer != 0`.
+**Registered cvar default**: no distinct literal found directly adjacent
+in the cvar-registration string pool (`df_ndm_nomover`/`noteleport`/`nopad`/
+`itemsSpawn`/`weaponsPickup` all sit consecutively with no default string
+between them) — same situation as `df_ndm_damage`/`df_ndm_nopad` earlier in
+this project, i.e. a dedup'd shared `"0"` literal; same medium-high
+confidence as those two, not a directly-read literal.
+
+Also resolves `ps.ammo[2]` (`WP_MACHINEGUN`)'s special case from the table
+above: `ammo2 = (df_ndm_weaponsPickup.integer != 0) ? 100 : 200` — the one
+slot in this function that does NOT use `BG_FindItemForWeapon` even when
+the gate is active, just a flat `100` instead of `200`.
+
+## Implemented
+
+`code/game/g_client.c`'s `ClientSpawn`: replaced the vanilla hardcoded
+gauntlet+machinegun loadout and `handicap+25`-always health with the
+decoded DeFRaG logic — `STAT_WEAPONS` from `df_ndm_weaponsSet.integer`, the
+`df_ndm_damage`-gated health/armor branch above, and now (this pass) the
+full `df_ndm_weaponsPickup`-gated ammo logic: `WP_MACHINEGUN` gets
+`100`/`200`, and `WP_SHOTGUN..WP_BFG` get `BG_FindItemForWeapon(i)->quantity`
+when `df_ndm_weaponsPickup` is set and the weapon is present in
+`weaponsSet`, else `200` — exactly matching the decoded loop. New cvars
+`df_ndm_damage` (default `"0"`), `df_ndm_weaponsSet` (default `"1022"`),
+and `df_ndm_weaponsPickup` (default `"0"`) registered in `code/game/g_main.c`.
+Compiled clean.
+
+Still **not** ported faithfully: the bytecode's apparent quirk of
+overwriting `ps.ammo[WP_GRAPPLING_HOOK]` from `-1` to `200`/item-quantity in
+the same loop — oDFs keeps it at `-1` (infinite) instead, since that's
+strictly more sensible and the hook is excluded from the default
+`weaponsSet` mask anyway. `ent->client+0xf8` and the `0x131808==3`/
+`StartRace` call are likewise not ported (see unresolved items below,
+unchanged).
+
 ## Unresolved items (flagged, not speculated on)
 
-- **`func_0x4b6a(i)`** — takes the loop index (`3..10`), returns a pointer;
-  offset `+0x20` of that pointer is read into `ps.ammo[i]`. Not identified.
-  Plausibly a weapon/item-table lookup (e.g. something returning a
-  `gitem_t`-like struct and reading an ammo-count field), but this is
-  explicitly **not confirmed** — flagged as unknown per project rules.
 - **`ent->client + 0xf8`** — cleared to 0 at the very start of this function.
   Field identity unknown.
-- **`ent->client + 0x224`** — read (and `+25` added) when computing spawn
-  health if `*(0x131820) != 0`. Field identity unknown; plausibly a
-  handicap-derived value, not confirmed.
 - **Why `0x131808` is compared `==3` here vs. `==1` in `use_startTimer`
   (`0x39c5`)** for what is nominally the same address — not resolved. Both
   reads target the literal address `0x131808`; per `func_0x1e60.md`,

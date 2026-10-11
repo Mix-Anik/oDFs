@@ -165,14 +165,121 @@ the `VectorCopy` velocity write, which now happens earlier/branch-specific
 instead of always-last — no observable behavioral effect from the reorder
 itself).
 
+## Touch side — `trigger_push_touch` also has a DeFRaG addition
+
+Found while tracing the spawn side below: `trigger_push_touch` itself (the
+shared `touch` callback used by both `SP_trigger_push` and
+`SP_trigger_push_velocity`) is **not** vanilla-identical either — it gates
+an instant-kill `G_Damage` call on cvar `df_ndm_nopad`. Fully decoded and
+**implemented**; see
+[`../G_TRIGGER/trigger_push_touch.md`](../G_TRIGGER/trigger_push_touch.md)
+for the full writeup (this applies to *every* jump pad, not just the custom
+ones below).
+
+## Spawn side — RESOLVED: new classname `trigger_push_velocity`
+
+A later pass traced this fully. `SP_trigger_push` itself (`0x27a39`, 62
+bytes) is **hash-identical to vanilla** (`23e9115c`) — confirmed completely
+unmodified, so it does not set `weapon`/`angles2`. The spawn-table data
+segment (walked directly: entries are 8-byte `{char *name; void
+(*spawn)(gentity_t*);}` pairs, e.g. `0x2684`→`{"trigger_push", 0x27a39}`)
+contains an entry immediately after it: `0x268c`→`{"trigger_push_velocity",
+0x27a76}` — a brand-new DeFRaG-only classname, string-confirmed at `0x96e3`
+in the data segment. Its spawn function (`SP_trigger_push_velocity`,
+`0x27a76`, 119 bytes, no vanilla hash counterpart) is **byte-for-byte
+identical to `SP_trigger_push`** (`InitTrigger`, same sound precache, same
+`ET_PUSH_TRIGGER`/`touch`/`think`/`nextthink` assignments) plus four extra
+field copies inserted right before `trap_LinkEntity`:
+
+```c
+self->s.weapon     = self->spawnflags;        // *(self+0x210) -> *(self+0xc0)
+self->s.angles2[0] = self->random;            // *(self+0x2a0) -> *(self+0x80)
+self->s.angles2[1] = self->random;            // *(self+0x2a0) -> *(self+0x84) (same value, duplicated)
+self->s.angles2[2] = (float)self->count;      // *(self+0x2f8) -> *(self+0x88), cvif
+```
+
+`self+0x210` = `spawnflags` was independently confirmed via `SP_trigger_hurt`
+(`0x27df3`, hash-identical to vanilla, `-7f009cb7`): it reads `*(self+0x210)
+& 2` and `& 1` to gate `hurt_use`/deferred-link exactly where vanilla checks
+`self->spawnflags`. `self+0x2a0` = `random` and `self+0x2f8` = `count` were
+already independently confirmed elsewhere in this project
+(`G_ACTIVE/func_0x20d2d.md` and `G_TRIGGER/race_timer_system.md`
+respectively) — both cross-checks agree with zero drift.
+
+**Practical effect:** a DeFRaG map author places a `trigger_push_velocity`
+entity (instead of `trigger_push`), still pointing "target" at a
+`target_position` the same way, and uses the entity's **Spawnflags
+checkboxes** to pick the custom mode bits below, its **"random" key** as the
+bit-`0x1`/bit-`0x1`-clear-with-`0x10` magnitude, and its **"count" key**
+(integer) as the bit-`0x4` vertical magnitude.
+
+## CORRECTION — a 6th mode bit was missed: `0x20` (vertical auto-flip)
+
+A full line-by-line re-decode of the vertical-magnitude computation
+(`0x51c3`–`0x521d`, the `mode & 0x4` **clear** path) found a second,
+previously undocumented auto-flip bit, structurally identical to bit `0x10`
+but applied to the vertical (`origin2[2]`) magnitude instead of the
+horizontal direction:
+
+```c
+vertBoost = jumppad->origin2[2];
+if ( mode & 0x20 ) {
+    // same "which side gives more/less total speed" comparison as bit 0x10,
+    // applied to vertBoost instead of the horizontal pushDir
+    if ( |velocity_with_vertBoost_subtracted| > |velocity_with_vertBoost_added| )
+        vertBoost = -vertBoost;
+}
+```
+Only meaningful when bit `0x4` is **clear** (i.e. using the pad's configured
+`origin2[2]` magnitude rather than the velocity-sign-derived one from bit
+`0x4`), exactly paralleling how bit `0x10` only matters when bit `0x1` is
+clear.
+
+## CORRECTION — the "`local2c` may be uninitialized" caveat was wrong
+
+The original pass's caveat about bit `0x8`'s hard-overwrite path
+(`ps->velocity.z = local2c`) possibly reading an uninitialized value when bit
+`0x4` is clear was **incorrect** — a full decode shows `local2c` (this doc's
+`vertBoost`) is unconditionally assigned by exactly one of the two mutually
+exclusive branches above (`mode & 0x4` set → velocity-sign-derived; clear →
+`origin2[2]`, optionally flipped by `0x20`) before any apply-mode code runs.
+There is no reachable path where it is read uninitialized.
+
+## CORRECTION — the anti-reversal (`0x40`) comparison is a true cosine, not a bare length compare
+
+Re-derived precisely: for both the horizontal (`0x521d`+) and vertical
+(`0x52ac`+) additive-blend paths, the candidate blended vector's cosine
+similarity against the player's *original, unmodified* velocity
+(`DotProduct(candidate, original) / (|candidate| * |original|)`) is computed
+via two `VectorLength` calls (`0x8d63`) and a manual 3-term dot product —
+confirmed exactly matching a textbook cosine-of-angle formula, not an
+approximation. If bit `0x40` is set and this cosine is negative, the
+corresponding velocity component(s) are zeroed instead of applied. Note the
+vertical check's "original velocity" is read *after* the horizontal
+apply-mode block has already run, so if that block modified
+`ps->velocity.x`/`.y`, the vertical cosine check sees the *already-updated*
+horizontal components — this is a direct, intentional consequence of the
+two blocks running sequentially and both reading live `ps->velocity`, not a
+bug.
+
 ## Summary
 
 This is a genuine, substantial DeFRaG-specific jumppad feature: a
-per-trigger_push opt-in (via `entityState_t.weapon` != 0) alternate physics
-mode supporting direction-from-player-velocity pushes, automatic push-side
-flipping, separately configurable horizontal/vertical apply modes
-(additive-blend vs hard-set), and an anti-reversal safety clamp — all
+per-trigger_push-entity opt-in (new classname `trigger_push_velocity`, via
+`entityState_t.weapon` != 0, set from the entity's own `spawnflags`)
+alternate physics mode supporting direction-from-player-velocity pushes,
+automatic push-side flipping on **both** axes (bits `0x10`/`0x20`),
+separately configurable horizontal/vertical apply modes (additive-blend vs
+hard-set), and an anti-reversal safety clamp (true cosine check) — all
 falling back to exact vanilla behavior for any jumppad that leaves `weapon`
-at its default `0`. **Not yet connected to any known DeFRaG cvar or mapping
-entity-key name** — that would require examining `g_trigger.c`/`g_target.c`
-spawn code, out of scope for this `bg_misc.c`-focused pass.
+at its default `0` (i.e. any ordinary `trigger_push`).
+
+**Implemented** (`code/game/bg_misc.c`'s `BG_TouchJumpPad`, and
+`code/game/g_trigger.c`'s new `SP_trigger_push_velocity` + its
+`code/game/g_spawn.c` spawn-table registration): full port of all seven mode bits
+(`0x1`, `0x2`, `0x4`, `0x8`, `0x10`, `0x20`, `0x40` — `0x40` modifies the
+behavior of the `0x2`/`0x8` apply-mode branches rather than acting
+independently) and the new map entity. No DeFRaG cvar is involved anywhere in
+this feature — it is purely per-entity map data (spawnflags/"random"/"count"
+keys on `trigger_push_velocity`), so there was no gating-condition ambiguity
+blocking the port this time.

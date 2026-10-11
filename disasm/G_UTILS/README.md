@@ -80,50 +80,88 @@ in every row except `G_UseTargets`.
 
 ---
 
-## `G_TouchTriggers` open question — partial progress, not resolved
+## `G_TouchTriggers` open question — two candidates ruled out, both now fully decoded
 
 Per the prior `G_ACTIVE` pass, the true general-purpose `G_TouchTriggers`
 (handling items/teleporters, as opposed to `func_0x1a1b2`'s race-trigger-only
 scanner) was never conclusively located; two candidates were flagged:
 `0x23158` and `0x285b2`.
 
-**Both candidates are now ruled out as previously described:**
+**Both candidates are ruled out, and both are now fully decoded (not just
+narrowed):**
 
 - **`0x285b2` is not a separate function.** It is the `trap_EntitiesInBox`
   call (trap `-0x21`) *inside* `G_KillBox` (`0x28534`, decoded in full above,
   confirmed vanilla-identical `G_KillBox`). Not `G_TouchTriggers`.
 - **`0x23158` is not a function start either.** It is a `trap_EntitiesInBox`
-  call site *inside* a large, unlabeled function starting at `0x22fe6`
-  (`enter 0x10b8` — a 4280-byte stack frame, comparable in scale to
-  `func_0x1a1b2`'s own `enter 0x10a8`). This function is **not present in
-  DeFRaG's own top-level function-hash table** (it falls in the same
-  unlisted `0x22a37`–`0x232f6` gap as the already-documented grapple-swing
-  helpers `0x22b16`/`0x22b82`/`0x22eb4`), and per `../G_ACTIVE/README.md` is
-  reached via the call chain `0x23429 → 0x232f6 → 0x22fe6`, i.e. from the
-  grapple-swing subsystem, not from a per-frame client-touch dispatcher.
-
-Partial decode of `0x22fe6`'s entry (first ~90 instructions, box-construction
-only, not the full 784-instruction body): it takes 4 args (`ent`, a
-range/offset vector pointer, a 3rd arg, and an output pointer zeroed at
-entry), conditionally builds an expanded mins/maxs box from
-`ent->r.currentOrigin` (`ent+0x1e8`, confirmed field) plus the caller-supplied
-range vector, and passes `(ent+0x1b4, ent+0x1c0)` to a helper at `0x9bef` —
-the **same two field offsets** (`+0x1b4`/`+0x1c0`) that `func_0x1a1b2.md`
-already documented as "player movement bounds" used for its own extended
-per-entity overlap test. This suggests `0x22fe6` is a **shared box-construction
-utility used by both the grapple-swing code and (possibly) trigger-touch
-logic**, not a standalone `G_TouchTriggers`. Its `EntitiesInBox` result is
-never traced to a touch-function dispatch loop within the ~90 instructions
-read — **not confirmed either way**; a full 784-instruction decode would be
-needed to settle this, which was not done (out of budget for this pass, and
-explicitly lower-priority per task scope).
+  call site *inside* the function starting at `0x22fe6` (`enter 0x10b8`,
+  confirmed via its matching `leave` at `0x232f5` to be a full 784-instruction
+  body). **This function is now fully decoded — see
+  [`../G_ACTIVE/GrappleHookMover.md`](../G_ACTIVE/GrappleHookMover.md).**
+  It is definitively **NOT** `G_TouchTriggers`: it never reads a `->touch`
+  function pointer anywhere. It's a grapple-hook-specific push/crush/carry
+  mover — it moves the hook entity, then either damages (`G_Damage`,
+  `MOD_CRUSH`) or repositions (via a separate linked-list walk, not the
+  `EntitiesInBox` result) entities caught in its new bounding box. Reached
+  via the call chain `0x23429 → 0x232f6 → 0x22fe6`, confirming it belongs to
+  the grapple-swing subsystem, not a per-frame client-touch dispatcher.
 
 **Net result: the true general-purpose `G_TouchTriggers` remains
 unlocated.** Both previously-flagged candidate addresses are now positively
-identified as *not* being it (one is inside `G_KillBox`, the other is inside
-an uninvestigated grapple-adjacent helper), which narrows future search but
-does not close the question. Not behavior-relevant to `g_utils.c` itself —
-recorded here only because the task asked for a final status check.
+and fully identified as *not* being it (one is inside `G_KillBox`, the other
+is the grapple-hook mover documented in `GrappleHookMover.md`) — this closes
+out both leads rather than just narrowing them.
+
+**Follow-up (same pass): a full sweep of every `trap_EntitiesInBox` call
+site in the entire QVM** (grepped the whole file for the trap constant,
+verified each hit is actually followed by a `call` and not a coincidental
+bitmask `band`) found exactly **6 real call sites** total:
+`0x1a223` (`func_0x1a1b2`, race-trigger scanner, implemented), `0x1c5c7`
+(`func_0x1c56f`, an "is another player near this position" proximity
+check — see [`../G_COMBAT/func_0x1c56f.md`](../G_COMBAT/func_0x1c56f.md)),
+`0x207bc` (`G_RadiusDamage`),
+`0x209ed` (`func_0x20998`, a missile-only trigger-touch dispatcher — see
+[`../G_MISSILE/func_0x20998.md`](../G_MISSILE/func_0x20998.md)), `0x23158`
+(the grapple-hook mover above), and `0x285b2` (`G_KillBox`). **None of the
+6 is a confirmed generic player-side `G_TouchTriggers`** under the name/shape
+originally being searched for. The search continues; this sweep at least
+conclusively eliminates "it's some not-yet-opened `EntitiesInBox` call site"
+as a possibility — there are no more unexamined ones.
+
+**RESOLVED (same pass, final): `func_0x1a1b2` (item 1 above) *is*
+`G_TouchTriggers`.** It was labeled "race-trigger-only" in an earlier pass
+(justifying oDFs's split into a generic `G_TouchTriggers` plus a race-only
+`DeFRaG_TouchTriggers`), then re-read as "probably the sole scanner, but
+unconditionally excludes teleporters via a still-mysterious mechanism." A
+third, closer read of the exact branch targets around the
+`sessionTeam`/`eType`/hardcoded-address checks found that reasoning was
+still wrong: those three checks form **one single nested conditional**,
+byte-for-byte identical to vanilla `G_TouchTriggers`'s own spectator
+exception (`if (sessionTeam==SPECTATOR) { if (eType != ET_TELEPORT_TRIGGER
+&& touch != Touch_DoorTrigger) continue; }`) — not a flat, unconditional
+exclusion list. Teleporters are **never** excluded for normal players; the
+earlier "eType==9 universal exclusion" claim was a misread of the branch
+structure. The hardcoded address is now identified as `Touch_DoorTrigger`
+(confirmed by matching its full decode against oDFs's own vanilla-derived
+`Touch_DoorTrigger`/`Touch_DoorTriggerSpectator`/`Use_BinaryMover` in
+`g_mover.c`, instruction for instruction). The function's previously-unread
+tail also contains the exact vanilla jumppad-frame reset. **Full writeup:
+[`../G_ACTIVE/func_0x1a1b2.md`](../G_ACTIVE/func_0x1a1b2.md).**
+
+**Fixed in code this pass:** oDFs's `DeFRaG_TouchTriggers` (`g_active.c`)
+now implements the correct nested spectator/`Touch_DoorTrigger` exception
+and the jumppad-frame reset, making it a complete, faithful port of
+`func_0x1a1b2`. The now-fully-redundant second `G_TouchTriggers(ent)` call
+inside `ClientThink_real`'s per-frame tail has been removed (it was
+double-touching every item/trigger/door every frame); `G_TouchTriggers` as
+a function is kept, since `SpectatorThink` still legitimately calls it
+separately for spectator physics. Compiled clean (zero errors/warnings).
+
+**The only genuinely unresolved detail left**: one DeFRaG-added
+`trigger->flags & 0x40000000` exclusion bit with no located spawn-time
+writer and no confirmed purpose — flagged, not guessed at, not ported.
+Not behavior-relevant to `g_utils.c` itself — recorded here only because
+the task asked for a final status check.
 
 ---
 
@@ -143,6 +181,9 @@ recorded here only because the task asked for a final status check.
 3. **`G_KillBox` fully spot-decoded** (not just hash-matched) to rule out a
    hidden telefrag-damage constant change — confirmed `100000`/
    `DAMAGE_NO_PROTECTION`/`MOD_TELEFRAG` all vanilla.
-4. **`G_TouchTriggers` open question: narrowed, not resolved.** Both prior
-   candidate addresses are now shown to be something else; the real function
-   is still unlocated.
+4. **`G_TouchTriggers` open question: both prior candidates fully decoded and
+   ruled out, real function still unlocated.** `0x285b2` is inside
+   `G_KillBox`; `0x23158` is inside a fully-decoded grapple-hook
+   push/crush/carry mover (`0x22fe6`, see
+   [`../G_ACTIVE/GrappleHookMover.md`](../G_ACTIVE/GrappleHookMover.md)) —
+   neither is a touch dispatcher.

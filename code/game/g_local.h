@@ -310,6 +310,16 @@ struct gclient_s {
 
 	// timers
 	int			respawnTime;		// can respawn when time > this, force after g_forcerespwan
+	// DeFRaG: per-client configurable respawn delay (userinfo key
+	// "df_cl_respawnMsec", clamped [50,1700], default 250 when unset —
+	// replaces the hardcoded delay used in player_die). Confirmed from
+	// qagame.qvm disassembly; see disasm/G_CLIENT/README.md
+	int			respawnMsec;
+	// DeFRaG: per-client "demo name" (userinfo key "df_name"), distinct from
+	// the regular netname. Confirmed parsed/sanitized/stored server-side;
+	// no consumer (e.g. a broadcast configstring) was found in this pass —
+	// stored for completeness/future use. See disasm/G_CLIENT/README.md
+	char		demoName[21];
 	int			inactivityTime;		// kick players when time > this
 	qboolean	inactivityWarning;	// qtrue if the five seoond warning has been given
 	int			rewardTime;			// clear the EF_AWARD_IMPRESSIVE, etc when time > this
@@ -781,6 +791,11 @@ extern	vmCvar_t	df_ob_killobs;
 extern	vmCvar_t	df_mode;
 extern	vmCvar_t	df_hook_type;
 extern	vmCvar_t	df_lg_knockback;
+extern	vmCvar_t	df_ndm_damage;
+extern	vmCvar_t	df_ndm_weaponsSet;
+extern	vmCvar_t	df_ndm_weaponsPickup;
+extern	vmCvar_t	df_ndm_nopad;
+extern	vmCvar_t	df_ndm_noteleport;
 
 void	trap_Print( const char *text );
 _Noreturn void	trap_Error( const char *text );

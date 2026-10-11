@@ -24,7 +24,34 @@ trusting the "ClientThink_real" name below; it may actually be `ClientSpawn`
 
 ## Important: what is NOT in this function
 
-The `G_TouchTriggers` and `ClientEvents` calls documented in the old analysis are **not** inside ClientThink_real. They are in the **next function** (`0x1d6dc`), which is a thin wrapper that calls `G_TouchTriggers(0x1bda5)` and `ClientEvents(0x273f)` for every client each game frame. ClientThink_real ends cleanly at `0x1d6db`.
+The `G_TouchTriggers` and `ClientEvents` calls documented in the old analysis are **not** inside ClientThink_real. ClientThink_real ends cleanly at `0x1d6db`.
+
+**Correction (later pass, see [`../G_UTILS/README.md`](../G_UTILS/README.md)):**
+the claim that the next function (`0x1d6dc`) is "a thin wrapper that calls
+`G_TouchTriggers(0x1bda5)`" is **wrong and has been directly disproven**.
+`0x1d6dc` does call `0x1bda5` unconditionally first (confirmed, matches the
+original claim about the call site itself), but `0x1bda5` itself was
+independently decoded this pass and is **not** `G_TouchTriggers`.
+
+**Identity resolved (same session, cross-referenced from
+[`../G_CLIENT/README.md`](../G_CLIENT/README.md)): `0x1d6dc` is
+`ClientDisconnect`.** That module's own README had already identified it
+(address match confirmed exactly) and, independently, `0x1bda5` is
+`G_RemoveQueuedBotBegin` (per `G_CLIENT/README.md`'s own finding 6 — the
+"16-entry queue clear" shape was correct, it's a pending-bot-begin queue,
+not a trigger table), called from `ClientDisconnect` exactly where vanilla
+calls it. The `0x273f` call (gated on `ent->client != NULL` in this pass's
+own decode) is `ClientEvents`. The per-client bit manipulation against an
+array at `0x12a2f0` (stride `0x37c`) found in this pass is plausibly the
+"global max-speed-holder cleanup" and/or `0x13184c` 20-byte name-copy
+behavior described in `G_CLIENT/README.md`'s findings 5 and 7 — not
+individually re-matched instruction-for-instruction against that README's
+claims in this pass. So `0x1d6dc` is **not** the
+"`G_TouchTriggers`+`ClientEvents` wrapper" this doc previously assumed, but
+its real purpose is now identified (`ClientDisconnect`), just not via this
+doc. It has been removed from the `G_TouchTriggers` search. The real
+generic `G_TouchTriggers` turned out to be `func_0x1a1b2` after all — see
+[`../G_ACTIVE/func_0x1a1b2.md`](func_0x1a1b2.md) for the final resolution.
 
 ---
 

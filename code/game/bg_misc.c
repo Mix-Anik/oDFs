@@ -1018,7 +1018,11 @@ qboolean	BG_PlayerTouchesItem( playerState_t *ps, entityState_t *item, int atTim
 		|| ps->origin[0] - origin[0] < -50
 		|| ps->origin[1] - origin[1] > 36
 		|| ps->origin[1] - origin[1] < -36
-		|| ps->origin[2] - origin[2] > 36
+		// DeFRaG: the upper Z tolerance is relaxed from 36 to 66 units in
+		// promode (needed for CPM's higher jump arcs to still register
+		// airborne pickups). Confirmed from qagame.qvm disassembly; see
+		// disasm/BG_MISC/BG_PlayerTouchesItem.md
+		|| ps->origin[2] - origin[2] > ( (ps->pm_flags & PMF_PROMODE) ? 66 : 36 )
 		|| ps->origin[2] - origin[2] < -36 ) {
 		return qfalse;
 	}
@@ -1416,12 +1420,28 @@ void BG_AddPredictableEventToPlayerstate( int newEvent, int eventParm, playerSta
 /*
 ========================
 BG_TouchJumpPad
+
+DeFRaG addition: jumppad->weapon (set from the spawning trigger_push_velocity
+entity's spawnflags, see SP_trigger_push_velocity in g_trigger.c) is a mode
+bitmask that replaces the plain vanilla velocity copy with a configurable
+push-direction/apply system. jumppad->angles2 carries the mode's magnitude
+parameters (angles2[0]/[1] from the entity's "random" key, angles2[2] from
+its "count" key). weapon == 0 (any ordinary, unmodified trigger_push) falls
+back to byte-for-byte vanilla behavior. Confirmed from qagame.qvm
+disassembly; see disasm/BG_MISC/BG_TouchJumpPad.md for the full bit-by-bit
+derivation.
 ========================
 */
 void BG_TouchJumpPad( playerState_t *ps, entityState_t *jumppad ) {
 	vec3_t	angles;
 	float p;
 	int effectNum;
+	int mode;
+	qboolean antiReversal;
+	vec3_t pushDir;
+	float vertBoost;
+	vec3_t cand, orig;
+	float candLen, origLen, cosTheta;
 
 	// spectators don't use jump pads
 	if ( ps->pm_type != PM_NORMAL ) {
@@ -1446,11 +1466,122 @@ void BG_TouchJumpPad( playerState_t *ps, entityState_t *jumppad ) {
 		}
 		BG_AddPredictableEventToPlayerstate( EV_JUMP_PAD, effectNum, ps );
 	}
+
+	mode = jumppad->weapon;
+
+	if ( !mode ) {
+		// ordinary jumppad: remember hitting this jumppad this frame,
+		// give the player the velocity from the jumppad (unconditional overwrite)
+		ps->jumppad_ent = jumppad->number;
+		ps->jumppad_frame = ps->pmove_framecount;
+		VectorCopy( jumppad->origin2, ps->velocity );
+		return;
+	}
+
+	antiReversal = ( mode & 0x40 ) != 0;
+
+	// --- horizontal push direction ---
+	if ( mode & 0x1 ) {
+		// push along the player's own current horizontal movement direction,
+		// magnitude from angles2[0] ("random" key on the trigger_push_velocity)
+		pushDir[0] = ps->velocity[0];
+		pushDir[1] = ps->velocity[1];
+		pushDir[2] = 0;
+		VectorNormalize( pushDir );
+		VectorScale( pushDir, jumppad->angles2[0], pushDir );
+	} else {
+		pushDir[0] = jumppad->origin2[0];
+		pushDir[1] = jumppad->origin2[1];
+		pushDir[2] = 0;
+
+		if ( mode & 0x10 ) {
+			// auto-flip: push correctly regardless of which side the player
+			// approaches from
+			VectorCopy( ps->velocity, cand );
+			VectorCopy( ps->velocity, orig );
+			cand[0] += pushDir[0];
+			cand[1] += pushDir[1];
+			orig[0] -= pushDir[0];
+			orig[1] -= pushDir[1];
+			if ( VectorLength( orig ) > VectorLength( cand ) ) {
+				VectorScale( pushDir, -1.0f, pushDir );
+			}
+		}
+	}
+
+	// --- vertical push magnitude ---
+	if ( mode & 0x4 ) {
+		// magnitude from angles2[2] ("count" key), sign matches the player's
+		// existing vertical velocity sign
+		vec3_t vertVec;
+		vertVec[0] = 0;
+		vertVec[1] = 0;
+		vertVec[2] = ps->velocity[2];
+		VectorNormalize( vertVec );
+		vertBoost = vertVec[2] * jumppad->angles2[2];
+	} else {
+		vertBoost = jumppad->origin2[2];
+
+		if ( mode & 0x20 ) {
+			// auto-flip, vertical equivalent of bit 0x10
+			VectorCopy( ps->velocity, cand );
+			VectorCopy( ps->velocity, orig );
+			cand[2] += vertBoost;
+			orig[2] -= vertBoost;
+			if ( VectorLength( orig ) > VectorLength( cand ) ) {
+				vertBoost = -vertBoost;
+			}
+		}
+	}
+
+	// --- horizontal apply mode ---
+	if ( mode & 0x2 ) {
+		// additive blend, only once per touched-jumppad streak
+		if ( ps->jumppad_ent != jumppad->number ) {
+			cand[0] = ps->velocity[0] + pushDir[0];
+			cand[1] = ps->velocity[1] + pushDir[1];
+			cand[2] = 0;
+			candLen = VectorLength( cand );
+			origLen = VectorLength( ps->velocity );
+			cosTheta = DotProduct( cand, ps->velocity ) / ( candLen * origLen );
+
+			if ( antiReversal && cosTheta < 0 ) {
+				ps->velocity[0] = 0;
+				ps->velocity[1] = 0;
+			} else {
+				ps->velocity[0] = cand[0];
+				ps->velocity[1] = cand[1];
+			}
+		}
+	} else {
+		// hard overwrite, unconditional
+		ps->velocity[0] = pushDir[0];
+		ps->velocity[1] = pushDir[1];
+	}
+
+	// --- vertical apply mode ---
+	if ( mode & 0x8 ) {
+		if ( ps->jumppad_ent != jumppad->number ) {
+			cand[0] = 0;
+			cand[1] = 0;
+			cand[2] = ps->velocity[2] + vertBoost;
+			candLen = VectorLength( cand );
+			origLen = VectorLength( ps->velocity );
+			cosTheta = DotProduct( cand, ps->velocity ) / ( candLen * origLen );
+
+			if ( antiReversal && cosTheta < 0 ) {
+				ps->velocity[2] = 0;
+			} else {
+				ps->velocity[2] = cand[2];
+			}
+		}
+	} else {
+		ps->velocity[2] = vertBoost;
+	}
+
 	// remember hitting this jumppad this frame
 	ps->jumppad_ent = jumppad->number;
 	ps->jumppad_frame = ps->pmove_framecount;
-	// give the player the velocity from the jumppad
-	VectorCopy( jumppad->origin2, ps->velocity );
 }
 
 /*
@@ -1466,7 +1597,12 @@ void BG_PlayerStateToEntityState( playerState_t *ps, entityState_t *s, qboolean 
 
 	if ( ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPECTATOR ) {
 		s->eType = ET_INVISIBLE;
-	} else if ( ps->stats[STAT_HEALTH] <= GIB_HEALTH ) {
+	// DeFRaG: this specific transmission-visibility gate compares against 0,
+	// not GIB_HEALTH(-40) — confirmed from qagame.qvm disassembly; see
+	// disasm/BG_MISC/BG_PlayerStateToEntityState.md. Does not affect the
+	// actual gibbing threshold elsewhere (g_combat.c), which still uses
+	// GIB_HEALTH unmodified.
+	} else if ( ps->stats[STAT_HEALTH] <= 0 ) {
 		s->eType = ET_INVISIBLE;
 	} else {
 		s->eType = ET_PLAYER;
@@ -1542,7 +1678,12 @@ void BG_PlayerStateToEntityStateExtraPolate( playerState_t *ps, entityState_t *s
 
 	if ( ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPECTATOR ) {
 		s->eType = ET_INVISIBLE;
-	} else if ( ps->stats[STAT_HEALTH] <= GIB_HEALTH ) {
+	// DeFRaG: this specific transmission-visibility gate compares against 0,
+	// not GIB_HEALTH(-40) — confirmed from qagame.qvm disassembly; see
+	// disasm/BG_MISC/BG_PlayerStateToEntityState.md. Does not affect the
+	// actual gibbing threshold elsewhere (g_combat.c), which still uses
+	// GIB_HEALTH unmodified.
+	} else if ( ps->stats[STAT_HEALTH] <= 0 ) {
 		s->eType = ET_INVISIBLE;
 	} else {
 		s->eType = ET_PLAYER;

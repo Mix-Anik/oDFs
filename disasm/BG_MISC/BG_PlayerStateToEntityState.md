@@ -112,6 +112,11 @@ implementation itself uses `GIB_HEALTH` or a literal was not re-checked here
 since the task is documentation/research only — see `code/game/bg_misc.c`
 lines ~1469 and ~1545, both currently `<= GIB_HEALTH`.)
 
+**Implemented.** Both sites changed from `<= GIB_HEALTH` to `<= 0`. The `GIB_HEALTH` macro
+itself and its other usages (`g_combat.c`, `g_client.c` — the actual gibbing threshold) were left
+untouched, since only these two `eType = ET_INVISIBLE` transmission-visibility gates are confirmed
+to differ from vanilla.
+
 ## `BG_EntityStateToPlayerState` — does not exist in this codebase
 
 Searched `baseq3-game-functions.hmap` (vanilla) and oDFs's `bg_misc.c` for

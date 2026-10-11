@@ -610,7 +610,10 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 
 	// don't allow respawn until the death anim is done
 	// g_forcerespawn may force spawning at some later time
-	self->client->respawnTime = level.time + 500;
+	// DeFRaG: per-client configurable delay (df_cl_respawnMsec, default
+	// 250ms, clamped [50,1700]) replaces a fixed delay here. Confirmed
+	// from qagame.qvm disassembly; see disasm/G_CLIENT/README.md
+	self->client->respawnTime = level.time + self->client->respawnMsec;
 
 	// remove powerups
 	memset( self->client->ps.powerups, 0, sizeof(self->client->ps.powerups) );
