@@ -838,6 +838,20 @@ G_Say
 ==================
 */
 
+/*
+==================
+G_IsIgnoring
+
+DeFRaG func_0x1de19: does 'ent' ignore client 'num'?
+==================
+*/
+qboolean G_IsIgnoring( gentity_t *ent, int num ) {
+	if ( num < 0 || num > 63 ) {
+		return qfalse;
+	}
+	return ( ent->client->pers.ignoreMask[num >> 5] >> ( num & 31 ) ) & 1;
+}
+
 static void G_SayTo( gentity_t *ent, gentity_t *other, int mode, int color, const char *name, const char *message ) {
 	if (!other) {
 		return;
@@ -849,6 +863,10 @@ static void G_SayTo( gentity_t *ent, gentity_t *other, int mode, int color, cons
 		return;
 	}
 	if ( other->client->pers.connected != CON_CONNECTED ) {
+		return;
+	}
+	// DeFRaG (G_Say, bytecode 0x1e614): skip listeners who ignore the speaker
+	if ( ent->client && G_IsIgnoring( other, ent->client->ps.clientNum ) ) {
 		return;
 	}
 	if ( mode == SAY_TEAM  && !OnSameTeam(ent, other) ) {
@@ -1732,6 +1750,189 @@ void Cmd_PlacePlayer_f( gentity_t *ent ) {
 
 /*
 =================
+Cmd_RespawnPoint_f
+
+DeFRaG client command (bytecode 0x47b1, see disasm/G_CLIENT/respawnpoint.md):
+	respawnpoint set			- use current origin
+	respawnpoint set x y z		- use the given point
+	respawnpoint clear			- unset
+ClientSpawn then spawns at the spawn entity closest to this point.
+=================
+*/
+void Cmd_RespawnPoint_f( gentity_t *ent ) {
+	char		arg[MAX_TOKEN_CHARS];
+	vec3_t		point;
+	int			i;
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+
+	if ( !Q_stricmp( arg, "set" ) && trap_Argc() == 5 ) {
+		for ( i = 0 ; i < 3 ; i++ ) {
+			trap_Argv( i + 2, arg, sizeof( arg ) );
+			point[i] = atof( arg );
+		}
+	} else if ( !Q_stricmp( arg, "set" ) ) {
+		VectorCopy( ent->client->ps.origin, point );
+	} else if ( !Q_stricmp( arg, "clear" ) ) {
+		VectorClear( ent->client->pers.respawnPoint );
+		trap_SendServerCommand( ent-g_entities, "print \"^2Respawnpoint Cleared\n\"" );
+		return;
+	} else {
+		trap_SendServerCommand( ent-g_entities,
+			"print \"Usage: respawnpoint set\n respawnpoint set x y z\n respawnpoint clear\n\"" );
+		return;
+	}
+
+	VectorCopy( point, ent->client->pers.respawnPoint );
+	trap_SendServerCommand( ent-g_entities,
+		va( "print \"^2Respawnpoint Set:^7 ( %.3f %.3f %.3f )\n\"", point[0], point[1], point[2] ) );
+}
+
+
+/*
+=================
+Cmd_Ignore_f
+
+DeFRaG client command (bytecode 0x1de5e, see disasm/G_CLIENT/ignore_command.md):
+	ignore <name|number>	- toggle ignoring that client's chat
+=================
+*/
+void Cmd_Ignore_f( gentity_t *ent ) {
+	char		arg[MAX_TOKEN_CHARS];
+	int			target;
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	target = ClientNumberFromString( ent, arg, qtrue, qtrue );
+	if ( target < 0 ) {
+		return;
+	}
+
+	if ( G_IsIgnoring( ent, target ) ) {
+		trap_SendServerCommand( ent-g_entities, va( "print \"Now unignoring %s.\n\"", level.clients[target].pers.netname ) );
+	} else {
+		trap_SendServerCommand( ent-g_entities, va( "print \"Now ignoring %s.\n\"", level.clients[target].pers.netname ) );
+	}
+	if ( target >= 0 && target < 64 ) {
+		ent->client->pers.ignoreMask[target >> 5] ^= 1u << ( target & 31 );
+	}
+}
+
+
+/*
+=================
+Cmd_Arena_f
+
+DeFRaG client command (bytecode 0x4a5f, see disasm/G_CLIENT/arena_command.md):
+	arena <n>	- switch to multi-arena number n (re-begins the client)
+=================
+*/
+void Cmd_Arena_f( gentity_t *ent ) {
+	char		arg[MAX_TOKEN_CHARS];
+	int			n;
+
+	if ( !level.numMultiArenas ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Not a multiarena map\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	n = atoi( arg );
+	if ( trap_Argc() != 2 || ent->client->pers.arena == n || n > level.numMultiArenas ) {
+		trap_SendServerCommand( ent-g_entities,
+			va( "print \"Arena: %i of %i\n\"", ent->client->pers.arena, level.numMultiArenas ) );
+		return;
+	}
+
+	ent->client->pers.arena = n;
+	ClientBegin( ent-g_entities );
+	// DeFRaG also stamps client+0x350 = level.time + 5000 here (shared with the team-change cooldown); consumer not located, not ported
+}
+
+
+/*
+=================
+Cmd_FireMissile_f
+
+DeFRaG cheat command (bytecode 0x489b, see disasm/G_CLIENT/ClientCommands_sweep.md):
+	firemissile x y z fx fy fz weapon quaded selfstyle
+weapon is 4 (grenade), 5 (rocket), 8 (plasma) or 9 (bfg); anything else fires nothing.
+=================
+*/
+void Cmd_FireMissile_f( gentity_t *ent ) {
+	vec3_t		start, forward;
+	char		buffer[MAX_TOKEN_CHARS];
+	gentity_t	*missile;
+	float		quadFactor;
+	int			weapon, i, savedNumber;
+	qboolean	selfStyle;
+
+	if ( !CheatsOk( ent ) ) {
+		return;
+	}
+	if ( trap_Argc() != 10 ) {
+		trap_SendServerCommand( ent-g_entities,
+			"print \"Usage: firemissile (start) x y z (forward) x y z weapon_num (4|5|8|9) quaded (0|1) self-style (0|1)\n\"" );
+		return;
+	}
+
+	for ( i = 0 ; i < 3 ; i++ ) {
+		trap_Argv( i + 1, buffer, sizeof( buffer ) );
+		start[i] = atof( buffer );
+	}
+	for ( i = 0 ; i < 3 ; i++ ) {
+		trap_Argv( i + 4, buffer, sizeof( buffer ) );
+		forward[i] = atof( buffer );
+	}
+	trap_Argv( 7, buffer, sizeof( buffer ) );
+	weapon = (int)atof( buffer );
+	trap_Argv( 8, buffer, sizeof( buffer ) );
+	quadFactor = ( atof( buffer ) > 0 ) ? 3.0f : 1.0f;
+	trap_Argv( 9, buffer, sizeof( buffer ) );
+	selfStyle = ( atof( buffer ) != 0 );
+
+	// self-style 0: fire with an invalid owner number, restored below
+	savedNumber = ent->s.number;
+	if ( !selfStyle ) {
+		ent->s.number = -1;
+	}
+
+	// muzzle offset of 14 units along the aim direction, then snapped to integers
+	for ( i = 0 ; i < 3 ; i++ ) {
+		start[i] += 14.0f * forward[i];
+		start[i] = (int)start[i];
+	}
+
+	missile = NULL;
+	switch ( weapon ) {
+	case 4:
+		forward[2] += 0.2f;
+		VectorNormalize( forward );
+		missile = fire_grenade( ent, start, forward );
+		break;
+	case 5:
+		missile = fire_rocket( ent, start, forward );
+		break;
+	case 8:
+		missile = fire_plasma( ent, start, forward );
+		break;
+	case 9:
+		missile = fire_bfg( ent, start, forward );
+		break;
+	}
+
+	if ( !selfStyle ) {
+		ent->s.number = savedNumber;
+	}
+	if ( !missile ) {
+		return;
+	}
+	missile->damage = (int)( missile->damage * quadFactor );
+	missile->splashDamage = (int)( missile->splashDamage * quadFactor );
+}
+
+
+/*
+=================
 Cmd_Stats_f
 =================
 */
@@ -1866,6 +2067,14 @@ void ClientCommand( int clientNum ) {
 		Cmd_GameCommand_f( ent );
 	else if (Q_stricmp (cmd, "setviewpos") == 0)
 		Cmd_SetViewpos_f( ent );
+	else if (Q_stricmp (cmd, "ignore") == 0)
+		Cmd_Ignore_f( ent );
+	else if (Q_stricmp (cmd, "arena") == 0)
+		Cmd_Arena_f( ent );
+	else if (Q_stricmp (cmd, "firemissile") == 0)
+		Cmd_FireMissile_f( ent );
+	else if (Q_stricmp (cmd, "respawnpoint") == 0)
+		Cmd_RespawnPoint_f( ent );
 	else if (Q_stricmp (cmd, "placeplayer") == 0)
 		Cmd_PlacePlayer_f( ent );
 	else if (Q_stricmp (cmd, "stats") == 0)

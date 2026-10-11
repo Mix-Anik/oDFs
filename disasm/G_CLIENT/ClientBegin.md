@@ -59,17 +59,22 @@ void ClientBegin( int clientNum ) {
     } else if ( client->ps.persistant[??] /* +0x288 again? */ == oldTeam ) {
         // no team change -> skip the teleport-effect broadcast
     } else {
-        if ( *(int*)0x1b1ec == 1 ) {    // unidentified global, same one gating a check in
-                                          // ClientThink_real ("0x1b1ec < 4") — meaning not pinned down
-            trap_G2_Something = G_TempEntity( ???, ??? );  // 0xac4e, not identified
-            trap( -0x12, -1, tempEntity );                  // not identified
-        }
+        // RESOLVED (later pass, bytecode 0x1d257-0x1d26d): this is vanilla's "entered the game" broadcast.
+        // 0x1b1ec = g_gametype.integer (vanilla gates on != GT_TOURNAMENT == 1); the outer gate is
+        // client+0x284 (sess.sessionTeam) != 3 (TEAM_SPECTATOR); 0xac4e = va(); trap -0x12 = id 17 =
+        // G_SEND_SERVER_COMMAND:
+        //   trap_SendServerCommand( -1, va( <str@0x7df0 "print \"%s^7 entered the game.\"...">, client->pers.netname /*+0x200*/ ) );
+        // Followed by G_LogPrintf("ClientBegin: %i
+") (0xa1a, str 0x7ddf) and func_0x6cc() (zero-arg, same
+        // spot where vanilla calls CalculateRanks(); not body-verified). Differs from oDFs only by the
+        // string text (DeFRaG's has a '.' after "game"; exact trailing-newline layout of the literal not hex-checked).
+        if ( g_gametype != GT_TOURNAMENT ) trap_SendServerCommand( -1, va( ... ) );
     }
 
     G_Printf( "%s^7 entered the game.\n", ... );     // data string 0x7df0, vanilla-shaped broadcast
     G_LogPrintf( "ClientBegin: %i\n", clientNum );     // 0xa1a = G_LogPrintf, confirmed via this
                                                          // project's own top-of-file hash-table listing
-    func_0x6cc();                                       // zero-arg call, not identified
+    CalculateRanks();                                   // func_0x6cc — CONFIRMED, see func_0x6cc.md
 }
 ```
 
@@ -91,8 +96,7 @@ lower-confidence.
    new team. **Field identities not confirmed** — do not assume these are
    `ps.persistant[]` slots; this pass did not independently verify
    `persistant[]`'s base address, so no `PERS_*` mapping is asserted.
-2. **`func_0x26e8(ent)`** — called right after the `ps` wipe, right before
-   `ClientSpawn`. Partial decode: reads a pointer from `ent+0x328` (a
+2. **`func_0x26e8(ent)`** — **now decoded, see [auth_handshake.md](auth_handshake.md)**: it stamps the auth-request delay timer (`+0xc = level.time+2500`) and `func_0x3a47` clears the client's `raceTimer_t` (ported). Earlier partial decode: reads a pointer from `ent+0x328` (a
    "team-adjacent" struct not otherwise identified in this project), checks
    two of its fields (`+0x8`/`+0xc`) against each other, and if they don't
    already hold a matching sentinel, writes `level.time + 2500` into
@@ -112,7 +116,7 @@ lower-confidence.
 
 ## oDFs implementation status
 
-**Not implemented.** Both additions are DeFRaG-internal bookkeeping with
+**Partly implemented** (the `func_0x3a47` race-timer clear is ported; the auth timer is not, see auth_handshake.md). Original note: both additions are DeFRaG-internal bookkeeping with
 no clear gameplay-visible effect identified (a cooldown timestamp and a
 stat-reset on team change); porting either without knowing their exact
 purpose risks introducing behavior oDFs doesn't actually need. Flagged for

@@ -452,6 +452,9 @@ void CG_PredictPlayerState( void ) {
 	if ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
 		cg_pmove.tracemask &= ~CONTENTS_BODY;	// spectators can fly through bodies
 	}
+	if ( cg.predictedPlayerState.stats[STAT_INTERFERENCE] & 1 ) {
+		cg_pmove.tracemask &= ~CONTENTS_BODY;	// DeFRaG: players don't collide with each other (networked df_mp_InterferenceOff)
+	}
 	cg_pmove.noFootsteps = ( cgs.dmflags & DF_NO_FOOTSTEPS ) > 0;
 
 	// save the state before the pmove so we can detect transitions
@@ -498,6 +501,7 @@ void CG_PredictPlayerState( void ) {
 
 	cg_pmove.pmove_fixed = pmove_fixed.integer;// | cg_pmove_fixed.integer;
 	cg_pmove.pmove_msec = pmove_msec.integer;
+	cg_pmove.killWallbug = cgs.killWallbug;
 
 	// run cmds
 	moved = qfalse;

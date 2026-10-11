@@ -663,9 +663,7 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 			if ( ent->s.eType != ET_PLAYER ) {
 				break;		// not in the player model
 			}
-			if ( g_dmflags.integer & DF_NO_FALLING ) {
-				break;
-			}
+			// DeFRaG's ClientEvents (0x1a63a) has no DF_NO_FALLING check, see disasm/G_ACTIVE/ClientEvents.md
 			if ( event == EV_FALL_FAR ) {
 				damage = 10;
 			} else {
@@ -1036,6 +1034,13 @@ void ClientThink_real( gentity_t *ent ) {
 		client->ps.stats[STAT_DEFRAG_FLAGS] |= DFLAG_LG_KNOCKBACK;
 
 	pm.promode     = df_promode.integer;
+	pm.killWallbug = g_killWallbug.integer;
+
+	// DeFRaG (func_0x4239): network the interference value and drop CONTENTS_BODY from the trace mask when players don't interact
+	client->ps.stats[STAT_INTERFERENCE] = df_mp_InterferenceOff.integer;
+	if ( df_mp_InterferenceOff.integer & 1 ) {
+		pm.tracemask &= ~CONTENTS_BODY;
+	}
 
 	// DeFRaG: network the promode state so BG_ (both-game) functions like
 	// BG_PlayerTouchesItem can see it from cgame prediction too, not just

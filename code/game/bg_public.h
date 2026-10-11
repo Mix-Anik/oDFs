@@ -200,6 +200,7 @@ typedef struct {
 
 	int			obs_disabled;
 	int			promode;
+	int			killWallbug;		// DeFRaG g_killWallbug: zero velocity when the step-up test is allsolid, see disasm/BG_PMOVE/killWallbug.md
 
 	// callbacks to test the world
 	// these will be different functions during game and cgame
@@ -244,6 +245,7 @@ typedef enum {
 
 // DeFRaG per-frame input state packed into stats[13] — written in PmoveSingle (func_0x4152).
 // Client reads this each prediction frame to drive the key-indicator HUD.
+#define STAT_INTERFERENCE       14	// DeFRaG df_mp_InterferenceOff value (bit 0: players don't collide), see disasm/G_COMBAT/interference.md
 #define STAT_DEFRAG_INPUT       13
 #define DINPUT_FORWARD          0x001   // cmd.forwardmove > 0
 #define DINPUT_BACKWARD         0x002   // cmd.forwardmove < 0

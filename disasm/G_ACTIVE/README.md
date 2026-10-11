@@ -198,7 +198,7 @@ and [PickTeam.md](PickTeam.md). Summary of what changed:
 |-------|---------|
 | stats[12] & 0x200 origin | ✅ Resolved — set by func_0x426b called from func_0x421b, called from ClientThink_real; implemented in g_active.c |
 | gauntletHit PM_Weapon check | ✅ Resolved — always 0 (pm struct memset every frame, never written); see [func_0x1a394.md](func_0x1a394.md#resolved-gauntlethit-always-0) |
-| ClientEvents address | 0x273f → calls 0x3a5f(client) → clears 32 bytes of per-client array at 0x1318dc; purpose unclear (DeFRaG-specific?) |
+| `0x273f` | ✅ Resolved — NOT ClientEvents (that is `0x1a63a`, [ClientEvents.md](ClientEvents.md)). `0x273f(ent)` = tiny wrapper → `0x3a5f(ent->client)`, which `memset`s that client's 32-byte `raceTimer_t` record; see [../G_CLIENT/func_0x273f.md](../G_CLIENT/func_0x273f.md) |
 | ClientEndFrame | ✅ Resolved — is a separate function, `0x1adc9`, see [ClientEndFrame.md](ClientEndFrame.md). Supersedes the earlier "merged into 0x1a866" claim; `0x1a866` may still separately contain its own P_WorldEffects-shaped call (`0x1ab6a`) — not reconciled with `0x1adc9`'s `func_0x19e41` call this pass. |
 | func_0x1a1b2 purpose | ✅ Identified: **per-frame touch trigger handler** — detects start/finish/checkpoint zone entry each physics tick |
 | func_0x1c937 purpose | ✅ Resolved (strong match) — `CopyToBodyQue`, see [ClientRespawn.md](ClientRespawn.md) |

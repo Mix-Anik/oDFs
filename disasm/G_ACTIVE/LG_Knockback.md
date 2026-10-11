@@ -1,8 +1,7 @@
 # DFLAG_LG_KNOCKBACK — Lightning Gun splash-knockback mechanic (full decode)
 
 **Source file:** `D:\Other\Reverse Engineering\q3vm\qagame.dis`
-**Consumer chain:** `0x1a866` (Pmove outer) → `0x1a63a` (per-frame continuous-weapon-effect
-dispatcher) → `0x29497` (LG quad-scale setup) → `0x291f4` (LG beam-trace/damage/
+**Consumer chain (corrected):** `PM_Weapon` `EV_FIRE_WEAPON` → `0x1a63a` (`ClientEvents`, called from `ClientThink_real` `0x1a866`) → `0x29497` (`FireWeapon`) → `0x291f4` (LG beam-trace/damage/
 knockback-spawn loop) → `0x22880` (phantom "rocket" spawner, previously documented
 as inert in [../G_COMBAT/RocketJump_ExtraVelocity_Search_Pass2.md](../G_COMBAT/RocketJump_ExtraVelocity_Search_Pass2.md))
 
@@ -26,7 +25,7 @@ the flag only controls whether the *bonus splash entity* gets spawned in additio
 
 ---
 
-## `func_0x1a63a` — per-frame continuous-weapon dispatcher (called from Pmove outer)
+## `func_0x1a63a` — **CORRECTED: this is `ClientEvents`**, see [ClientEvents.md](ClientEvents.md). The text below is the superseded earlier reading (MOD_* switch is really an EV_* switch; `0xb`/`0xc` are EV_FALL_MEDIUM/FAR).
 
 **Address:** `0x1a63a`, called only from `0x1a866` (Pmove outer)
 
@@ -63,6 +62,13 @@ question, but partially probed in a later pass:
 - `0x1a`(26) branch (`0x1a797`) not examined at all this pass.
 
 ---
+
+> **RETRACTION (read first):** this and the preceding `0x1a63a` section
+> were built on a wrong identity. `0x1a63a` = `ClientEvents`; `0x29497` =
+> `FireWeapon`, whose only caller is `ClientEvents`' `EV_FIRE_WEAPON` case
+> (verified: `0x29497` is referenced only at `0x1a6d8`). Claims below that DeFRaG
+> runs LG from inside Pmove / calls `FireWeapon` once per frame are FALSE. The
+> `0x291f4`/`0x22880` flag-gated phantom-rocket findings are unaffected.
 
 ## `func_0x29497` — quad-damage scale setup
 

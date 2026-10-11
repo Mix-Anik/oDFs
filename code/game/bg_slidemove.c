@@ -278,7 +278,8 @@ void PM_StepSlideMove( qboolean gravity ) {
 		if ( pm->debugLevel ) {
 			Com_Printf("%i:bend can't step\n", c_pmove);
 		}
-		if ( pm->promode ) {
+		// DeFRaG: gated by g_killWallbug (pm struct +0x20 in the QVM), not by promode
+		if ( pm->killWallbug ) {
 			VectorClear( pm->ps->velocity );
 		}
 		return;		// can't step up

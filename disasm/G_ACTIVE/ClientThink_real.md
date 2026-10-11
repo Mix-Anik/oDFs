@@ -41,7 +41,8 @@ independently decoded this pass and is **not** `G_TouchTriggers`.
 "16-entry queue clear" shape was correct, it's a pending-bot-begin queue,
 not a trigger table), called from `ClientDisconnect` exactly where vanilla
 calls it. The `0x273f` call (gated on `ent->client != NULL` in this pass's
-own decode) is `ClientEvents`. The per-client bit manipulation against an
+own decode) is NOT `ClientEvents` (corrected): it clears the disconnecting
+client's `raceTimer_t` record, see ../G_CLIENT/func_0x273f.md. The per-client bit manipulation against an
 array at `0x12a2f0` (stride `0x37c`) found in this pass is plausibly the
 "global max-speed-holder cleanup" and/or `0x13184c` 20-byte name-copy
 behavior described in `G_CLIENT/README.md`'s findings 5 and 7 — not
@@ -61,7 +62,7 @@ generic `G_TouchTriggers` turned out to be `func_0x1a1b2` after all — see
 ClientBegin (0x1d18b) / ClientRespawn (0x1cb0b, after CopyToBodyQue)
     → this function (0x1d27b) — identity uncertain, see header
             → 0x2830 (client state manager)
-            → [cmd acquisition: 0x44bc / 0x1c6be / 0x1c8c5 / 0x1c860 / 0x270ee]
+            → [spawn-point selection / cmd acquisition: 0x44bc (O3J_SelectSpawnPoint_UseClosest) / 0x1c6be / 0x1c8c5 / 0x1c860 / 0x270ee]
             → [spawn block if needed]
                 → 0x274b (entity setup)
                 → 0x421b (per-frame ps flags)
@@ -96,9 +97,15 @@ call 0x2830(clientNum);   // client state manager — iterates internal client l
                           // at 0x2c1f0, checks session states, syncs spectator
 ```
 
-`0x2830` is a DeFRaG-specific client state management function. Takes clientNum, walks a
-linked structure at `0x2c1f0`, checking `pm_type` and session states. Purpose not fully
-decoded but it doesn't affect movement physics.
+`0x2830` — **fully decoded later this session**, see
+[`../G_CLIENT/func_0x2830.md`](../G_CLIENT/func_0x2830.md). It's a
+per-client stale-entity sweep over `g_entities[64..1023]` (i.e. every
+non-client slot of the same `g_entities` array — an earlier pass had
+mistakenly concluded `0x2c1f0` was a separate table due to an arithmetic
+slip, corrected in that doc and in
+[`../G_CLIENT/O3J_SelectSpawnPoint_UseClosest.md`](../G_CLIENT/O3J_SelectSpawnPoint_UseClosest.md)),
+freeing owned entities and clearing some trigger-classname-matched
+bookkeeping fields. Doesn't affect movement physics, confirmed.
 
 ---
 
@@ -130,18 +137,34 @@ if (local_pmtype == 2) local_pmtype = 1;    // team 2 → PM_NOCLIP(1)?
 // Command acquisition (several paths based on entity velocity):
 speed = VectorLength(client->ps + 0x2a4);   // some velocity field
 if (speed > 0.0f) {
-    call 0x44bc(ent, &cmd, &oldcmd);         // GetCurrentCmd normal path
+    call 0x44bc(ent, &origin, &angles);      // O3J_SelectSpawnPoint_UseClosest — see below
 } else {
     call 0x8d63(client + 0x2a4);             // VectorLength again?
     if (result > 0.0f) {
-        call 0x44bc(ent, &cmd, &oldcmd);     // GetCurrentCmd
+        call 0x44bc(ent, &origin, &angles);  // O3J_SelectSpawnPoint_UseClosest
     } else {
         // client+0x1f4 / client+0x1f0 flag checks → select further paths
-        call 0x270ee(local_pmtype, 0, &cmd, &oldcmd);   // spectator cmd
+        call 0x270ee(local_pmtype, 0, &origin, &angles);   // fallback selector, not decoded
         // or fall through to: ...
     }
 }
 ```
+
+**Correction (later pass):** `0x44bc` is **not** "GetCurrentCmd" (that
+label was an unverified guess, never checked against this function's own
+body) and its 2nd/3rd args are **not** `&cmd`/`&oldcmd` — they're output
+`vec3_t` pointers for an origin and an angles vector. The real identity,
+confirmed via an embedded debug string
+(`"O3J_SelectSpawnPoint_UseClosest() couldn't find a spawnpoint"`), is a
+spawn-point-selection helper that scans `g_entities[64..]` for an
+`info_player_start`/`info_player_deathmatch`/`team_CTF_*` entity closest to
+a reference point, and writes the winner's origin/angles out through
+these two pointers. Full decode:
+[`../G_CLIENT/O3J_SelectSpawnPoint_UseClosest.md`](../G_CLIENT/O3J_SelectSpawnPoint_UseClosest.md).
+The surrounding `speed > 0.0f` gating condition itself was correctly
+described above; only the call's identity/args were wrong. The `else`
+branch's `func_0x270ee` is now also decoded — see
+[`../G_CLIENT/func_0x270ee.md`](../G_CLIENT/func_0x270ee.md).
 
 The exact pm_type values for teams 1 and 2 are uncertain — DeFRaG may use a different
 team numbering than stock Q3. Team 3 = TEAM_SPECTATOR is confirmed.
@@ -483,7 +506,7 @@ when following a player, SpectatorThink is skipped.
 
 **Substantially analyzed.** All major sections are now documented. Remaining uncertainties:
 
-- Exact purpose of `0x2830` (client state manager) — DeFRaG-specific, no movement impact
+- `0x2830` — ✅ Fully decoded, see [`../G_CLIENT/func_0x2830.md`](../G_CLIENT/func_0x2830.md). A per-client stale-entity sweep over a separate 1024-slot table — DeFRaG-specific, no movement impact
 - Exact pm_type mapping for sessionTeam 1/2 — unlikely to affect movement
 - `0x1317bc` OBS bit-scan logic — needs further trace; currently marked uncertain
 - Trap -0x1f identity (probably `trap_LinkEntity` but not 100% confirmed)

@@ -45,6 +45,13 @@ void SP_info_player_deathmatch( gentity_t *ent ) {
 	if ( i ) {
 		ent->flags |= FL_NO_HUMANS;
 	}
+
+	// DeFRaG (bytecode 0x1c501): multi-arena maps tag spawn points with an "arena" key (stored in ent->count)
+	G_SpawnInt( "arena", "0", &i );
+	ent->count = i;
+	if ( i && level.numMultiArenas < i ) {
+		level.numMultiArenas = i;
+	}
 }
 
 /*QUAKED info_player_start (1 0 0) (-16 -16 -24) (16 16 32)
@@ -83,6 +90,11 @@ qboolean SpotWouldTelefrag( gentity_t *spot ) {
 	int			touch[MAX_GENTITIES];
 	gentity_t	*hit;
 	vec3_t		mins, maxs;
+
+	// DeFRaG (func_0x1c56f): with player interaction off a spot is never blocked by another player
+	if ( df_mp_InterferenceOff.integer & 1 ) {
+		return qfalse;
+	}
 
 	VectorAdd( spot->s.origin, playerMins, mins );
 	VectorAdd( spot->s.origin, playerMaxs, maxs );
@@ -180,6 +192,9 @@ SelectRandomFurthestSpawnPoint
 Chooses a player start, deathmatch start, etc
 ============
 */
+// arena number the spawn selection filters on (set from client->pers.arena in ClientSpawn); 0 matches untagged spawn points
+static int s_spawnArena;
+
 gentity_t *SelectRandomFurthestSpawnPoint ( const vec3_t avoidPoint, vec3_t origin, vec3_t angles, qboolean isbot ) {
 	gentity_t	*spot;
 	vec3_t		delta;
@@ -194,6 +209,10 @@ gentity_t *SelectRandomFurthestSpawnPoint ( const vec3_t avoidPoint, vec3_t orig
 	while((spot = G_Find (spot, FOFS(classname), "info_player_deathmatch")) != NULL)
 	{
 		if(SpotWouldTelefrag(spot))
+			continue;
+
+		// DeFRaG: only spawn points of the selected arena (func_0x1c6be tag filter, spot+0x2f8 == tag)
+		if(spot->count != s_spawnArena)
 			continue;
 
 		if(((spot->flags & FL_NO_BOTS) && isbot) ||
@@ -1073,6 +1092,9 @@ void ClientBegin( int clientNum ) {
 	memset( &client->ps, 0, sizeof( client->ps ) );
 	client->ps.eFlags = flags;
 
+	// DeFRaG (func_0x26e8 -> func_0x3a47): clear this client's race timer record, see disasm/G_CLIENT/auth_handshake.md
+	memset( G_GetTimerRecord( client ), 0, sizeof(raceTimer_t) );
+
 	// locate ent at a spawn point
 	ClientSpawn( ent );
 
@@ -1085,6 +1107,63 @@ void ClientBegin( int clientNum ) {
 
 	// count current clients and rank for scoreboard
 	CalculateRanks();
+}
+
+/*
+===========
+SelectClosestSpawnPoint
+
+DeFRaG O3J_SelectSpawnPoint_UseClosest (bytecode 0x44bc, see
+disasm/G_CLIENT/O3J_SelectSpawnPoint_UseClosest.md): spawn entity closest
+(by r.currentOrigin) to the given reference point. Returns NULL if the point is
+unset (zero vector) or no spawn entity exists.
+============
+*/
+static gentity_t *SelectClosestSpawnPoint( const vec3_t point, vec3_t origin, vec3_t angles ) {
+	static const char *classnames[] = {
+		"info_player_start", "info_player_deathmatch",
+		"team_CTF_redplayer", "team_CTF_blueplayer",
+		"team_CTF_redspawn", "team_CTF_bluespawn"
+	};
+	gentity_t	*spot, *best;
+	vec3_t		delta;
+	float		dist, bestDist;
+	int			i, j;
+
+	if ( VectorLength( point ) == 0 ) {
+		return NULL;
+	}
+
+	best = NULL;
+	bestDist = 0;
+	for ( i = MAX_CLIENTS ; i < level.num_entities ; i++ ) {
+		spot = &g_entities[i];
+		if ( !spot->inuse ) {
+			continue;
+		}
+		for ( j = 0 ; j < 6 ; j++ ) {
+			if ( !Q_stricmp( spot->classname, classnames[j] ) ) {
+				break;
+			}
+		}
+		if ( j == 6 ) {
+			continue;
+		}
+		VectorSubtract( point, spot->r.currentOrigin, delta );
+		dist = VectorLength( delta );
+		if ( !best || dist < bestDist ) {
+			best = spot;
+			bestDist = dist;
+		}
+	}
+	if ( !best ) {
+		return NULL;
+	}
+
+	VectorCopy( best->s.origin, origin );
+	origin[2] += 9;
+	VectorCopy( best->s.angles, angles );
+	return best;
 }
 
 /*
@@ -1117,6 +1196,7 @@ void ClientSpawn(gentity_t *ent) {
 	client = ent->client;
 
 	VectorClear(spawn_origin);
+	s_spawnArena = client->pers.arena;
 
 	// find a spawn point
 	// do it before setting health back up, so farthest
@@ -1124,6 +1204,8 @@ void ClientSpawn(gentity_t *ent) {
 	if ( client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		spawnPoint = SelectSpectatorSpawnPoint ( 
 						spawn_origin, spawn_angles);
+	} else if ( ( spawnPoint = SelectClosestSpawnPoint( client->pers.respawnPoint, spawn_origin, spawn_angles ) ) != NULL ) {
+		// DeFRaG: player-set respawnpoint, see disasm/G_CLIENT/respawnpoint.md
 	} else if (g_gametype.integer >= GT_CTF ) {
 		// all base oriented team games use the CTF spawn points
 		spawnPoint = SelectCTFSpawnPoint ( 
@@ -1289,7 +1371,9 @@ void ClientSpawn(gentity_t *ent) {
 
 	if (!level.intermissiontime) {
 		if (ent->client->sess.sessionTeam != TEAM_SPECTATOR) {
-			G_KillBox(ent);
+			if ( !( df_mp_InterferenceOff.integer & 1 ) ) {	// DeFRaG: no telefrag when players don't interact
+				G_KillBox(ent);
+			}
 			// force the base weapon up
 			client->ps.weapon = WP_MACHINEGUN;
 			client->ps.weaponstate = WEAPON_READY;
@@ -1356,6 +1440,16 @@ void ClientDisconnect( int clientNum ) {
 	G_RemoveQueuedBotBegin( clientNum );
 
 	ent = g_entities + clientNum;
+	// DeFRaG (func_0x273f): clear this client's race timer record, see disasm/G_CLIENT/func_0x273f.md
+	if ( ent->client ) {
+		memset( G_GetTimerRecord( ent->client ), 0, sizeof(raceTimer_t) );
+	}
+	// DeFRaG (ClientDisconnect): drop this client from every client's ignore mask so a reused slot isn't inherited
+	if ( ent->client && clientNum >= 0 && clientNum < 64 ) {
+		for ( i = 0 ; i < level.maxclients ; i++ ) {
+			level.clients[i].pers.ignoreMask[clientNum >> 5] &= ~( 1u << ( clientNum & 31 ) );
+		}
+	}
 	if (!ent->client || ent->client->pers.connected == CON_DISCONNECTED) {
 		return;
 	}

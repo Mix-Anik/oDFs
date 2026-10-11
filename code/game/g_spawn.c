@@ -395,6 +395,88 @@ void G_ParseField( const char *key, const char *value, gentity_t *ent ) {
 
 /*
 ===================
+G_ParseModeKeys
+
+DeFRaG func_0x1c9c: translate the mode-exclusion spawn keys into ent->flags bits.
+Returns qfalse for "notdefrag" (caller stops without freeing).
+===================
+*/
+qboolean G_ParseModeKeys( gentity_t *ent ) {
+	int		i;
+	char	*value;
+
+	G_SpawnInt( "notdefrag", "0", &i );
+	if ( i ) {
+		return qfalse;
+	}
+	G_SpawnInt( "notcpm", "0", &i );	if ( i ) ent->flags |= FL_NOT_CPM;
+	G_SpawnInt( "notvq3", "0", &i );	if ( i ) ent->flags |= FL_NOT_VQ3;
+	G_SpawnInt( "notmp", "0", &i );		if ( i ) ent->flags |= FL_NOT_MP;
+	G_SpawnInt( "notsp", "0", &i );		if ( i ) ent->flags |= FL_NOT_SP;
+	G_SpawnInt( "notdf", "0", &i );		if ( i ) ent->flags |= FL_NOT_DF;
+	G_SpawnInt( "nottm", "0", &i );		if ( i ) ent->flags |= FL_NOT_TM;
+	G_SpawnInt( "notfc", "0", &i );		if ( i ) ent->flags |= FL_NOT_FC;
+	G_SpawnInt( "notteam", "0", &i );	if ( i ) ent->flags |= FL_NOT_FC;
+	G_SpawnInt( "notfree", "0", &i );	if ( i ) ent->flags |= FL_NOT_DF | FL_NOT_TM;
+	if ( G_SpawnString( "gametype", NULL, &value ) ) {
+		// strstr semantics (func_0x5ce7): a gametype list that doesn't mention a family excludes the entity from it
+		if ( !strstr( value, "ffa" ) ) ent->flags |= FL_NOT_DF | FL_NOT_TM;
+		if ( !strstr( value, "ctf" ) ) ent->flags |= FL_NOT_FC;
+	}
+	return qtrue;
+}
+
+/*
+===================
+G_ApplyModeExclusion
+
+DeFRaG func_0x20e0: level-init sweep that frees entities excluded by the current physics (df_promode),
+server type (dedicated) and DeFRaG mode (df_gametype 1 = run, 2 = tricks, 3 = fastcaps).
+Mode auto-detection of the original is not implemented. FL_MOVER (0x800000) is set by func_plat/bobbing/train.
+===================
+*/
+void G_ApplyModeExclusion( void ) {
+	gentity_t	*ent;
+	int			i, mode;
+
+	mode = df_gametype.integer;
+	if ( mode >= 5 ) {
+		mode -= 4;
+	}
+	if ( mode < 1 || mode > 3 ) {
+		mode = 1;
+	}
+
+	for ( i = MAX_CLIENTS, ent = &g_entities[MAX_CLIENTS] ; i < level.num_entities ; i++, ent++ ) {
+		if ( !ent->inuse ) {
+			continue;
+		}
+		if ( df_promode.integer == 1 ) {
+			if ( ent->flags & FL_NOT_CPM ) { G_FreeEntity( ent ); continue; }
+		} else {
+			if ( ent->flags & FL_NOT_VQ3 ) { G_FreeEntity( ent ); continue; }
+		}
+		if ( g_dedicated.integer || df_gametype.integer >= 5 ) {
+			if ( ent->flags & FL_NOT_MP ) { G_FreeEntity( ent ); continue; }
+		} else {
+			if ( ent->flags & FL_NOT_SP ) { G_FreeEntity( ent ); continue; }
+		}
+		if ( mode == 1 ) {
+			if ( ent->flags & FL_NOT_DF ) G_FreeEntity( ent );
+		} else if ( mode == 2 ) {
+			if ( ent->flags & FL_NOT_TM ) G_FreeEntity( ent );
+		} else if ( mode == 3 ) {
+			if ( ent->flags & FL_NOT_FC ) {
+				G_FreeEntity( ent );
+			} else if ( df_ndm_nomover.integer && ( ent->flags & FL_MOVER ) ) {
+				G_FreeEntity( ent );
+			}
+		}
+	}
+}
+
+/*
+===================
 G_SpawnGEntityFromSpawnVars
 
 Spawn an entity and fill in all of the level fields from
@@ -404,8 +486,7 @@ level.spawnVars[], then call the class specific spawn function
 void G_SpawnGEntityFromSpawnVars( void ) {
 	int			i;
 	gentity_t	*ent;
-	char		*s, *value, *gametypeName;
-	static char *gametypeNames[] = {"ffa", "tournament", "single", "team", "ctf", "oneflag", "obelisk", "harvester"};
+
 
 	// get the next free entity
 	ent = G_Spawn();
@@ -423,21 +504,11 @@ void G_SpawnGEntityFromSpawnVars( void ) {
 			return;
 		}
 	}
-	// check for "notteam" flag (GT_FFA, GT_TOURNAMENT, GT_SINGLE_PLAYER)
-	if ( g_gametype.integer >= GT_TEAM ) {
-		G_SpawnInt( "notteam", "0", &i );
-		if ( i ) {
-			ADJUST_AREAPORTAL();
-			G_FreeEntity( ent );
-			return;
-		}
-	} else {
-		G_SpawnInt( "notfree", "0", &i );
-		if ( i ) {
-			ADJUST_AREAPORTAL();
-			G_FreeEntity( ent );
-			return;
-		}
+	// DeFRaG (func_0x24b2a/func_0x1c9c): replaces vanilla's notteam/notfree/gametype handling with mode-flag keys
+	// that G_ApplyModeExclusion() evaluates after all entities exist. "notdefrag" leaves the entity allocated but
+	// unspawned (the bytecode returns without freeing it).
+	if ( !G_ParseModeKeys( ent ) ) {
+		return;
 	}
 
 #ifdef MISSIONPACK
@@ -456,18 +527,6 @@ void G_SpawnGEntityFromSpawnVars( void ) {
 	}
 #endif
 
-	if( G_SpawnString( "gametype", NULL, &value ) ) {
-		if( g_gametype.integer >= GT_FFA && g_gametype.integer < GT_MAX_GAME_TYPE ) {
-			gametypeName = gametypeNames[g_gametype.integer];
-
-			s = strstr( value, gametypeName );
-			if( !s ) {
-				ADJUST_AREAPORTAL();
-				G_FreeEntity( ent );
-				return;
-			}
-		}
-	}
 
 	// move editor origin to pos
 	VectorCopy( ent->s.origin, ent->s.pos.trBase );

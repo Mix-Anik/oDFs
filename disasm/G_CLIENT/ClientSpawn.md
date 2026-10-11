@@ -34,8 +34,23 @@ loop whose exact semantics are still not fully pinned down.
 
 ## Still open (see the linked doc's "Status" section for the full list)
 
-- `func_0x2830` (client state manager, called at entry)
-- The restructured spawn-point-selection dispatch
+- The restructured spawn-point-selection dispatch — **fully resolved**,
+  entire call graph decoded: `0x44bc` = `O3J_SelectSpawnPoint_UseClosest`
+  (confirmed via an embedded debug string), called 3× from here under a
+  `VectorLength(client+0x2a4) != 0` gate, else falling to `func_0x270ee`
+  (a CTF flag/player/spawn-classname picker, `func_0x26fbf`), with both
+  of those ultimately falling back to `func_0x1c6be` — a DeFRaG-extended
+  `SelectRandomFurthestSpawnPoint` (confirmed via vanilla's exact
+  `"Couldn't find a spawn point"` error string), reached via a trivial
+  stub `func_0x1c84b`. `ClientSpawn` also calls `func_0x1c6be` directly
+  (2× more) and a sibling `info_player_deathmatch`-only scanner
+  (`func_0x1c860`). Full decodes:
+  [`O3J_SelectSpawnPoint_UseClosest.md`](O3J_SelectSpawnPoint_UseClosest.md),
+  [`func_0x270ee.md`](func_0x270ee.md),
+  [`func_0x26fbf.md`](func_0x26fbf.md),
+  [`func_0x1c6be.md`](func_0x1c6be.md). Not ported (no CTF gametype in
+  oDFs to hang this off of; `client+0x2a4` and the DeFRaG-added
+  `+0x2f8` tag field are both still unidentified).
 - The `0x1317bc==1` "keep weapon across respawn" gate (identified
   structurally — `0x1317bc` is the same DeFRaG game-mode selector
   `func_0x1e60`/`G_InitRaceMode` already established, mode `1` = full

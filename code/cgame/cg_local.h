@@ -1005,6 +1005,7 @@ typedef struct {
 	// parsed from serverinfo
 	gametype_t		gametype;
 	int				dmflags;
+	int				killWallbug;		// g_killWallbug from serverinfo (pmove prediction parity)
 	int				teamflags;
 	int				fraglimit;
 	int				capturelimit;

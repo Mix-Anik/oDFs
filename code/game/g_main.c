@@ -86,6 +86,7 @@ vmCvar_t	g_localTeamPref;
 vmCvar_t	df_promode;
 vmCvar_t	df_ob_killobs;
 vmCvar_t	df_mode;
+vmCvar_t	df_gametype;
 vmCvar_t	df_hook_type;
 vmCvar_t	df_lg_knockback;
 vmCvar_t	df_ndm_damage;
@@ -93,6 +94,9 @@ vmCvar_t	df_ndm_weaponsSet;
 vmCvar_t	df_ndm_weaponsPickup;
 vmCvar_t	df_ndm_nopad;
 vmCvar_t	df_ndm_noteleport;
+vmCvar_t	df_ndm_nomover;
+vmCvar_t	g_killWallbug;
+vmCvar_t	df_mp_InterferenceOff;
 #ifdef MISSIONPACK
 vmCvar_t	g_obeliskHealth;
 vmCvar_t	g_obeliskRegenPeriod;
@@ -198,6 +202,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &df_promode,    	"df_promode",    	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_ob_killobs, 	"df_ob_killobs", 	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_mode,       	"df_mode",       	"1",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
+	{ &df_gametype,   	"df_gametype",   	"1",			CVAR_LATCH, 0, qfalse },
 	{ &df_hook_type,  	"df_hook_Type",  	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_lg_knockback,	"df_lg_Knockback",	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ NULL, 			"defrag_mode",     		"-1",   	CVAR_SERVERINFO, 0, qfalse },
@@ -219,6 +224,9 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &df_ndm_weaponsSet,    "df_ndm_weaponsSet",    "1022", CVAR_SERVERINFO, 0, qfalse },
 	{ &df_ndm_weaponsPickup, "df_ndm_weaponsPickup", "0",    CVAR_SERVERINFO, 0, qfalse },
 	{ &df_ndm_nopad,         "df_ndm_nopad",         "0",    CVAR_SERVERINFO, 0, qfalse },
+	{ &df_ndm_nomover,       "df_ndm_nomover",       "0",    CVAR_SERVERINFO, 0, qfalse },
+	{ &g_killWallbug,        "g_killWallbug",        "1",    CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
+	{ &df_mp_InterferenceOff, "df_mp_InterferenceOff", "3",   CVAR_SYSTEMINFO | CVAR_LATCH, 0, qfalse },
 	{ &df_ndm_noteleport,    "df_ndm_noteleport",    "0",    CVAR_SERVERINFO, 0, qfalse },
 };
 
@@ -528,6 +536,9 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	// parse the key/value pairs and spawn gentities
 	G_SpawnEntitiesFromString();
+
+	// DeFRaG (func_0x20e0): drop entities whose notvq3/notcpm/notmp/notsp/notdf/nottm/notfc keys exclude the current mode
+	G_ApplyModeExclusion();
 
 	// After spawning: build defrag_route from what entities were found.
 	// Format mirrors DeFRaG's G_InitRaceMode default-path: "df[-df][-df]"

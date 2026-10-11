@@ -18,7 +18,7 @@ table (top of `qagame.dis`) starting from the already-confirmed
 **Important limitation discovered this pass:** the lock-step-by-position
 assumption breaks down once DeFRaG's Lightning Gun logic is reached — DeFRaG
 restructured the tail of `g_weapon.c` so that `FireWeapon` itself became
-directly callable from a Pmove-embedded per-frame dispatcher; a
+(retracted: it is only called from `ClientEvents`) a
 position-based-only guess at `0x21b5e` in `disasm/README.md` predating this
 pass turned out to be a misidentification (corrected in
 [FireWeapon.md](FireWeapon.md)). Every identification below was confirmed via
@@ -44,7 +44,7 @@ direct call-target/argument evidence, not position alone.
 | `Weapon_GrapplingHook_Fire` | `0x290cf` | `0x206a2` | ❌ modified (+76 instr) | ✅ Decoded — "LAG CHEAT" gate + redundant re-aim using current (not old) origin — see [Weapon_GrapplingHook_Fire.md](Weapon_GrapplingHook_Fire.md) |
 | `Weapon_HookFree` | `0x29145` | `0x206cd` | ✅ hash-identical | ✅ Confirmed unmodified (size+1 drift only) |
 | `Weapon_HookThink` | `0x2916e` | `0x206f6` | ✅ hash-identical | ✅ Confirmed unmodified (size+1 drift only) |
-| `Weapon_LightningFire`-equivalent | `0x291f4` (`func_0x291f4`) | `0x2077c` | ❌ modified | ✅ Already fully decoded in [../G_ACTIVE/LG_Knockback.md](../G_ACTIVE/LG_Knockback.md); **confirmed still reached from `FireWeapon`'s normal `case WP_LIGHTNING`, in addition to a new Pmove-embedded per-frame caller** — see [FireWeapon.md](FireWeapon.md#5-wp_lightning-open-question--resolved) |
+| `Weapon_LightningFire`-equivalent | `0x291f4` (`func_0x291f4`) | `0x2077c` | ❌ modified | ✅ Already fully decoded in [../G_ACTIVE/LG_Knockback.md](../G_ACTIVE/LG_Knockback.md); **reached from `FireWeapon`'s normal `case WP_LIGHTNING`, as in vanilla (the earlier "extra Pmove per-frame caller" claim was retracted — that caller is `ClientEvents`)** — see [FireWeapon.md](FireWeapon.md#5-wp_lightning-open-question--resolved) |
 | `LogAccuracyHit` | `0x29334` | `0x2087f` | ✅ hash-identical | ✅ Fully decoded, confirmed unmodified — all 6 vanilla checks present in order — see [LogAccuracyHit.md](LogAccuracyHit.md) |
 | `CalcMuzzlePoint` | `0x29383` | `0x208ce` | ✅ identical | ✅ Confirmed unmodified — see [CalcMuzzlePoint.md](CalcMuzzlePoint.md) |
 | `CalcMuzzlePointOrigin` | `0x2940d` | `0x20958` | ✅ identical | ✅ Confirmed unmodified (hash + spot-check only) |
@@ -106,9 +106,8 @@ order exactly. `ShotgunPellet` remains the only one of the five
    documented hashing caveat (opcode-shape-only, not constants/signature).
 6. **The Lightning Gun's normal fire path still exists and is unchanged in
    position** (`FireWeapon`'s `case WP_LIGHTNING` still calls the beam-trace
-   function) — DeFRaG *added* a second caller (a Pmove-embedded per-frame
-   re-invocation of the whole `FireWeapon` function) rather than replacing
-   the normal path. Resolves the open question flagged in this task.
+   function) — (RETRACTED later: no second caller exists; `0x1a63a` is
+   `ClientEvents`, see FireWeapon.md §5.) Resolves the open question flagged in this task.
 7. **`Weapon_GrapplingHook_Fire` redundantly recomputes aim/muzzle** using
    the entity's *current* origin (`CalcMuzzlePoint`) rather than reusing
    `FireWeapon`'s already-computed muzzle (which used `oldOrigin` via

@@ -64,6 +64,7 @@ Function names are **not preserved** in QVM. All identifications are inferred fr
 - Caller arguments at `local 1 0x28`, `local 1 0x2c`, ... (above frame base)
 - Return value left on stack before `leave`
 - Negative call targets (e.g., `call -0x6b`) are **trap calls** to the engine
+  - Numbering: `call -N` = trap id `N-1` (so `-0x1`=G_PRINT … `-0x7`=cvar int, `-0x8`=cvar string buf, `-0xa`=argv, `-0xb`=fopen, `-0xc`=fread, `-0xd`=**fwrite**, `-0xe`=fclose, `-0x11`=drop client, `-0x12`=send server cmd, `-0x13`=set configstring, `-0x19`=trace, `-0x1f`/`-0x20`=link/unlink, `-0x21`/`-0x22`=entities in box/contact; math ids from `bg_lib`: `-0x65`=memset, `-0x67`=strncpy, `-0x6b`=sqrt, `-0x6f`=floor). Derived from `g_public.h` order; re-verify an unlisted one before citing.
 
 ### Identifying functions without names
 

@@ -27,10 +27,9 @@ void ClientDisconnect( int clientNum ) {
                                              // vanilla's own call at this exact position
 
     if ( ent->client != NULL /* +0x204 */ )
-        ClientEvents( ent, ??? );            // 0x273f — called unconditionally in vanilla;
-                                               // this decode found it gated on ent->client,
-                                               // which is effectively always true for a
-                                               // disconnecting client anyway
+        ClearRaceTimer( ent );               // 0x273f — NOT ClientEvents (vanilla's
+                                               // ClientDisconnect never called it); zeroes this
+                                               // client's 32-byte raceTimer_t, see func_0x273f.md
 
     // --- DeFRaG addition #1: clear this clientNum out of every other
     // client's per-client bitmask pair ---
@@ -51,8 +50,8 @@ void ClientDisconnect( int clientNum ) {
     }
 
     // --- vanilla-shaped: G_LogPrintf / possibly a "left the game" broadcast ---
-    G_LogPrintf( ... , "" );    // -0x13 trap, args include an empty-string literal (0x7db4)
-    func_0x6cc();                // zero-arg call — same unidentified function ClientBegin also calls
+    trap_SetConfigstring( CS_PLAYERS + clientNum, "" );   // CORRECTED: -0x13 = id 18 = G_SET_CONFIGSTRING (not G_LogPrintf); args include the empty-string literal 0x7db4 — this is vanilla's own call at the end of ClientDisconnect
+    CalculateRanks();            // func_0x6cc — CONFIRMED (body decoded), see func_0x6cc.md
 
     // --- DeFRaG addition #2: invalidate the global max-speed record if
     // this client was its holder ---

@@ -445,6 +445,47 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 
 /*
 ================
+G_MissileTrace
+
+DeFRaG func_0x43c3 (called from G_RunMissile): the missile's world trace. With df_mp_InterferenceOff bit 1 set
+(missiles don't interact with players) every other client's body is made non-solid for the duration of the trace
+so the missile only hits the world and its own owner; if the owner is not a connected client only solids are hit.
+================
+*/
+static void G_MissileTrace( trace_t *tr, gentity_t *ent, vec3_t end, int passent ) {
+	gentity_t	*owner;
+	int			i;
+	qboolean	modified[MAX_CLIENTS];
+
+	if ( !( df_mp_InterferenceOff.integer & 2 ) ) {
+		trap_Trace( tr, ent->r.currentOrigin, ent->r.mins, ent->r.maxs, end, passent, ent->clipmask );
+		return;
+	}
+
+	owner = ent->parent;
+	if ( !owner || !owner->client || owner->client->pers.connected != CON_CONNECTED ) {
+		trap_Trace( tr, ent->r.currentOrigin, ent->r.mins, ent->r.maxs, end, passent, CONTENTS_SOLID );
+		return;
+	}
+
+	for ( i = 0 ; i < MAX_CLIENTS ; i++ ) {
+		modified[i] = qfalse;
+		if ( g_entities[i].inuse && &g_entities[i] != owner && g_entities[i].r.contents == CONTENTS_BODY ) {
+			g_entities[i].r.contents = 0;
+			modified[i] = qtrue;
+		}
+	}
+	trap_Trace( tr, ent->r.currentOrigin, ent->r.mins, ent->r.maxs, end, passent, CONTENTS_SOLID | CONTENTS_BODY );
+	// (the original restores every in-use entity whose contents are 0, which also turns spectators into bodies; only the ones changed above are restored here)
+	for ( i = 0 ; i < MAX_CLIENTS ; i++ ) {
+		if ( modified[i] ) {
+			g_entities[i].r.contents = CONTENTS_BODY;
+		}
+	}
+}
+
+/*
+================
 G_RunMissile
 ================
 */
@@ -471,7 +512,7 @@ void G_RunMissile( gentity_t *ent ) {
 		passent = ent->r.ownerNum;
 	}
 	// trace a line from the previous position to the current position
-	trap_Trace( &tr, ent->r.currentOrigin, ent->r.mins, ent->r.maxs, origin, passent, ent->clipmask );
+	G_MissileTrace( &tr, ent, origin, passent );
 
 	if ( tr.startsolid || tr.allsolid ) {
 		// make sure the tr.entityNum is set to the entity we're stuck in

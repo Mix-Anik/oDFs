@@ -160,23 +160,41 @@ enough for a pure position walk (see headline finding 5 below).
 
 ## Not attempted this pass
 
-- `func_0x2830` (called at `ClientSpawn` entry, before spawn-point
-  selection) — a loop over all entities checking `eType`/owner, freeing
-  matching entities via `G_FreeEntity`. Plausibly cleans up leftover
-  hook/missile entities owned by the respawning client, but not fully
-  decoded (out of the health/DFLAG scope requested this pass).
-- The restructured spawn-point-selection dispatch in `ClientSpawn` (multiple
-  candidate helper functions gated on race-mode/spectator globals) — not
-  individually decoded; noted structurally in
-  [ClientSpawn.md](ClientSpawn.md).
+- `func_0x2830` — **now fully decoded**, see [`func_0x2830.md`](func_0x2830.md).
+  Loops over `g_entities[64..1023]` (every non-client slot — an earlier
+  pass mistakenly called this a separate "shadow table" due to an
+  arithmetic slip, now corrected) with a three-way type dispatch that
+  frees owned entities (`G_FreeEntity`) and clears classname-matched
+  entries' bookkeeping fields. Also connects to and confirms the
+  `+0x54`/`+0x58` per-client bitmask fields independently found in
+  [`../G_MISSILE/func_0x20998.md`](../G_MISSILE/func_0x20998.md) earlier
+  this session. Not implemented (the `type` values and several field
+  offsets are still unconfirmed).
+- The restructured spawn-point-selection dispatch in `ClientSpawn` —
+  **fully resolved, whole call graph decoded**: `0x44bc` =
+  `O3J_SelectSpawnPoint_UseClosest` (confirmed via an embedded debug
+  string), see
+  [`O3J_SelectSpawnPoint_UseClosest.md`](O3J_SelectSpawnPoint_UseClosest.md).
+  Its fallback (`func_0x270ee` → `func_0x26fbf`, a CTF spawn-point
+  picker) and the shared "last resort" helper both paths converge on
+  (`func_0x1c6be`, a DeFRaG-extended `SelectRandomFurthestSpawnPoint`,
+  confirmed via vanilla's exact error string) are now also decoded — see
+  [`func_0x270ee.md`](func_0x270ee.md),
+  [`func_0x26fbf.md`](func_0x26fbf.md),
+  [`func_0x1c6be.md`](func_0x1c6be.md). Confirmed reusing this project's
+  own `G_Find`/`func_0x1c56f`/`rand()`. `client+0x2a4`'s identity (the
+  reference-point field the whole dispatch hinges on) and the
+  DeFRaG-added `+0x2f8` entity tag field are the only pieces still not
+  decoded.
 - `func_0x274b`'s two unidentified sub-calls (`func_0x3597`, `func_0x3933`)
   and its ammo-table lookup helper `func_0x4b6a`.
-- `func_0x273f` ("ClientEvents", called unconditionally at the top of
-  `ClientDisconnect`) — already flagged purpose-unclear in
-  `G_ACTIVE/README.md`; not re-examined this pass.
+- `func_0x273f` — **resolved**: race-timer record clear (not ClientEvents),
+  see [func_0x273f.md](func_0x273f.md).
 - `ClientBegin`'s new `func_0x26e8` call and the team-change stat-reset
   block (`client+0x288`/`0x2a4`/`0x2a8`/`0x2ac`) — **now fully decoded**,
   see [`ClientBegin.md`](ClientBegin.md). The gating condition (skip unless
   team actually changed and wasn't from spectator) is now confirmed; the
   individual fields' identities and `func_0x26e8`/`func_0x3a47`'s exact
   purpose are still not identified.
+
+- Auth handshake (client authentication, `auth_request`/`auth_reply`): see [auth_handshake.md](auth_handshake.md).

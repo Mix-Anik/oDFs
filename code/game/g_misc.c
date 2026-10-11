@@ -108,7 +108,7 @@ void TeleportPlayer( gentity_t *player, vec3_t origin, vec3_t angles ) {
 	// toggle the teleport bit so the client knows to not lerp
 	player->client->ps.eFlags ^= EF_TELEPORT_BIT;
 	// kill anything at the destination
-	if ( player->client->sess.sessionTeam != TEAM_SPECTATOR ) {
+	if ( player->client->sess.sessionTeam != TEAM_SPECTATOR && !( df_mp_InterferenceOff.integer & 1 ) ) {
 		G_KillBox (player);
 	}
 

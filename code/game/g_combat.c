@@ -844,6 +844,18 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		attacker = &g_entities[ENTITYNUM_WORLD];
 	}
 
+	// DeFRaG (G_Damage, bytecode 0x2017a): with df_mp_InterferenceOff bit 1 set, clients take no damage from other clients
+	// (directly or via an inflictor owned by another client); self-inflicted damage is still allowed.
+	if ( ( df_mp_InterferenceOff.integer & 2 ) && ( targ - g_entities ) < MAX_CLIENTS && attacker != targ
+		&& !( inflictor && inflictor->parent == targ ) ) {
+		if ( ( attacker - g_entities ) < MAX_CLIENTS ) {
+			return;
+		}
+		if ( inflictor && inflictor->parent && ( inflictor->parent - g_entities ) < MAX_CLIENTS ) {
+			return;
+		}
+	}
+
 	// shootable doors / buttons don't actually have any health
 	if ( targ->s.eType == ET_MOVER ) {
 		if ( targ->use && targ->moverState == MOVER_POS1 ) {

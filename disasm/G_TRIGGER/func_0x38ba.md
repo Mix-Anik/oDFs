@@ -1,0 +1,95 @@
+# `func_0x38ba` — publish race-timer state into `ps.stats` (+ time obfuscation `func_0x3f0c`)
+
+**Address:** `0x38ba` (`enter 0x24`), arg0 = `gentity_t *ent`. Called from `0x259a`
+(per-frame client function reached from `ClientEndFrame`, see
+[../G_CLIENT/auth_handshake.md](../G_CLIENT/auth_handshake.md)) as its **first** action; also from
+`0x274b`'s neighborhood per the disassembler's caller list (`0x274b 0x39c5 0x3b96`
+are listed for the *next* function `0x3933`, not this one — this one's list is
+only `0x259a`).
+
+## Decode
+```c
+void func_0x38ba( gentity_t *ent ) {
+    gclient_t   *cl  = ent->client;                 // +0x204
+    raceTimer_t *rec = func_0x3588( cl );           // 0x1318dc + clientNum*32
+    if ( rec->initialized /* +0x14 */ )  cl->ps.stats[12] |=  2;      // client+0xe8 = stats[12]
+    else                                  cl->ps.stats[12] &= ~2;
+
+    int v;
+    if ( *(int*)0x1317c0 != 0 /*dedicated/variant flag, see G_UTILS/func_0x21fc.md*/ || func_0x3e0a() != 0 )   // 0x3e0a = cached sv_cheats (see G_COMBAT/G_Damage.md)
+        v = rec->ms;                                    // plain elapsed ms
+    else
+        v = func_0x3f0c( rec->ms, cl );                 // obfuscated/encoded ms
+    cl->ps.stats[8] = v & 0xffff;                       // client+0xd8
+    cl->ps.stats[7] = v >> 16;                          // client+0xd4 (arithmetic shift)
+}
+```
+Stat offsets: `ps.stats` base `client+0xb8` (stats[12] = `+0xe8` already used in
+[../G_ACTIVE/ClientThink_real.md](../G_ACTIVE/ClientThink_real.md) docs; `+0xd4`/`+0xd8` follow by
+index arithmetic only). Condition reading: the jump `0x38f7 ne → 0x3900`
+(plain value) and `0x38ff eq → 0x3907` (encode path) as transcribed.
+
+So the race time (32-bit `rec->ms`) is networked as two 16-bit halves in
+`ps.stats[7]`/`[8]`, **encoded when `sv_cheats == 0` and `0x1317c0 == 0`**; and
+`stats[12]` bit `0x2` mirrors `rec->initialized`.
+
+## `func_0x3f0c(ms, client)` — fully decoded (second pass)
+Syscall `-0x6f` = `floor` (trap id 110) and `-0x65` = memset (id 100); numbering `-(id+1)` as in `g_public.h`/`bg_lib` trap tables; the same pass checked `-0x67` = strncpy (`0x5dc2` = `rand`, confirmed elsewhere).
+```c
+int func_0x3f0c( int ms, gclient_t *cl ) {
+    if ( ms == 0 ) return 0;
+    ms &= 0x3fffff;                                              // 22 bits
+    a = 0; for ( i = 0; i < 3; i++ ) a += (ms >> (6*i)) & 0x3f;
+    a += (ms >> 18) & 0xf;
+    ms |= (a & 0x3f) << 22;                                      // 6-bit checksum in bits 22..27
+    r = rand() % 15 + 1;
+    r |= (~r << 4) & 0xff;  r |= r << 8;  r |= r << 16;          // replicate byte (hi nibble = ~lo nibble)
+    ms ^= r;  ms &= 0xfffffff;  ms |= r << 28;                   // low nibble of r into bits 28..31
+    x  = level.time << 2;
+    x += ( *(byte*)0x1320f0 + 0x4abb ) << 8;
+    x ^= level.time << 24;
+    ms ^= x;
+    for ( j = 0; j < 3; j++ ) ((byte*)&ms)[j+1] ^= ((byte*)&ms)[j];   // chained byte XOR
+    if ( *(int*)0x1317c0 == 0 ) {                                 // else return as-is
+        v = (int)floor( cl->ps.origin[0] );   /* cl+0x14 */  ms ^= abs(v) & 0xffff;
+        v = (int)floor( cl->ps.velocity[0] ); /* cl+0x20 */  ms ^= abs(v) << 16;
+        v = cl->ps.stats[0] /* cl+0xb8, health */;           ms ^= ( v > 0 ) ? (v & 0xff) : 0x96;
+        ms ^= ( cl->ps.movementDir /* cl+0x58 */ & 0xf ) << 28;
+    }
+    return ms;
+}
+```
+(`abs` as the two `lei`-guarded negations at `0x3ff1`/`0x401e`.) So with cheats off the
+networked time is a salted, checksummed value that also folds in the player's
+current x-origin, x-velocity, health and `movementDir`, the level time and a
+byte at `0x1320f0` (`= (Σ chars of lowercased mapname) & 0xff`, set by init `0x406d`, see below) — a tamper-evident
+encoding, not a mere hash. The checksum/field layout is transcribed from the
+bytecode; the *purpose* (anti-spoof of the displayed race time) is an inference.
+
+**cgame consumer found:** cgame `0x5fd7` (called from `0x63f5`) has the matching
+decode — same `0x3fffff` mask, `6*i` / `>>18 &0xf` checksum loop, byte-replicate
+(`<<8`, `<<16`) at `0x615b`-`0x6172`, a `(x >> 0x16) & 0x3f` checksum compare
+(`0x61b1`), and on mismatch calls `0x59b4(2, 0)` and returns 0; on success stores
+the decoded ms to `0x11d77c` (cgame data). Not decoded further this pass.
+
+## Init `func_0x406d` (called once from `0x1c74`, init path) — salts for the encoder
+```c
+*(int*)0x1320fc = level.time;                                        // init stamp (readers not searched)
+trap_Cvar_Set( "defrag_vers", va("%i", 0x4abb /*19131*/) );          // name built byte-by-byte on stack; value 19131 = "1.91.31"
+name = Cvar_VariableString("mapname"); strncpy(buf, name, 0x80); buf[0x7f]=0;
+func_0xaadf( buf );                                                  // string helper, same one 0x2d02 applies to the map name (lowercasing shape; not hash-checked)
+*(byte*)0x1320f0 = 0; for ( p = buf; *p; p++ ) *(byte*)0x1320f0 += *p;   // byte-sum of the map name
+```
+(`func_0x138e(name)` = `Cvar_VariableStringBuffer(name, 0x12c6f0, 0x100); return 0x12c6f0;`.) The
+`19131` literal independently matches the `"1.91.31"` version string used by the
+auth hash in [../G_CLIENT/auth_handshake.md](../G_CLIENT/auth_handshake.md). Note
+oDFs registers `defrag_vers` itself in `g_main.c` as a ROM serverinfo cvar
+(value `ODFS_VERSION`) — this init overwrites it at runtime with `19131` in DeFRaG.
+
+## oDFs
+Not ported. oDFs's cgame path derives timer start from `STAT_DEFRAG_FLAGS`
+state-change bits (see `g_defrag.c` comments / `CGAME/cgame_timer_hud.md`), and
+nothing in oDFs writes `stats[7]`/`stats[8]` or flag bit `0x2`; porting the
+encoded value without the matching cgame decoder would break nothing but add
+nothing either. Bit `0x2` ("timer initialized") is a possible small port once
+cgame's reader of `stats[12] & 2` is confirmed — not checked.

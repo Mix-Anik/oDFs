@@ -1156,6 +1156,7 @@ void SP_func_plat (gentity_t *ent) {
 	if ( !ent->targetname ) {
 		SpawnPlatTrigger(ent);
 	}
+	ent->flags |= FL_MOVER;	// DeFRaG: tagged so G_ApplyModeExclusion can drop it in fastcaps mode with df_ndm_nomover
 }
 
 
@@ -1454,6 +1455,7 @@ void SP_func_train (gentity_t *self) {
 	// a chance to spawn
 	self->nextthink = level.time + FRAMETIME;
 	self->think = Think_SetupTrainTargets;
+	self->flags |= FL_MOVER;	// DeFRaG: tagged so G_ApplyModeExclusion can drop it in fastcaps mode with df_ndm_nomover
 }
 
 /*
@@ -1575,6 +1577,7 @@ void SP_func_bobbing (gentity_t *ent) {
 	} else {
 		ent->s.pos.trDelta[2] = height;
 	}
+	ent->flags |= FL_MOVER;	// DeFRaG: tagged so G_ApplyModeExclusion can drop it in fastcaps mode with df_ndm_nomover
 }
 
 /*

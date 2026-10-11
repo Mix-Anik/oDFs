@@ -174,7 +174,7 @@ int Touch_Item(gentity_t *ent, gentity_t *other) {
 
     // 0x21055-0x2107c: CONFIRMED DeFRaG addition, NOT part of the visibility mechanism —
     // only runs when giType != 1 (not IT_WEAPON). Debug string "aswitch %i" (@ 0x8ecd) plus a call
-    // to an unidentified helper (0x ac4e) and a trap call (-0x12). A second nearby debug string
+    // to `0xac4e` (= `va()`-shaped formatter, see G_CLIENT/auth_handshake.md / ClientBegin.md) and a trap call `-0x12` = id 17 = `trap_SendServerCommand` — i.e. "aswitch %i" is a server command sent to a client (target/args not re-decoded). A second nearby debug string
     // "...me changed to %s^7" and associated float math (0x210a2-0x210cc) appear to belong to a
     // related but SEPARATE auto-weapon-switch-on-pickup feature, not the item-visibility mechanism.
     // Neither branch touches ent->perClientPickupTime, svFlags, eFlags, or nextthink. Out of scope,

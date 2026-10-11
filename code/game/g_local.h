@@ -52,6 +52,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define FL_NO_BOTS				0x00002000	// spawn point not for bot use
 #define FL_NO_HUMANS			0x00004000	// spawn point just for bots
 #define FL_FORCE_GESTURE		0x00008000	// force gesture on client
+// DeFRaG per-entity mode exclusion bits (ent->flags), see disasm/G_SPAWN/entity_mode_exclusion.md
+#define FL_NOT_VQ3				0x00010000	// "notvq3"
+#define FL_NOT_CPM				0x00020000	// "notcpm"
+#define FL_NOT_MP				0x00040000	// "notmp"
+#define FL_NOT_SP				0x00080000	// "notsp"
+#define FL_NOT_DF				0x00100000	// "notdf"  (mode 1)
+#define FL_NOT_TM				0x00200000	// "nottm"  (mode 2)
+#define FL_NOT_FC				0x00400000	// "notfc"/"notteam" (mode 3)
+#define FL_MOVER				0x00800000	// set by func_plat/func_bobbing/func_train; removed in mode 3 when df_ndm_nomover is set
 
 // movers are things like doors, plats, buttons, etc
 typedef enum {
@@ -264,6 +273,9 @@ typedef struct {
 	int			voteCount;			// to prevent people from constantly calling votes
 	int			teamVoteCount;		// to prevent people from constantly calling votes
 	qboolean	teamInfo;			// send team overlay updates?
+	vec3_t		respawnPoint;		// DeFRaG: player-set respawn reference point (all zero = unset), see disasm/G_CLIENT/respawnpoint.md
+	unsigned int	ignoreMask[2];		// DeFRaG: bit n (n<32 in [0], n>=32 in [1]) set = this client ignores clientNum n's chat, see disasm/G_CLIENT/ignore_command.md
+	int			arena;				// DeFRaG: selected multi-arena number (spawn points carry a matching "arena" key), see disasm/G_CLIENT/arena_command.md
 } clientPersistant_t;
 
 
@@ -393,6 +405,7 @@ typedef struct {
 
 	qboolean	restarted;				// waiting for a map_restart to fire
 
+	int			numMultiArenas;		// DeFRaG: highest "arena" key seen on info_player_deathmatch (0 = not a multiarena map)
 	int			numConnectedClients;
 	int			numNonSpectatorClients;	// includes connecting clients
 	int			numPlayingClients;		// connected, non-spectators
@@ -458,6 +471,8 @@ qboolean	G_SpawnFloat( const char *key, const char *defaultString, float *out );
 qboolean	G_SpawnInt( const char *key, const char *defaultString, int *out );
 qboolean	G_SpawnVector( const char *key, const char *defaultString, float *out );
 void		G_SpawnEntitiesFromString( void );
+qboolean	G_ParseModeKeys( gentity_t *ent );
+void		G_ApplyModeExclusion( void );
 char *G_NewString( const char *string );
 
 //
@@ -789,6 +804,10 @@ extern	vmCvar_t	g_localTeamPref;
 extern	vmCvar_t	df_promode;
 extern	vmCvar_t	df_ob_killobs;
 extern	vmCvar_t	df_mode;
+extern	vmCvar_t	df_gametype;
+extern	vmCvar_t	df_ndm_nomover;
+extern	vmCvar_t	g_killWallbug;
+extern	vmCvar_t	df_mp_InterferenceOff;	// bit 0: no player-player collision/telefrag, bit 1: no player-player damage + missiles pass through players
 extern	vmCvar_t	df_hook_type;
 extern	vmCvar_t	df_lg_knockback;
 extern	vmCvar_t	df_ndm_damage;
