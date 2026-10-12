@@ -259,3 +259,12 @@ In oDFs we do not have the DeFRaG mode system (`0x1317bc`). The simplest equival
 set the ready flags directly in the spawn functions (`SP_target_startTimer` sets
 `g_startTimerReady = 1`, etc.) rather than requiring a post-init scan. A `G_InitRaceMode`
 call in `G_InitGame` could reset all race state at map load.
+
+---
+
+## Preset / mode table decoded and PORTED (`G_ResolveNdm`)
+`G_InitRaceMode` (`0x1e60`) is where the "no damage mode" globals get their values:
+- **mode 1 (run)**: `0x131820 = 1` (damage), `0x131824 = 6` (weapons = gauntlet + machinegun), `0x131828 = 0x13182c = 0x7e`, nopad/noteleport 0, `0x131838 = 1` (movers kept), `defrag_mode = -1`. So in run mode the spawn loadout is **gauntlet + machinegun (100 ammo), health maxHealth+25, armor 0** regardless of the `df_ndm_*` cvars.
+- **other modes**: `defrag_mode` = `df_mode_tricksmode` (mode 2) / `df_mode_fastcaps` (mode 3) (both default 2). Values 1..7 select a preset (jump table data `0x930`, code `0x1f86`-`0x2006`): 1: weapons 6, nopad 2, noteleport 2, nomover; 2: weapons `0x1fe` (gauntlet..plasma, no BFG/hook); 3: weapons 6; 4: `0x1fe`, nopad 2, noteleport 2, nomover; 5/6: weapons `0x404` (MG + hook; sets `0x13183c` hook 1 / 0); 7: damage 1, weapons 6, flags `0x7e`. Any other value (0) reads the `df_ndm_*` cvars (`damage`, `weaponsSet`, `nopad`, `noteleport`, `nomover`; flags |= `0x18` if damage, `0x60` if powerups, `0x6` if weaponsPickup).
+**oDFs:** `g_spawn.c` `G_ResolveNdm()` (run from `G_ResolveDfMode`, i.e. after entity spawn) fills `g_ndm`; `ClientSpawn`, `target_init`, nomover exclusion, jump-pad/teleporter gates now read `g_ndm` instead of the raw cvars; new LATCH cvars `df_mode_tricksmode`/`df_mode_fastcaps` (default 2). The preset hook setting (`0x13183c`) is not applied.
+**Behaviour change (visible):** on maps with a start timer (mode 1) you spawn with gauntlet + machinegun only, MG ammo 100, 125 health, 0 armor. On maps without a timer (tricks, preset 2) you get weapons 1..8 with 200 ammo/200 hp/200 armor. Revert: make `G_ResolveNdm` copy the cvars (the `default:` branch) for every mode. Verified headless (`df_dbg_speed 1` prints `weapons 0x6 hp 125 armor 0 mg 100 mode 1`).

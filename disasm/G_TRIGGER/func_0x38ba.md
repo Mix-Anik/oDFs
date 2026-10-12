@@ -74,8 +74,7 @@ bytecode; the *purpose* (anti-spoof of the displayed race time) is an inference.
    `*(arg0+0xe4)` (`& 0xff`, or `0x96` when `<= 0`, i.e. health) and `(*(arg0+0x84) & 0xf) << 28`, XORing them into `x`; then undoes the chained byte-XOR (`b[i] ^= b[i-1]`, loop at `0x60f1`),
    the replicated random byte and the time salt, extracts `chk = (x >> 22) & 0x3f`, masks `x &= 0x3fffff`, recomputes the 6-bit-field checksum (same `6*i` loop plus `>>18 & 0xf`) and compares:
    mismatch → `cgame 0x59b4(2, 0)` (an error/cheat report, not decoded) and return 0; match → store to `0x11d77c` and return the decoded milliseconds.
-The `arg0` offsets differ from the *game* `playerState_t` offsets used by the encoder (`+0x14` origin.x, `+0x20` velocity.x, `+0xb8` health, `+0x58` movementDir), so `arg0` is evidently a
-cgame-side struct (or a differently laid-out ps) holding copies — the field mapping was not resolved. Two debug-label artefacts in the `.dis` ("Item not found", "String: bad index") are
+**Resolved:** `arg0` is the cgame `snapshot_t*` (ps starts at `snap+0x2c`): `snap+0x100/0x104` = `ps.stats[7]/[8]`, `+0x40` = `ps.origin[0]`, `+0x4c` = `ps.velocity[0]`, `+0xe4` = `ps.stats[0]` (health), `+0x84` = `ps.movementDir` — exactly the fields the server encoder folds in. The decoded value is stored by `cgame 0x5248` into the per-checkpoint/stop time list `0x11d6b8[0x11d738]` and compared with the best-time table (`0x11d634`) to raise the new-record event bits `0x200`/`0x400`; i.e. DeFRaG's cgame takes checkpoint/finish times from these stats. Two debug-label artefacts in the `.dis` ("Item not found", "String: bad index") are
 mis-attached constants (`0xffff`, `0x46b4`), not strings used here.
 
 ## Init `func_0x406d` (called once from `0x1c74`, init path) — salts for the encoder
@@ -92,7 +91,10 @@ auth hash in [../G_CLIENT/auth_handshake.md](../G_CLIENT/auth_handshake.md). Not
 oDFs registers `defrag_vers` itself in `g_main.c` as a ROM serverinfo cvar
 (value `ODFS_VERSION`) — this init overwrites it at runtime with `19131` in DeFRaG.
 
-## oDFs
+## oDFs — PORTED (2nd pass)
+`g_defrag.c`: `G_PublishRaceTime` (called from `G_UpdateRacePs`) writes `ps.stats[7]/[8]` (new `STAT_RACE_TIME_HI/LO`) = `raceTimer.ms` (new field: whole-ms elapsed, frozen after the finish) and sets/clears `stats[12]` bit 2 from `initialized`; plain when `g_dfVariant` (dedicated) or `sv_cheats`, otherwise `G_EncodeRaceTime` (transcribed from `0x3f0c` above, salted with mapname byte-sum + 19131). **Behaviour change:** cgame now receives times it previously saw as 0; revert = remove the `G_PublishRaceTime( ent )` call. Syntax-checked, untested; the encoder has not been cross-checked against the cgame decoder.
+
+## (old note) oDFs
 Not ported. oDFs's cgame path derives timer start from `STAT_DEFRAG_FLAGS`
 state-change bits (see `g_defrag.c` comments / `CGAME/cgame_timer_hud.md`), and
 nothing in oDFs writes `stats[7]`/`stats[8]` or flag bit `0x2`; porting the

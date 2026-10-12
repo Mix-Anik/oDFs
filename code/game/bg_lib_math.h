@@ -8,7 +8,7 @@ extern double pow(double x, double y);
 
 #ifdef Q3_VM
 /* QVM math function implementations (only for Q3VM, not for DLL builds) */
-static float sqrtf(float x) {
+float sqrtf(float x) {
 	return (float)sqrt((double)x);
 }
 

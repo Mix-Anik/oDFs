@@ -91,6 +91,11 @@ vmCvar_t	df_hook_type;
 vmCvar_t	df_lg_knockback;
 vmCvar_t	df_ndm_damage;
 vmCvar_t	df_ndm_powerups;
+vmCvar_t	df_racePsSignal;
+vmCvar_t	df_mode_tricksmode;
+vmCvar_t	df_mode_fastcaps;
+vmCvar_t	df_dbg_speed;
+vmCvar_t	df_dbg_respawn;
 vmCvar_t	df_ndm_weaponsSet;
 vmCvar_t	df_ndm_weaponsPickup;
 vmCvar_t	df_ndm_nopad;
@@ -200,7 +205,8 @@ static cvarTable_t		gameCvarTable[] = {
 
 	// oDFs cvars
 	{ NULL,        		"df_version",    	ODFS_VERSION,	CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
-	{ NULL, 			"defrag_vers",     	ODFS_VERSION,	CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
+	// DeFRaG cgame parses atoi(defrag_vers) (cgame 0x3c33) and below 18100 uses a legacy time-decoding path -> must be numeric, DeFRaG itself publishes 19131 (=1.91.31)
+	{ NULL, 			"defrag_vers",     	"19131",	CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
 	{ &df_promode,    	"df_promode",    	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_ob_killobs, 	"df_ob_killobs", 	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_mode,       	"df_mode",       	"1",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
@@ -224,6 +230,11 @@ static cvarTable_t		gameCvarTable[] = {
 	// registration table's string pool). See disasm/G_TRIGGER/func_0x1e60.md.
 	{ &df_ndm_damage,        "df_ndm_damage",        "0",    CVAR_SERVERINFO, 0, qfalse },
 	{ &df_ndm_powerups,      "df_ndm_powerups",      "0",    CVAR_SERVERINFO | CVAR_LATCH, 0, qfalse },
+	{ &df_racePsSignal,      "df_racePsSignal",      "0",    0, 0, qfalse },
+	{ &df_dbg_speed,         "df_dbg_speed",         "0",    0, 0, qfalse },
+	{ &df_dbg_respawn,       "df_dbg_respawn",       "0",    0, 0, qfalse },
+	{ &df_mode_tricksmode,   "df_mode_tricksmode",   "2",    CVAR_LATCH, 0, qfalse },
+	{ &df_mode_fastcaps,     "df_mode_fastcaps",     "2",    CVAR_LATCH, 0, qfalse },
 	{ &df_ndm_weaponsSet,    "df_ndm_weaponsSet",    "1022", CVAR_SERVERINFO, 0, qfalse },
 	{ &df_ndm_weaponsPickup, "df_ndm_weaponsPickup", "0",    CVAR_SERVERINFO, 0, qfalse },
 	{ &df_ndm_nopad,         "df_ndm_nopad",         "0",    CVAR_SERVERINFO, 0, qfalse },
@@ -1995,6 +2006,20 @@ void G_RunFrame( int levelTime ) {
 	CheckTeamVote( TEAM_BLUE );
 
 	G_FragsFilterPublish();
+
+	// debug: df_dbg_respawn <ms> respawns client 0 every <ms> milliseconds (tests the per-client respawn sweep)
+	if ( df_dbg_respawn.integer > 0 && level.clients[0].pers.connected == CON_CONNECTED 
+		&& level.time > 0 && ( level.time % df_dbg_respawn.integer ) < 20 && ( level.time > df_dbg_respawn.integer ) ) {
+		ClientSpawn( &g_entities[0] );
+		G_Printf( "dbg respawn\n" );
+	}
+
+	// debug: print client 0's speed about once a second (df_dbg_speed 1)
+	if ( df_dbg_speed.integer && ( level.time % 1000 ) < 20 && level.clients[0].pers.connected == CON_CONNECTED ) {
+		G_Printf( "dbg speed: %.1f ups  vel %.1f %.1f %.1f  weapons 0x%x hp %i armor %i mg %i mode %i\n", VectorLength( level.clients[0].ps.velocity ),
+			level.clients[0].ps.velocity[0], level.clients[0].ps.velocity[1], level.clients[0].ps.velocity[2],
+			level.clients[0].ps.stats[STAT_WEAPONS], level.clients[0].ps.stats[STAT_HEALTH], level.clients[0].ps.stats[STAT_ARMOR], level.clients[0].ps.ammo[WP_MACHINEGUN], g_dfMode );
+	}
 
 	// for tracking changes
 	CheckCvars();

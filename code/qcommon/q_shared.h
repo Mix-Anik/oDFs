@@ -591,6 +591,13 @@ float RadiusFromBounds( const vec3_t mins, const vec3_t maxs );
 void ClearBounds( vec3_t mins, vec3_t maxs );
 void AddPointToBounds( const vec3_t v, vec3_t mins, vec3_t maxs );
 
+#ifdef Q3_VM
+// sqrtf() is defined in bg_lib_math.h (compiled once, in q_math.c). It MUST be declared before the inline vector
+// functions below: without a prototype lcc assumes `int sqrtf()`, so VectorLength() converted the float's bit pattern
+// from int to float and returned garbage (huge values -> astronomically high speeds in PM_Friction & co).
+float sqrtf( float x );
+#endif
+
 #if !defined( Q3_VM ) || ( defined( Q3_VM ) && defined( __Q3_VM_MATH ) )
 static ID_INLINE int VectorCompare( const vec3_t v1, const vec3_t v2 ) {
 	if (v1[0] != v2[0] || v1[1] != v2[1] || v1[2] != v2[2]) {

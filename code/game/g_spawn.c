@@ -471,7 +471,66 @@ void G_ResolveDfMode( void ) {
 		g_dfVariant = qtrue;
 	}
 	g_dfMode = mode;
+	G_ResolveNdm();
 	trap_Cvar_Set( "defrag_gametype", va( "%i", g_dfVariant ? mode + 4 : mode ) );
+}
+
+ndmSettings_t g_ndm;
+
+/*
+DeFRaG G_InitRaceMode (func_0x1e60 body for the preset switch at 0x1f76, jump table data 0x930):
+mode 1 (run): damage 1, weapons 6 (gauntlet+machinegun), flags 0x7e, no pad/teleport restriction, movers kept.
+other modes: defrag_mode = df_mode_tricksmode (mode 2) / df_mode_fastcaps (mode 3); 1..7 select a preset, otherwise the df_ndm_* cvars apply:
+  1: weapons 6,     nopad 2, noteleport 2, nomover      2: weapons 0x1fe, 0,0
+  3: weapons 6,     0,0                                  4: weapons 0x1fe, 2,2, nomover
+  5: weapons 0x404, 0,0 (hook 1)                         6: weapons 0x404, 0,0 (hook 0)
+  7: damage 1, weapons 6, flags 0x7e, 0,0
+(nomover is set by presets 1 and 4; the preset values for the "hook" setting are not applied here.)
+*/
+void G_ResolveNdm( void ) {
+	int v;
+
+	memset( &g_ndm, 0, sizeof( g_ndm ) );
+	if ( g_dfMode == 1 ) {
+		g_ndm.damage = 1;
+		g_ndm.weaponsSet = 6;
+		g_ndm.flags = 0x7e;
+		trap_Cvar_Set( "defrag_mode", "-1" );
+		return;
+	}
+
+	v = trap_Cvar_VariableIntegerValue( g_dfMode == 3 ? "df_mode_fastcaps" : "df_mode_tricksmode" );
+	if ( v < 1 || v > 7 ) {
+		v = 0;
+	}
+	trap_Cvar_Set( "defrag_mode", va( "%i", v ) );
+
+	switch ( v ) {
+	case 1:	g_ndm.weaponsSet = 6;     g_ndm.nopad = 2; g_ndm.noteleport = 2; g_ndm.nomover = qtrue;  break;
+	case 2:	g_ndm.weaponsSet = 0x1fe;                                                              break;
+	case 3:	g_ndm.weaponsSet = 6;                                                                  break;
+	case 4:	g_ndm.weaponsSet = 0x1fe; g_ndm.nopad = 2; g_ndm.noteleport = 2; g_ndm.nomover = qtrue;  break;
+	case 5:
+	case 6:	g_ndm.weaponsSet = 0x404;                                                              break;
+	case 7:	g_ndm.damage = 1; g_ndm.weaponsSet = 6; g_ndm.flags = 0x7e;                           break;
+	default:
+		// custom: the df_ndm_* cvars
+		g_ndm.damage = df_ndm_damage.integer;
+		g_ndm.weaponsSet = df_ndm_weaponsSet.integer;
+		g_ndm.nopad = df_ndm_nopad.integer;
+		g_ndm.noteleport = df_ndm_noteleport.integer;
+		g_ndm.nomover = df_ndm_nomover.integer ? qtrue : qfalse;
+		if ( g_ndm.damage ) {
+			g_ndm.flags |= 0x18;
+		}
+		if ( df_ndm_powerups.integer ) {
+			g_ndm.flags |= 0x60;
+		}
+		if ( df_ndm_weaponsPickup.integer ) {
+			g_ndm.flags |= 0x6;
+		}
+		break;
+	}
 }
 
 void G_ApplyModeExclusion( void ) {
@@ -502,7 +561,7 @@ void G_ApplyModeExclusion( void ) {
 		} else if ( mode == 3 ) {
 			if ( ent->flags & FL_NOT_FC ) {
 				G_FreeEntity( ent );
-			} else if ( df_ndm_nomover.integer && ( ent->flags & FL_MOVER ) ) {
+			} else if ( g_ndm.nomover && ( ent->flags & FL_MOVER ) ) {
 				G_FreeEntity( ent );
 			}
 		}

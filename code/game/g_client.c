@@ -1195,6 +1195,9 @@ void ClientSpawn(gentity_t *ent) {
 	index = ent - g_entities;
 	client = ent->client;
 
+	// DeFRaG func_0x2830: first thing on every (re)spawn -- re-arm items/triggers for this client, drop its missiles
+	G_ClientSpawnSweep( index );
+
 	VectorClear(spawn_origin);
 	s_spawnArena = client->pers.arena;
 
@@ -1316,7 +1319,12 @@ void ClientSpawn(gentity_t *ent) {
 	// so the frag score (used by target_fragsFilter) restarts per life. See disasm/G_TRIGGER/func_0x274b.md.
 	client->ps.persistant[PERS_SCORE] = 0;
 
-	client->ps.stats[STAT_WEAPONS] = df_ndm_weaponsSet.integer;
+	// DeFRaG func_0x274b -> Reset_0x3597: every (re)spawn -- incl. "kill" -- wipes this client's race timer, so a run is
+	// stopped/reset by respawning. (DeFRaG keeps the touch-driven state/fracDelta words across the wipe; oDFs's TIMER_RUNNING
+	// persists for the whole run, so here it must be cleared too, otherwise the next tick would restart the timer.)
+	memset( G_GetTimerRecord( client ), 0, sizeof(raceTimer_t) );
+
+	client->ps.stats[STAT_WEAPONS] = g_ndm.weaponsSet;
 	client->ps.ammo[WP_GAUNTLET] = -1;
 	client->ps.ammo[WP_GRAPPLING_HOOK] = -1;
 
@@ -1329,9 +1337,9 @@ void ClientSpawn(gentity_t *ent) {
 	// formula: real bytecode tests "(0x13182c & 0x6) != 0", and 0x13182c's
 	// bit 0x6 is set unconditionally whenever df_ndm_weaponsPickup != 0 (and
 	// never otherwise) — i.e. a plain boolean gate, not a real bitmask.
-	client->ps.ammo[WP_MACHINEGUN] = df_ndm_weaponsPickup.integer ? 100 : 200;
+	client->ps.ammo[WP_MACHINEGUN] = ( g_ndm.flags & 0x6 ) ? 100 : 200;
 	for ( i = WP_SHOTGUN; i < WP_GRAPPLING_HOOK; i++ ) {
-		if ( df_ndm_weaponsPickup.integer && ( df_ndm_weaponsSet.integer & ( 1 << i ) ) ) {
+		if ( ( g_ndm.flags & 0x6 ) && ( g_ndm.weaponsSet & ( 1 << i ) ) ) {
 			client->ps.ammo[i] = BG_FindItemForWeapon( (weapon_t)i )->quantity;
 		} else {
 			client->ps.ammo[i] = 200;
@@ -1345,7 +1353,7 @@ void ClientSpawn(gentity_t *ent) {
 	// handicap-based health with no armor (df_ndm_damage != 0, vanilla-style
 	// "damage matters" mode). Confirmed from qagame.qvm disassembly
 	// (func_0x274b); see disasm/G_TRIGGER/func_0x274b.md.
-	if ( df_ndm_damage.integer != 0 ) {
+	if ( g_ndm.damage != 0 ) {
 		ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH] + 25;
 		client->ps.stats[STAT_ARMOR] = 0;
 	} else {

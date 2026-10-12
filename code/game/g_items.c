@@ -421,6 +421,86 @@ void RespawnItem( gentity_t *ent ) {
 
 
 /*
+================
+G_ItemSetClientBit / G_ItemClearClientBit
+
+DeFRaG func_0x1629 / func_0x15fa: per-client "has taken this item" bit, kept in the 64 bits of
+entityState_t.time (clients 0-31) and .time2 (clients 32-63) (entity offsets +0x54/+0x58). The stock
+DeFRaG cgame reads it to hide/fade an item for the client that picked it up (df_cl_alwaysDrawItems).
+================
+*/
+void G_ItemSetClientBit( gentity_t *ent, int clientNum ) {
+	if ( clientNum >= 32 ) {
+		ent->s.time2 |= 1 << ( clientNum - 32 );
+	} else {
+		ent->s.time |= 1 << clientNum;
+	}
+}
+
+void G_ItemClearClientBit( gentity_t *ent, int clientNum ) {
+	if ( clientNum >= 32 ) {
+		ent->s.time2 &= ~( 1 << ( clientNum - 32 ) );
+	} else {
+		ent->s.time &= ~( 1 << clientNum );
+	}
+}
+
+/*
+================
+G_ClientSpawnSweep
+
+DeFRaG func_0x2830, run first thing in ClientSpawn (so also for "kill"/respawn): resets everything the
+respawning client has interacted with, so that a run can be repeated from the start.
+  ET_ITEM    without a targetname: pickup cooldown reset to 0 (grabbable again, even "wait -1" items) and the
+             client's taken-bit cleared; WITH a targetname (items that only appear when triggered): cooldown set
+             to -1 (unavailable) and the bit set.
+  ET_MISSILE owned by the client: freed.
+  ET_GENERAL trigger_multiple / trigger_hurt: per-client time reset; target_delay started by this client: cancelled.
+see disasm/G_CLIENT/func_0x2830.md
+================
+*/
+void G_ClientSpawnSweep( int clientNum ) {
+	int			i;
+	gentity_t	*e;
+
+	for ( i = MAX_CLIENTS, e = &g_entities[MAX_CLIENTS]; i < MAX_GENTITIES; i++, e++ ) {
+		if ( !e->inuse ) {
+			continue;
+		}
+		switch ( e->s.eType ) {
+		case ET_ITEM:
+			if ( !e->targetname ) {
+				e->perClientPickupTime[clientNum] = 0;
+				G_ItemClearClientBit( e, clientNum );
+			} else {
+				e->perClientPickupTime[clientNum] = -1;
+				G_ItemSetClientBit( e, clientNum );
+			}
+			break;
+		case ET_MISSILE:
+			if ( e->r.ownerNum == clientNum || ( e->activator && e->activator - g_entities == clientNum ) ) {
+				G_FreeEntity( e );
+			}
+			break;
+		case ET_GENERAL:
+			if ( e->classname && !Q_stricmp( e->classname, "trigger_multiple" ) ) {
+				e->perClientPickupTime[clientNum] = 0;
+			}
+			if ( e->classname && !Q_stricmp( e->classname, "trigger_hurt" ) ) {
+				e->perClientPickupTime[clientNum] = 0;
+			}
+			if ( e->classname && !Q_stricmp( e->classname, "target_delay" ) && e->activator && e->activator - g_entities == clientNum ) {
+				e->think = 0;
+				e->nextthink = 0;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+}
+
+/*
 ===============
 Touch_Item
 ===============
@@ -554,6 +634,7 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 	} else {
 		ent->perClientPickupTime[ other->s.number ] = -1;
 	}
+	G_ItemSetClientBit( ent, other->s.number );	// DeFRaG func_0x1629 (see G_ItemSetClientBit)
 }
 
 
@@ -644,6 +725,7 @@ disasm/G_ITEMS/RespawnItem.md
 void Use_Item( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
 	if ( activator && activator->client ) {
 		ent->perClientPickupTime[ activator->s.number ] = 0;
+		G_ItemClearClientBit( ent, activator->s.number );	// DeFRaG func_0x15fa
 	}
 }
 

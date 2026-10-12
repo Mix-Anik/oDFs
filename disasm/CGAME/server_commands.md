@@ -17,3 +17,11 @@ String compares found in the DeFRaG cgame dispatcher: `auth_request`, `cpsm`, `s
 ## Legacy/demo-compat commands (decoded structure only)
 `ckpt`: consumed silently (`return 1`). `TimerStarted`: calls cgame `0x1ae1()`. `TimerStopped`: `if (global 0x11d29c < 0x46b4 /*18100, a demo/server version gate*/) { v = atoi(Argv(1+..)) ...; 0x11d590 = atoi(Argv(n+6)); 0x11d5a0 = atoi(Argv(n+7)) }` then `0x1aec(atoi(Argv(1)))`.
 `NewTime`: `0x6222(atoi(Argv(1)))`, then prints `"^3Time performed by ^2%s"` (`0x23c`, Argv(4)), followed by `route` handling (`"^3 on ^7%s^3 route"`, `"^3 : ^7%s "`, `"^3(%s)"`). These look like the **pre-1.91 text protocol** for race results kept so old demos still play; current DeFRaG servers announce results via `print` (see G_TRIGGER/finish_handler.md). Not ported (low value).
+
+## Server -> client command contract (complete for the current DeFRaG qagame)
+Command strings present in the DeFRaG **qagame** literal pool (i.e. the only ones it can send): `auth_request %i %i`, `auth_reply` (client reply, server side verifies), `cpsm "%s"` / `cpsm "%i more frag(s) needed"`, `aswitch %i`, `stats` (no arguments), `print "..."`, `cp`/`chat`-style vanilla ones.
+- `cpsm`, `aswitch`, `print`: sent and handled — oDFs now sends all three.
+- `stats` (no args): sent by the finish handler `0x35ce` only on its **non-variant** branch (`0x1317c0 == 0`, see G_TRIGGER/finish_handler.md) to make the finisher's cgame print the end-of-run stats; the dedicated/variant branch does not send it (the client prints its stats from its own timer events). oDFs does not send it (no difference for dedicated play).
+- `auth_request`: not ported (needs the matching client reply).
+- cgame also accepts `df_options <n>` (stores `atoi(Argv(1))` in cgame global `0x11d2b8`), `chkpt "<text>"` (small centre print `CG_CenterPrint(text, 200, 10)` when the checkpoint cvar `0x11bee0` is set) and silently swallows `rec`, `newTime`, `exec`, `bestTime`, `ckpt`;
+  **no string for any of these exists in the qagame literal pool**, so the current DeFRaG qagame never sends them (legacy/other-server compatibility). Nothing for oDFs to add.

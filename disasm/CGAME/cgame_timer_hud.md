@@ -126,6 +126,9 @@ was wrong — it caused startTime to reset each snapshot (~every 8ms).
 
 ## What oDFs must set in server ps for the HUD to work
 
+> **CORRECTION (later pass):** this section's `ps+0x..` offsets were taken straight from cgame addresses that are *snapshot-relative* (`snap = &snapshot_t`, `ps` starts at `snap+0x2c`, see `*(0xcfcec) + 0x2c` above). Re-based: `snap+0x17c/0x180/0x184` = `ps+0x150/0x154/0x158` = `ps.powerups[6/7/8]` (flight / **red flag / blue flag**), not `ammo[1..3]`; the `0x130` read (`persistant[14]`) is `ps+0x104`, etc. DeFRaG's own qagame never writes `ammo[1..10]`/`stats[2]`/`stats[3]` as signals (they are real ammo / weapons mask / armor there, see G_TRIGGER/func_0x274b.md, target_init.md). The real server inputs are the SERVERINFO cvars below, `stats[12]` event bits and (new) the race time in `stats[7]/[8]` (G_TRIGGER/func_0x38ba.md). oDFs `G_UpdateRacePs` now only publishes those; the old ammo/stats writes are behind `df_racePsSignal` (default 0).
+> The table below is kept for history.
+
 | Field | Value | Purpose |
 |-------|-------|---------|
 | `ps.ammo[1]` = ps+0x17c | `-1` | Sentinel (always) |
@@ -156,3 +159,27 @@ was wrong — it caused startTime to reset each snapshot (~every 8ms).
 2. What sets `*(0x11b000)` non-zero? (currently unclear — possibly same as `0x11d298`)
 3. What value does `rate` (timer struct `+0x3c`) need to be set to for interpolation?
 4. Does the cgame also need a specific value in `ps.persistant[14]` (ps+0x130)?
+
+---
+
+## Authoritative event derivation: cgame `0x1c8b(out, snapOld, snapNew)` (decoded later; all offsets are `snapshot_t`-relative, `ps` = `snap+0x2c`)
+Called from `0x29216` once per snapshot transition; fills the event word at `out+4` (global `0x11d280`, tested through `0x1ac7(mask)`) and passes `stats[12] & 2` (`snap+0x114`) as `out+0xc` to the timer-state update `0x5248`.
+Events derived by comparing the two snapshots:
+
+| Condition (old vs new) | Event bit |
+|---|---|
+| no old snapshot | `0x11` (first frame) |
+| `ps.eFlags` (`snap+0x94`) bit `4` (teleport toggle) differs | `0x13`, and the `out+0x18` counter is cleared |
+| `ps.persistant[14]` (`snap+0x130`) differs | `0x14` (interference/respawn-type state change) |
+| `ps.persistant[15]` (`snap+0x134`) differs | `0x10` |
+| `ps.stats[12]` (`snap+0x114`) bit `0x1` differs (**target_init toggle**) | `0x20` |
+| `ps.stats[12]` bit `0x4` differs | `0x40` ("timer start / running changed") |
+| `ps.stats[12]` bit `0x8` differs | `0x100` (finish) |
+| `ps.stats[12]` bit `0x10` differs | `0x80` (checkpoint) |
+| `snap+0xb8`-range stats differ (first stats compare at `0x1ce1`) | `0x800` |
+All "differs" tests are XORs between the old and new snapshot, i.e. **any change of the bit (set or clear) raises the event** — which is why DeFRaG's server toggles `0x8`/`0x10`/`0x1` once per event, and why oDFs may SET bit `0x4` once on start but CLEARing it on stop raises a second `0x40` event (kept as is: the earlier note says it was verified against the cgame).
+The result of the server's `stats[7]/[8]` time decode (`0x5fd7`) is compared against the best-time table in `0x5248` to add the record bits `0x200`/`0x400` (see G_TRIGGER/func_0x38ba.md).
+
+### How the server side raises those events in DeFRaG (cross-reading with G_TRIGGER/func_0x37c7.md)
+`TimerTick` XORs `stats[12]` bit `0x4` only inside its `state == TIMER_RUNNING` branch, and `TIMER_RUNNING` is a *command* set by the start trigger's touch (every frame the player overlaps it), not a persistent "running" state — after the tick the else-branch demotes it to IDLE once the touch stops while `initialized` stays 1 and `ms` keeps accumulating.
+So in DeFRaG bit `0x4` toggles on **each frame the player is inside the start zone** (cgame event `0x40` = `TimerStarted`: reset client accumulators, play the start sound), and the run's clock effectively starts from the last touched frame (with the sub-ms correction of G_TRIGGER/Touch_Multi_1mstimer.md). This is a hypothesis from the two decodes, not runtime-verified; oDFs's "set once / clear at stop" scheme (see g_defrag.c comment) produces `0x40` only on start and on stop, and in the stop snapshot the cgame would see `0x40` and `0x100` together (`0x1bd3` handles `0x40` first -> `0x1ae1` resets the stat accumulators, then `0x100` -> `0x1aec` prints/finalises). If end-of-run stats or the stop sound look wrong with the stock DeFRaG cgame, this ordering is the first thing to check.

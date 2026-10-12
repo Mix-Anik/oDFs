@@ -99,7 +99,3 @@ equ	atan2						-106
 equ	sqrt						-107
 equ floor						-108
 equ	ceil						-109
-equ log							-601
-equ pow							-602
-equ vsnprintf					-603
-

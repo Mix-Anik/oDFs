@@ -83,3 +83,26 @@ than silently discard incidental findings. If oDFs ever wants an equivalent
 `/stats`-style debug dump, the four `df_unit`-converted fields can reuse the
 `CG_ConvertDistance`/`CG_ConvertSpeed` helpers added for `df_unit` (see
 [df_unit.md](df_unit.md#odfs-implementation-notes)).
+
+---
+
+## Accumulators and writers (mapped in a later pass; NOT ported)
+The "Stats" dump is the **end-of-run statistics** feature: the `stats` server command (and the timer-stop handler `0x1aec` / `0x1b10`) call `0x4388` unless `df_noEndOfRunStats` (cvar storage `0x11bdd0`) is set.
+Writers of the accumulators (all in cgame, called per frame from `0x1bd3`, the per-snapshot timer/HUD update):
+
+| Global | Meaning | Writers |
+|---|---|---|
+| `0x11d230` | max speed | `0x3985`, `0x3a4a` |
+| `0x11d234` | distance run (sum of per-frame `|Δorigin|`, `VectorLength` = `0x3086a`) | `0x4677` |
+| `0x11d238`/`0x11d23c`/`0x11d240` | per-axis ± distance / jump-pad-count style counters (`0x4677` also bumps `0x11d240` when an axis delta equals exactly 1.0, i.e. "unit move" detection) | `0x4677` |
+| `0x11d244`/`0x11d248`/`0x11d24c`/`0x11d250` | current jump height / max-in-air-height-this-jump / max-so-far / highest jump | `0x458e` (jump tracking from ground/air transitions: `pm_flags`-style bit `4` of `ps+0x94`, origin `ps+0x40..0x48`, snapshot time `ps+0xe4`) |
+| `0x11d254`..`0x11d264` | last-ground-position bookkeeping (`0x11d258` = origin copy at takeoff) | `0x458e` |
+| `0x11d284` | elapsed time denominator | timer code |
+| `0x11d288` | "run active" flag | timer code; `0x1b10` clears it when the stats are printed |
+| `0x11d290`/`0x11d294` | pointers to the current and previous **snapshot playerState** (offsets `ps+0x40/44/48` origin, `ps+0x94` flags, `ps+0xe4` time, `ps+0xbc/0xe4/0xf0/0x1a4` misc) | snapshot code |
+| `0x4370` | resets all accumulators (called by `TimerStarted` handler `0x1ae1`) | |
+
+**Correction:** the offsets are the vanilla `snapshot_t` layout, not a different `playerState_t`: `0x11d290`/`0x11d294` point to snapshots (`ps` starts at `snap+0x2c`), so `snap+0x40` = `ps.origin[0]`, `+0x4c` = `ps.velocity[0]`, `+0x94` = `ps.eFlags` (bit 4 = `EF_TELEPORT_BIT`), `+0xe4` = `ps.stats[0]` (health; <= 0 skips tracking).
+The per-frame driver is `0x1bd3` (from `0x1e4c`): it polls event bits in global `0x11d280` via `0x1ac7(mask)` (`0x40` -> TimerStarted `0x1ae1`, `0x100` -> TimerStopped `0x1aec`, `0x08` -> `0x1b10`, `0x10` -> checkpoint reset `0x1b2e`), clamps `com_maxfps` to 60..140 (messages "^1com_maxfps lowest value restricted to 60.^7"), then runs the trackers `0x4677` (distance) and `0x458e` (jump).
+The event-bit word `0x11d280` is built in `0x5248` (the timer-state update, 4 writers) from the server-provided ps bits, i.e. this whole subsystem lives in **DeFRaG's own cgame.qvm**.
+**Important context:** oDFs deployments run players on the original DeFRaG `cgame.qvm` (via the mdd cgame-proxymod) with only `qagame` re-implemented, so a cgame port of this feature has little practical value; what matters is the *server -> client contract* (ps fields, configstrings, server commands) that DeFRaG's cgame consumes. See server_commands.md.

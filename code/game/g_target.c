@@ -828,16 +828,16 @@ void Use_Target_Init( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
 	}
 	client = activator->client;
 
-	if ( !( ent->spawnflags & 1 ) && df_ndm_damage.integer ) {
+	if ( !( ent->spawnflags & 1 ) && g_ndm.damage ) {
 		client->ps.stats[STAT_ARMOR] = 0;
 	}
-	if ( !( ent->spawnflags & 2 ) && df_ndm_damage.integer ) {
+	if ( !( ent->spawnflags & 2 ) && g_ndm.damage ) {
 		int hp = client->ps.stats[STAT_MAX_HEALTH] + 25;
 
 		activator->health = hp;
 		client->ps.stats[STAT_HEALTH] = hp;
 	}
-	if ( !( ent->spawnflags & 4 ) && df_ndm_weaponsPickup.integer ) {
+	if ( !( ent->spawnflags & 4 ) && ( g_ndm.flags & 0x6 ) ) {
 		for ( i = 0; i < 16; i++ ) {
 			client->ps.ammo[i] = 0;
 		}
@@ -848,7 +848,7 @@ void Use_Target_Init( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
 			client->ps.ammo[WP_MACHINEGUN] = 100;
 		}
 	}
-	if ( !( ent->spawnflags & 8 ) && df_ndm_powerups.integer ) {
+	if ( !( ent->spawnflags & 8 ) && ( g_ndm.flags & 0x60 ) ) {
 		if ( client->ps.powerups[PW_REDFLAG] ) {
 			Team_ReturnFlag( TEAM_RED );
 		} else if ( client->ps.powerups[PW_BLUEFLAG] ) {
@@ -858,7 +858,7 @@ void Use_Target_Init( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
 		}
 		memset( client->ps.powerups, 0, sizeof( client->ps.powerups ) );
 	}
-	if ( !( ent->spawnflags & 0x10 ) && df_ndm_powerups.integer ) {
+	if ( !( ent->spawnflags & 0x10 ) && ( g_ndm.flags & 0x60 ) ) {
 		client->ps.stats[STAT_HOLDABLE_ITEM] = 0;
 	}
 

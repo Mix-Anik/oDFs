@@ -237,6 +237,8 @@ typedef enum {
 // DeFRaG per-player flags packed into stats[12] — matches DeFRaG QVM ps.stats[12]
 // Set each frame in ClientThink_real from cvar caches; read in bg_pmove.c physics.
 // Networked via playerState_t so client prediction sees the same values.
+#define STAT_RACE_TIME_HI       7	// DeFRaG func_0x38ba: race ms >> 16 (plain on dedicated/variant servers, encoded otherwise)
+#define STAT_RACE_TIME_LO       8	// race ms & 0xffff
 #define STAT_DEFRAG_FLAGS       12
 #define DFLAG_OBS_DISABLED      0x200   // df_ob_KillOBs != 0 — suppress overbounce detection
 #define DFLAG_GRAPPLE_MODE_1    0x400   // df_hook_Type bit 0 — grapple swing-physics mode (0-3), see disasm/G_ACTIVE/GrappleMode.md

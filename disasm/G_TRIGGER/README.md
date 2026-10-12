@@ -31,3 +31,4 @@ used internally to detect entity presence. The actual map editor entity classnam
 - [target_smallprint.md](target_smallprint.md) — target_smallprint + cgame cpsm (ported)
 - [target_init.md](target_init.md) — DeFRaG target_init (ported)
 - [finish_handler.md](finish_handler.md) — finish handler 0x35ce + time formatter 0x13bf (partly ported)
+- [multi_trigger_perclient.md](multi_trigger_perclient.md) — per-client trigger wait + respawn timer reset (ported)

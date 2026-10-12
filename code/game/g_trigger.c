@@ -42,9 +42,21 @@ void multi_wait( gentity_t *ent ) {
 // the trigger was just activated
 // ent->activator should be set to the activator so it can be held through a delay
 // so wait for the delay time before firing
+/*
+DeFRaG func_0x273a5 (multi_trigger): the "wait" of a trigger_multiple is tracked PER CLIENT in the same
+perClientPickupTime[] array items use (ent+0x32c); only non-client activators use nextthink. wait <= 0 (one-shot)
+disables the trigger for that client only (-1) -- G_ClientSpawnSweep() re-arms it on respawn, which is what lets
+"kill" restart a run through a start trigger. See disasm/G_TRIGGER/multi_trigger_perclient.md
+*/
 void multi_trigger( gentity_t *ent, gentity_t *activator ) {
 	ent->activator = activator;
-	if ( ent->nextthink ) {
+	if ( activator->client ) {
+		int t = ent->perClientPickupTime[ activator->s.number ];
+
+		if ( t == -1 || level.time < t ) {
+			return;		// this client has to wait / already used it
+		}
+	} else if ( ent->nextthink ) {
 		return;		// can't retrigger until the wait is over
 	}
 
@@ -62,14 +74,22 @@ void multi_trigger( gentity_t *ent, gentity_t *activator ) {
 	G_UseTargets (ent, ent->activator);
 
 	if ( ent->wait > 0 ) {
-		ent->think = multi_wait;
-		ent->nextthink = level.time + ( ent->wait + ent->random * crandom() ) * 1000;
+		if ( activator->client ) {
+			ent->perClientPickupTime[ activator->s.number ] = level.time + ( ent->wait + ent->random * crandom() ) * 1000;
+		} else {
+			ent->think = multi_wait;
+			ent->nextthink = level.time + ( ent->wait + ent->random * crandom() ) * 1000;
+		}
 	} else {
-		// we can't just remove (self) here, because this is a touch function
-		// called while looping through area links...
-		ent->touch = 0;
-		ent->nextthink = level.time + FRAMETIME;
-		ent->think = G_FreeEntity;
+		if ( activator->client ) {
+			ent->perClientPickupTime[ activator->s.number ] = -1;
+		} else {
+			// we can't just remove (self) here, because this is a touch function
+			// called while looping through area links...
+			ent->touch = 0;
+			ent->nextthink = level.time + FRAMETIME;
+			ent->think = G_FreeEntity;
+		}
 	}
 }
 
@@ -158,7 +178,7 @@ void trigger_push_touch (gentity_t *self, gentity_t *other, trace_t *trace ) {
 	// qagame.qvm disassembly (trigger_push_touch, 0x278ef, calling G_Damage
 	// at 0x2015b with these exact arguments). See
 	// disasm/BG_MISC/BG_TouchJumpPad.md.
-	if ( df_ndm_nopad.integer != 0 && df_ndm_nopad.integer != 1 ) {
+	if ( g_ndm.nopad != 0 && g_ndm.nopad != 1 ) {
 		G_Damage( other, self, self, NULL, NULL, 9999, DAMAGE_NO_PROTECTION, MOD_TRIGGER_HURT );
 	}
 
@@ -342,10 +362,10 @@ void trigger_teleporter_touch (gentity_t *self, gentity_t *other, trace_t *trace
 	// teleport rather than preceding it. Confirmed from qagame.qvm
 	// disassembly (trigger_teleporter_touch, 0x27bf9). See
 	// disasm/G_TRIGGER/trigger_teleporter_touch.md.
-	if ( df_ndm_noteleport.integer == 1 ) {
+	if ( g_ndm.noteleport == 1 ) {
 		return;
 	}
-	if ( df_ndm_noteleport.integer != 0 ) {
+	if ( g_ndm.noteleport != 0 ) {
 		G_Damage( other, self, self, NULL, NULL, 9999, DAMAGE_NO_PROTECTION, MOD_TRIGGER_HURT );
 		return;
 	}

@@ -89,6 +89,7 @@ void G_StartRace( gentity_t *ent ) {
 	// The 750 ms gate prevents instant restart on re-entry into the start zone.
 	if ( t->initialized == 0 || elapsed >= 750 ) {
 		t->startTime = level.time;
+		t->ms        = 0;
 		t->state     = TIMER_RUNNING;
 		t->fracAccum = 0;	// sub-frame offset is filled in by G_TimerSubFrame() when the trigger crossing can be solved
 		t->fracDelta = 0;
@@ -131,12 +132,102 @@ void G_Checkpoint( gentity_t *ent, int idx ) {
 //   ps.ammo[3-10](ps+0x184) = weapon index  weapon tag for each slot
 //   ps.stats[2]  (ps+0xc0)  = 6             race mode config
 //   ps.stats[3]  (ps+0xc4)  = 0/200         0 = race active
+/*
+DeFRaG func_0x3f0c: obfuscated race time (see disasm/G_TRIGGER/func_0x38ba.md). Only used when the server is not dedicated/variant and sv_cheats is 0.
+*/
+static int G_EncodeRaceTime( int ms, gclient_t *cl ) {
+	static byte	mapSalt;
+	static qboolean	haveSalt;
+	unsigned int	x, r, a, e;
+	int				i, v;
+
+	if ( ms == 0 ) {
+		return 0;
+	}
+	if ( !haveSalt ) {
+		char map[MAX_QPATH];
+		char *p;
+
+		trap_Cvar_VariableStringBuffer( "mapname", map, sizeof( map ) );
+		Q_strlwr( map );
+		mapSalt = 0;
+		for ( p = map; *p; p++ ) {
+			mapSalt += (byte)*p;
+		}
+		haveSalt = qtrue;
+	}
+
+	e = (unsigned int)ms & 0x3fffff;
+	a = 0;
+	for ( i = 0; i < 3; i++ ) {
+		a += ( e >> ( 6 * i ) ) & 0x3f;
+	}
+	a += ( e >> 18 ) & 0xf;
+	e |= ( a & 0x3f ) << 22;
+
+	r = rand() % 15 + 1;
+	r |= ( ~r << 4 ) & 0xff;
+	r |= r << 8;
+	r |= r << 16;
+	e ^= r;
+	e &= 0xfffffff;
+	e |= r << 28;
+
+	x = (unsigned int)level.time << 2;
+	x += ( (unsigned int)mapSalt + 19131u ) << 8;
+	x ^= (unsigned int)level.time << 24;
+	e ^= x;
+
+	for ( i = 0; i < 3; i++ ) {
+		( (byte *)&e )[i + 1] ^= ( (byte *)&e )[i];
+	}
+
+	v = (int)floor( cl->ps.origin[0] );
+	e ^= (unsigned int)( v < 0 ? -v : v ) & 0xffff;
+	v = (int)floor( cl->ps.velocity[0] );
+	e ^= (unsigned int)( v < 0 ? -v : v ) << 16;
+	v = cl->ps.stats[STAT_HEALTH];
+	e ^= ( v > 0 ) ? (unsigned int)( v & 0xff ) : 0x96u;
+	e ^= (unsigned int)( cl->ps.movementDir & 0xf ) << 28;
+	return (int)e;
+}
+
+// DeFRaG func_0x38ba: publish the race time in ps.stats[7]/[8] and "timer initialized" in stats[12] bit 2
+static void G_PublishRaceTime( gentity_t *ent ) {
+	gclient_t	*cl = ent->client;
+	raceTimer_t	*t = G_GetTimerRecord( cl );
+	int			v;
+
+	if ( t->initialized ) {
+		cl->ps.stats[STAT_DEFRAG_FLAGS] |= 2;
+	} else {
+		cl->ps.stats[STAT_DEFRAG_FLAGS] &= ~2;
+	}
+
+	if ( g_dfVariant || trap_Cvar_VariableIntegerValue( "sv_cheats" ) ) {
+		v = t->ms;
+	} else {
+		v = G_EncodeRaceTime( t->ms, cl );
+	}
+	cl->ps.stats[STAT_RACE_TIME_LO] = v & 0xffff;
+	cl->ps.stats[STAT_RACE_TIME_HI] = v >> 16;
+}
+
 void G_UpdateRacePs( gentity_t *ent ) {
 	gclient_t *client    = ent->client;
 	int        raceActive = g_startTimerReady ? qtrue : qfalse;
 	int        i;
 
-	// sentinel — always -1
+	G_PublishRaceTime( ent );
+
+	// LEGACY "race HUD signal" (see disasm/CGAME/cgame_timer_hud.md and the correction in disasm/G_TRIGGER/func_0x38ba.md):
+	// these writes clobber the real ammo[] / STAT_WEAPONS / STAT_ARMOR every frame. The offsets they were derived from are
+	// snapshot-relative in the cgame (snap = ps + 0x2c): the cgame actually reads snap+0x17c/0x180/0x184 = ps.powerups[6..8]
+	// (flight / red flag / blue flag), not ammo. Disabled by default; set df_racePsSignal 1 to restore the old behaviour.
+	if ( !df_racePsSignal.integer ) {
+		return;
+	}
+
 	client->ps.ammo[1] = -1;
 
 	// race-active signal read by cgame to enable the timer HUD
@@ -295,6 +386,10 @@ void G_TimerTick( gentity_t *ent, int elapsed_ms ) {
 	if ( client->ps.stats[STAT_HEALTH] < 1 ) {
 		t->state = TIMER_IDLE;
 		return;
+	}
+
+	if ( t->initialized ) {
+		t->ms = level.time - t->startTime;
 	}
 
 	if ( t->initialized == 0 ) goto check_state;

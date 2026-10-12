@@ -2117,7 +2117,86 @@ int sscanf( const char *buffer, const char *fmt, ... ) {
 }
 
 int vsprintf(char *buffer, const char *fmt, va_list ap) {
-	return vsnprintf(buffer, 0x7fffffff, fmt, ap);
+	// was vsnprintf() -> engine syscall -603, which engines without that extension reject ("Bad ... system trap")
+	return Q_vsnprintf(buffer, 0x7fffffff, fmt, ap);
+}
+
+/*
+ * log() / pow() for the VM: software versions so no engine syscall (-601/-602) is needed.
+ * Accuracy ~1e-9 relative, plenty for Q_log2f/Q_exp2f.
+ */
+double log( double x ) {
+	double m, z, z2, sum, term;
+	int e, i;
+
+	if ( x <= 0.0 ) {
+		return -1.0e30;
+	}
+	e = 0;
+	while ( x >= 1.5 ) {
+		x *= 0.5;
+		e++;
+	}
+	while ( x < 0.75 ) {
+		x *= 2.0;
+		e--;
+	}
+	m = x;
+	z = ( m - 1.0 ) / ( m + 1.0 );
+	z2 = z * z;
+	sum = 0.0;
+	term = z;
+	for ( i = 1; i < 25; i += 2 ) {
+		sum += term / i;
+		term *= z2;
+	}
+	return 2.0 * sum + e * 0.69314718055994530942;
+}
+
+static double exp_vm( double t ) {
+	double r, sum, term;
+	int k, i;
+
+	if ( t > 700.0 ) {
+		t = 700.0;
+	} else if ( t < -700.0 ) {
+		t = -700.0;
+	}
+	k = (int)floor( t / 0.69314718055994530942 + 0.5 );
+	r = t - k * 0.69314718055994530942;
+	sum = 1.0;
+	term = 1.0;
+	for ( i = 1; i < 20; i++ ) {
+		term *= r / i;
+		sum += term;
+	}
+	while ( k > 0 ) {
+		sum *= 2.0;
+		k--;
+	}
+	while ( k < 0 ) {
+		sum *= 0.5;
+		k++;
+	}
+	return sum;
+}
+
+double pow( double x, double y ) {
+	if ( y == 0.0 ) {
+		return 1.0;
+	}
+	if ( x == 0.0 ) {
+		return 0.0;
+	}
+	if ( x < 0.0 ) {
+		// only integral exponents are meaningful for a negative base
+		double yi = floor( y );
+		if ( yi != y ) {
+			return 0.0;
+		}
+		return ( ( (int)yi & 1 ) ? -1.0 : 1.0 ) * exp_vm( y * log( -x ) );
+	}
+	return exp_vm( y * log( x ) );
 }
 
 #endif
