@@ -410,7 +410,8 @@ static void CG_ItemPickup( int itemNum ) {
 	// see if it should be the grabbed weapon
 	if ( bg_itemlist[itemNum].giType == IT_WEAPON ) {
 		// select it immediately
-		if ( cg_autoswitch.integer && bg_itemlist[itemNum].giTag != WP_MACHINEGUN ) {
+		// (the server's "aswitch" command handles cg_autoswitch >= 2; this path only serves value 1 / servers that do not send it)
+		if ( cg_autoswitch.integer == 1 && bg_itemlist[itemNum].giTag != WP_MACHINEGUN ) {
 			cg.weaponSelectTime = cg.time;
 			cg.weaponSelect = bg_itemlist[itemNum].giTag;
 		}

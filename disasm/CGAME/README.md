@@ -95,3 +95,4 @@ These are filled by `func_0x4e9c` which reads from SERVERINFO cvars and parses t
 - [ ] Trace `func_0x4e9c` completely to understand cvar-to-state parsing
 - [ ] Verify `ps.persistant[14]` (ps+0x130) value requirements
 - [ ] Test timer HUD display with current SERVERINFO cvar setup
+- [server_commands.md](server_commands.md) — DeFRaG cgame server commands (cpsm, aswitch ported; rest listed)

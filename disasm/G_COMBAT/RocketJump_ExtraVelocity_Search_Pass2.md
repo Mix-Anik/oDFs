@@ -107,6 +107,8 @@ using the hook).
 
 ### `0x22b82`/`0x22eb4` — grapple-swing physics (fully decoded)
 
+> **CORRECTION:** `0x22b82` is vanilla `G_TryPushingEntity` and its caller chain `0x23429`/`0x232f6`/`0x22fe6` is `G_RunMover`/`G_MoverTeam`/`G_MoverPush` — NOT grapple physics. See [../G_ACTIVE/GrappleHookMover.md](../G_ACTIVE/GrappleHookMover.md).
+
 **Update (later pass):** `0x22fe6` itself has since been fully decoded
 end-to-end (this section only covered its first ~90 instructions at the
 time) — see [`../G_ACTIVE/GrappleHookMover.md`](../G_ACTIVE/GrappleHookMover.md).

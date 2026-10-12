@@ -42,3 +42,4 @@ essentially all of the real DeFRaG insertion living one level down in
 substitute for decoding — this project has now caught this exact mistake
 (assuming identity from position without reading the bytes) more than
 once this session.
+- [shooters.md](shooters.md) — DeFRaG shooter_* (Use_Shooter 0x21b5e, activator aim)

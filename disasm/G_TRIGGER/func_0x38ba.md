@@ -66,11 +66,17 @@ byte at `0x1320f0` (`= (Σ chars of lowercased mapname) & 0xff`, set by init `0x
 encoding, not a mere hash. The checksum/field layout is transcribed from the
 bytecode; the *purpose* (anti-spoof of the displayed race time) is an inference.
 
-**cgame consumer found:** cgame `0x5fd7` (called from `0x63f5`) has the matching
-decode — same `0x3fffff` mask, `6*i` / `>>18 &0xf` checksum loop, byte-replicate
-(`<<8`, `<<16`) at `0x615b`-`0x6172`, a `(x >> 0x16) & 0x3f` checksum compare
-(`0x61b1`), and on mismatch calls `0x59b4(2, 0)` and returns 0; on success stores
-the decoded ms to `0x11d77c` (cgame data). Not decoded further this pass.
+**cgame consumer — `cgame 0x5fd7(arg0, arg1)` (called from cgame `0x5248`), read in a second pass:**
+1. Cache: if `arg1 != 0` and `*(arg0+8) == *(arg1+8)` returns the cached decoded value `*(int*)0x11d77c`.
+2. If a global counter `0x11d29c < 0x46b4`, it first defers to `cgame 0x5eb7(arg0)` and returns that result (`0x11d77c` updated) — an early/startup path.
+3. Otherwise it rebuilds the 32-bit encoded value `x = (arg0+0x100) << 16 | ((arg0+0x104) & 0xffff)` (the two 16-bit halves published in `ps.stats[7]/[8]`; if both are 0 the result is 0),
+   then recomputes the same salt the server folded in: for the mask pieces it uses `floor(float at arg0+0x40)` (|v| & 0xffff), `floor(float at arg0+0x4c)` (|v| << 16),
+   `*(arg0+0xe4)` (`& 0xff`, or `0x96` when `<= 0`, i.e. health) and `(*(arg0+0x84) & 0xf) << 28`, XORing them into `x`; then undoes the chained byte-XOR (`b[i] ^= b[i-1]`, loop at `0x60f1`),
+   the replicated random byte and the time salt, extracts `chk = (x >> 22) & 0x3f`, masks `x &= 0x3fffff`, recomputes the 6-bit-field checksum (same `6*i` loop plus `>>18 & 0xf`) and compares:
+   mismatch → `cgame 0x59b4(2, 0)` (an error/cheat report, not decoded) and return 0; match → store to `0x11d77c` and return the decoded milliseconds.
+The `arg0` offsets differ from the *game* `playerState_t` offsets used by the encoder (`+0x14` origin.x, `+0x20` velocity.x, `+0xb8` health, `+0x58` movementDir), so `arg0` is evidently a
+cgame-side struct (or a differently laid-out ps) holding copies — the field mapping was not resolved. Two debug-label artefacts in the `.dis` ("Item not found", "String: bad index") are
+mis-attached constants (`0xffff`, `0x46b4`), not strings used here.
 
 ## Init `func_0x406d` (called once from `0x1c74`, init path) — salts for the encoder
 ```c

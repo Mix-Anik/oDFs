@@ -277,3 +277,8 @@ unchanged).
   (e.g. no string literal or unambiguous cross-reference was found in this
   pass) — flagged as a candidate correction to the README table, not asserted
   as fact.
+
+## Update: `client+0xf8` resolved and ported
+`client+0xf8` = `ps.persistant[0]` = `PERS_SCORE` (stats[16] ends at 0xf8; consumer `target_fragsFilter`, see [target_fragsFilter.md](target_fragsFilter.md)).
+The store at `0x275d` (sole caller `ClientSpawn 0x1d27b`) zeroes the score on **every spawn**. Ported in oDFs `ClientSpawn` (`client->ps.persistant[PERS_SCORE] = 0`).
+**Behaviour change:** frag score resets to 0 at each respawn (scoreboard shows per-life score); revert = delete that one line in g_client.c. Syntax-checked, untested.

@@ -1312,6 +1312,10 @@ void ClientSpawn(gentity_t *ent) {
 	// value) — -1 is strictly more sensible if a server ever grants the hook
 	// via weaponsSet, and the hook is excluded from the default weaponsSet
 	// mask anyway. See disasm/G_TRIGGER/func_0x274b.md.
+	// DeFRaG func_0x274b: client+0xf8 = ps.persistant[PERS_SCORE] is zeroed on every spawn (first store of the function),
+	// so the frag score (used by target_fragsFilter) restarts per life. See disasm/G_TRIGGER/func_0x274b.md.
+	client->ps.persistant[PERS_SCORE] = 0;
+
 	client->ps.stats[STAT_WEAPONS] = df_ndm_weaponsSet.integer;
 	client->ps.ammo[WP_GAUNTLET] = -1;
 	client->ps.ammo[WP_GRAPPLING_HOOK] = -1;

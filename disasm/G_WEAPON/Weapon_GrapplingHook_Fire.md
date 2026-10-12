@@ -6,7 +6,7 @@ Scope note: this document covers only the *launch trigger* and think/free
 lifecycle functions from `g_weapon.c`. The grapple **swing physics** consumer
 chain and `fire_grapple`'s projectile spawn are already fully documented in
 [../G_ACTIVE/GrappleMode.md](../G_ACTIVE/GrappleMode.md) and the
-`0x2295f`/`0x22b82`/`0x22eb4` entries in [../README.md](../README.md) — not
+`0x2295f` entry (`0x22b82`/`0x22eb4` are mover code, not grapple — see G_ACTIVE/GrappleHookMover.md) in [../README.md](../README.md) — not
 duplicated here.
 
 ## Weapon_GrapplingHook_Fire — MODIFIED

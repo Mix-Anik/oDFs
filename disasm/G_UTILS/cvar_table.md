@@ -95,7 +95,7 @@ Flag names use the standard Q3 values (`1` ARCHIVE, `2` USERINFO, `4` SERVERINFO
 | `pmove_fixed` | `1` (SYSTEMINFO) | `0` | |
 | `df_gametype` | `0` (LATCH) | `1` (ARCHIVE\|LATCH, added in the entity-mode port) | `0` is *invalid* in DeFRaG → triggers mode auto-detect (`G_UTILS/func_0x21fc.md`); oDFs lacks auto-detect so `1` is kept |
 | `defrag_gametype` / `defrag_mode` / `defrag_flags` | `""` / `""` / `0`, flags `0x64` (SERVERINFO\|LATCH\|ROM) | `1` / `-1` / `2`, SERVERINFO | DeFRaG's are ROM and set by code |
-| `g_weaponTeamRespawn` | `5` (CHEAT) | `30` | vanilla default is 30 |
+| `g_weaponTeamRespawn` | `5` (CHEAT) | `30` | vanilla default is 30; DeFRaG also *forces* it (and other physics cvars) to fixed values on every map load, see [G_InitGame_forced_cvars.md](G_InitGame_forced_cvars.md) |
 
 ## Cvars in DeFRaG's table that oDFs does not register
 `gamename` (`defrag`, 0x44), `gamedate`, `sv_mapname`, `defrag_vers` (oDFs registers it differently), `defrag_obs`, `defrag_bspcrc`, `df_mode_tricksmode` (`2`),

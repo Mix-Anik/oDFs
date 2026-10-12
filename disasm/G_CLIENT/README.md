@@ -198,3 +198,4 @@ enough for a pure position walk (see headline finding 5 below).
   purpose are still not identified.
 
 - Auth handshake (client authentication, `auth_request`/`auth_reply`): see [auth_handshake.md](auth_handshake.md).
+- [Cmd_VoiceTaunt.md](Cmd_VoiceTaunt.md) — `0x1ea7b` vanilla vtaunt

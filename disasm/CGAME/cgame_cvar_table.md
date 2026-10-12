@@ -93,3 +93,5 @@ Code almost always reads a cvar's live value via `*(int*)(storage+0xc)`
 the batch loop returns — e.g. `"sv_running"` is registered this way. If a
 cvar you're looking for isn't in the batch table, check these individual
 call sites next before assuming it doesn't exist.
+
+> **Full decode:** every entry of this table (name, default, flags) is now listed in [cgame_cvar_table_full.md](cgame_cvar_table_full.md).

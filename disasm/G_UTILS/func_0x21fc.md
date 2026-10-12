@@ -55,3 +55,10 @@ Reading it as "dedicated server" is based on the cvar name; the `>= 5` path show
 ## oDFs
 oDFs registers `defrag_flags`/`defrag_gametype`/`defrag_mode` as static serverinfo cvars (`g_main.c:203-205`) and has no mode
 auto-detection; **not ported** (the `sv_fps` clamp / `timelimit=0` behaviour is decoded but deliberately not forced onto oDFs servers).
+
+## oDFs port status (mode auto-detect)
+Steps 2 and 5 are **ported**: `G_ResolveDfMode()` (g_spawn.c, run at the start of `G_ApplyModeExclusion` after entity spawn) resolves `df_gametype`
+(<=0, >=8 or ==4 -> auto: `g_startTimerReady` -> 1, `g_hasTeamItem` (set in `G_SpawnItem` for `IT_TEAM`) -> 3, else 2; >=5 -> mode-4 + variant),
+sets `g_dfMode`/`g_dfVariant` and publishes `defrag_gametype`. `df_gametype` default changed "1" -> "0" (auto, as DeFRaG).
+**Behaviour change:** maps without a start timer now run as mode 2 (tricks) for the `nottm`/`notdf` exclusion sweep; revert = set `df_gametype 1`
+(or default "1" in g_main.c). Step 3 (forcing `g_gametype` 4 for mode 3) deliberately NOT ported. Syntax-checked, untested.

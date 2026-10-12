@@ -104,7 +104,7 @@ narrowed):**
   `MOD_CRUSH`) or repositions (via a separate linked-list walk, not the
   `EntitiesInBox` result) entities caught in its new bounding box. Reached
   via the call chain `0x23429 → 0x232f6 → 0x22fe6`, confirming it belongs to
-  the grapple-swing subsystem, not a per-frame client-touch dispatcher.
+  the mover subsystem (`G_RunMover`->`G_MoverTeam`->`G_MoverPush`; the earlier "grapple-swing" label was wrong, see G_ACTIVE/GrappleHookMover.md), not a per-frame client-touch dispatcher.
 
 **Net result: the true general-purpose `G_TouchTriggers` remains
 unlocated.** Both previously-flagged candidate addresses are now positively
@@ -187,3 +187,5 @@ the task asked for a final status check.
    push/crush/carry mover (`0x22fe6`, see
    [`../G_ACTIVE/GrappleHookMover.md`](../G_ACTIVE/GrappleHookMover.md)) —
    neither is a touch dispatcher.
+- [G_Printf_G_Error.md](G_Printf_G_Error.md) — `0x96`/`0xb1` wrappers
+- [vanilla_identified_survey.md](vanilla_identified_survey.md) — survey results: vanilla functions that only differ by hash

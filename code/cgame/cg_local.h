@@ -1096,6 +1096,7 @@ extern	vmCvar_t		cg_shadows;
 extern	vmCvar_t		cg_gibs;
 extern	vmCvar_t		cg_drawTimer;
 extern	vmCvar_t		cg_drawFPS;
+extern	vmCvar_t		df_noTargetPrint;
 extern	vmCvar_t		cg_drawSnapshot;
 extern	vmCvar_t		cg_draw3dIcons;
 extern	vmCvar_t		cg_drawIcons;

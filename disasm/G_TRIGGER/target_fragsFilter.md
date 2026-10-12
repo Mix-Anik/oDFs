@@ -41,3 +41,14 @@ whose `frags` threshold the player's score has reached.
 `use(ent=arg0, other=arg1, activator=arg2)`: returns if `activator->client == NULL`; tests `ent->spawnflags (+0x210) & 0x10` together with
 `activator->client->ps.persistant[0] == ent->count` (exact-match mode when bit `0x10` set), otherwise `score >= count`, with `spawnflags & 4`
 as another gate; the rest (what it fires) was **not decoded**. `think 0x2919` (**resolved later**): loops entities via `G_Find(…, "targetname"?, string 0x3eb6)` (`0x2809c`), keeps the smallest non-zero `ent->count` in `0x131800` (`gti`/`ne` guards at `0x2938`-`0x293c`) and stamps `0x131804 = level.time + 200`; `func_0x23f2` then publishes `0x131800` as the `fraglimit` cvar ([../G_UTILS/func_0x23f2.md](../G_UTILS/func_0x23f2.md)). Earlier docs called `0x2919` "stopTimer entity lookup" — that label was wrong.
+
+## `use` handler `0x2963` and think `0x2919` — FULLY DECODED, entity PORTED
+`use(ent, other, activator)` (activator needs a client; `score = client->ps.persistant[0]`, `ent->count` = `frags`, spawnflags `ent+0x210`):
+1. `if (f&0x10 && score != count) return` (exact-match mode).
+2. `if (score < count)`: `if (!(f&4)) return;` else `SendServerCommand(activator, "cpsm \"%i more frag needed\"")` when `count-score == 1`, otherwise `"... more frags needed"` (small centre print, see target_smallprint.md) and return.
+3. Registered ents (`ent+0xcc != 0`, the auto-registry flag) are rate-limited: `if (ent->wait (+0x31c) <= level.time) wait = level.time+1000 (then fire) else { wait = level.time+1000; return }` — fires once, then stays quiet until the per-frame polling has stopped for a second.
+4. `if (f&1) score -= count; if (f&8) score = 0;` then `G_UseTargets(ent, activator)` (`0x28151`).
+Think `0x2919` (re-confirmed): `G_Find(.., targetname, ent->target)` loop; for each found entity whose classname is `"target_stopTimer"`: `0x131800 = min nonzero(count)` and `0x131804 = level.time + 200`; published as `fraglimit` by `0x23f2` (see func_0x23f2.md).
+**oDFs — PORTED:** `g_target.c` (`SP_target_fragsFilter`, `Use_Target_FragsFilter`, think, registry of <=10 unnamed filters, `G_FragsFilterCheck` called from `ClientEndFrame`, `G_FragsFilterPublish` from `G_RunFrame` before `CheckCvars`, `G_FragsFilterInit` from `G_InitRaceMode`), `gentity_t.fragsRegistered`.
+Not ported: the same hook's forced `ammo[weapon] = 200` when `df_ndm_weaponsPickup` is off (oDFs already refills via its own rules; unverified) and the undecoded `0x3d37` part? — `0x3d37` is now decoded: sets/clears `ps.stats[12]` bit `0x20` from global `0x1320f8` and bit `0x40` from `0x1320f4` (unknown writers).
+**Behaviour change:** only maps using `target_fragsFilter` (new entity). A filter feeding a `target_stopTimer` sets the `fraglimit` cvar, so reaching that score ends the map exactly like DeFRaG. Revert = remove the spawn entry / `G_FragsFilterPublish` call. Syntax-checked, untested.

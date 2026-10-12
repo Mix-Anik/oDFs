@@ -78,10 +78,15 @@ void Use_Multi( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
 }
 
 void Touch_Multi( gentity_t *self, gentity_t *other, trace_t *trace ) {
+	timerState_t	stateBefore;
+
 	if( !other->client ) {
 		return;
 	}
+	// DeFRaG (func_0x274db): wrap the ordinary touch and refine the race timer to sub-frame precision when it changes state
+	stateBefore = G_GetTimerRecord( other->client )->state;
 	multi_trigger( self, other );
+	G_TimerSubFrame( self, other, stateBefore );
 }
 
 /*QUAKED trigger_multiple (.5 .5 .5) ? RED_ONLY BLUE_ONLY

@@ -55,15 +55,12 @@ meaning). Called from 5 sites total — `0x44bc`
 examined), `func_0x1c84b` (hence transitively from here and
 `func_0x1c860`), and twice directly from `ClientSpawn`.
 
-### `func_0x1c860` — separate `info_player_deathmatch` scanner (seen in passing, not fully decoded)
+### `func_0x1c860` = `SelectInitialSpawnPoint` (RESOLVED)
 
-Also called only from `0x1d27b`, structurally similar to `func_0x26fbf`
-but scans a single fixed classname (`"info_player_deathmatch"`, confirmed
-string, via the same project-confirmed `G_Find`/`0x1c56f` pair), and falls
-back to the same `func_0x1c84b`/`0x1c6be` chain when nothing viable is
-found. Its own exact selection rule (a `+0x210` bit-flag skip condition
-during the scan, purpose unconfirmed) was read but not fully verified this
-pass.
+Sole caller `0x1d27b` (ClientSpawn). Loop: `G_Find(spot, +0x20c classname, "info_player_deathmatch")` (`0x2809c`), stopping at the first spot with `spot+0x210 & 1`
+(`+0x210` = `gentity_t.spawnflags`, between classname `+0x20c` and flags `+0x218`; bit 1 = "initial" spawn). Then `if (!spot || SpotWouldTelefrag(spot)=0x1c56f)`
+fall back to `func_0x1c84b(vec3_origin=&0x1524, origin, angles)`; else copy `spot+0x5c` -> origin with `origin[2] += 9.0f` (`0x41100000`) and `spot+0x74` -> angles.
+Matches vanilla / oDFs `SelectInitialSpawnPoint`; the only difference is that DeFRaG has no `FL_NO_BOTS`/`FL_NO_HUMANS` skip (not a DeFRaG-specific feature; nothing to port).
 
 ## Confirmed building blocks (cited)
 
@@ -75,7 +72,7 @@ pass.
 
 ## Open questions (flagged, not guessed)
 
-- `func_0x1c860`'s exact `+0x210` bit-flag semantics.
+- (closed) `func_0x1c860` = SelectInitialSpawnPoint, see above.
 - `&global_0x1524`'s purpose when passed as `func_0x1c6be`'s `avoidPoint`
   arg (now that `func_0x1c6be` is decoded, this is a zero-initialized
   global being read as a `vec3_t` — plausibly just "no real avoid point

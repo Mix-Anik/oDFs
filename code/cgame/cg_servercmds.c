@@ -1009,6 +1009,28 @@ static void CG_ServerCommand( void ) {
 		return;
 	}
 
+	// DeFRaG target_smallprint (cgame 0x3d8a): small centre print, suppressed by df_noTargetPrint
+	// DeFRaG cgame 0x3dc7: "aswitch <weapon>" is sent by Touch_Item for weapon pickups.
+	// cg_autoswitch: 0 = never, 1 = always switch, >1 = only switch to weapons we did not own yet.
+	if ( !strcmp( cmd, "aswitch" ) ) {
+		int w = atoi( CG_Argv( 1 ) );
+
+		if ( cg_autoswitch.integer ) {
+			if ( cg_autoswitch.integer == 1 || !( cg.snap->ps.stats[STAT_WEAPONS] & ( 1 << w ) ) ) {
+				cg.weaponSelectTime = cg.time;
+				cg.weaponSelect = w;
+			}
+		}
+		return;
+	}
+
+	if ( !strcmp( cmd, "cpsm" ) ) {
+		if ( !df_noTargetPrint.integer ) {
+			CG_CenterPrint( CG_Argv(1), 200, 10 );
+		}
+		return;
+	}
+
 	if ( !strcmp( cmd, "cs" ) ) {
 		CG_ConfigStringModified();
 		return;

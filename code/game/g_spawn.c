@@ -143,6 +143,11 @@ void SP_trigger_hurt (gentity_t *ent);
 void SP_target_remove_powerups( gentity_t *ent );
 void SP_target_give (gentity_t *ent);
 void SP_target_delay (gentity_t *ent);
+void SP_target_multimanager (gentity_t *ent);
+void SP_target_speed (gentity_t *ent);
+void SP_target_init (gentity_t *ent);
+void SP_target_fragsFilter (gentity_t *ent);
+void SP_target_smallprint (gentity_t *ent);
 void SP_target_speaker (gentity_t *ent);
 void SP_target_print (gentity_t *ent);
 void SP_target_laser (gentity_t *self);
@@ -168,6 +173,10 @@ void SP_misc_portal_surface(gentity_t *ent);
 void SP_shooter_rocket( gentity_t *ent );
 void SP_shooter_plasma( gentity_t *ent );
 void SP_shooter_grenade( gentity_t *ent );
+void SP_shooter_bfg( gentity_t *ent );
+void SP_shooter_rocket_targetplayer( gentity_t *ent );
+void SP_shooter_plasma_targetplayer( gentity_t *ent );
+void SP_shooter_grenade_targetplayer( gentity_t *ent );
 
 void SP_team_CTF_redplayer( gentity_t *ent );
 void SP_team_CTF_blueplayer( gentity_t *ent );
@@ -220,6 +229,11 @@ spawn_t	spawns[] = {
 	{"target_give", SP_target_give},
 	{"target_remove_powerups", SP_target_remove_powerups},
 	{"target_delay", SP_target_delay},
+	{"target_multimanager", SP_target_multimanager},
+	{"target_speed", SP_target_speed},
+	{"target_init", SP_target_init},
+	{"target_fragsFilter", SP_target_fragsFilter},
+	{"target_smallprint", SP_target_smallprint},
 	{"target_speaker", SP_target_speaker},
 	{"target_print", SP_target_print},
 	{"target_laser", SP_target_laser},
@@ -247,6 +261,10 @@ spawn_t	spawns[] = {
 	{"shooter_rocket", SP_shooter_rocket},
 	{"shooter_grenade", SP_shooter_grenade},
 	{"shooter_plasma", SP_shooter_plasma},
+	{"shooter_bfg", SP_shooter_bfg},
+	{"shooter_rocket_targetplayer", SP_shooter_rocket_targetplayer},
+	{"shooter_plasma_targetplayer", SP_shooter_plasma_targetplayer},
+	{"shooter_grenade_targetplayer", SP_shooter_grenade_targetplayer},
 
 	{"team_CTF_redplayer", SP_team_CTF_redplayer},
 	{"team_CTF_blueplayer", SP_team_CTF_blueplayer},
@@ -435,17 +453,33 @@ server type (dedicated) and DeFRaG mode (df_gametype 1 = run, 2 = tricks, 3 = fa
 Mode auto-detection of the original is not implemented. FL_MOVER (0x800000) is set by func_plat/bobbing/train.
 ===================
 */
+void G_ResolveDfMode( void ) {
+	int mode = df_gametype.integer;
+
+	g_dfVariant = g_dedicated.integer ? qtrue : qfalse;
+	if ( mode <= 0 || mode >= 8 || mode == 4 ) {
+		// invalid / 0 = auto-detect from the map: start timer -> run, team item -> fastcaps, else tricks
+		if ( g_startTimerReady ) {
+			mode = 1;
+		} else if ( g_hasTeamItem ) {
+			mode = 3;
+		} else {
+			mode = 2;
+		}
+	} else if ( mode >= 5 ) {
+		mode -= 4;
+		g_dfVariant = qtrue;
+	}
+	g_dfMode = mode;
+	trap_Cvar_Set( "defrag_gametype", va( "%i", g_dfVariant ? mode + 4 : mode ) );
+}
+
 void G_ApplyModeExclusion( void ) {
 	gentity_t	*ent;
 	int			i, mode;
 
-	mode = df_gametype.integer;
-	if ( mode >= 5 ) {
-		mode -= 4;
-	}
-	if ( mode < 1 || mode > 3 ) {
-		mode = 1;
-	}
+	G_ResolveDfMode();
+	mode = g_dfMode;
 
 	for ( i = MAX_CLIENTS, ent = &g_entities[MAX_CLIENTS] ; i < level.num_entities ; i++, ent++ ) {
 		if ( !ent->inuse ) {
@@ -456,7 +490,7 @@ void G_ApplyModeExclusion( void ) {
 		} else {
 			if ( ent->flags & FL_NOT_VQ3 ) { G_FreeEntity( ent ); continue; }
 		}
-		if ( g_dedicated.integer || df_gametype.integer >= 5 ) {
+		if ( g_dfVariant ) {
 			if ( ent->flags & FL_NOT_MP ) { G_FreeEntity( ent ); continue; }
 		} else {
 			if ( ent->flags & FL_NOT_SP ) { G_FreeEntity( ent ); continue; }

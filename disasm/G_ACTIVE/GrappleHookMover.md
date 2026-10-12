@@ -1,5 +1,15 @@
 # `func_0x22fe6` — grapple-hook push/crush/carry mover
 
+> **CORRECTION (supersedes everything below about "grapple"):** this function is **vanilla `G_MoverPush`**, not a grapple mechanic.
+> Evidence: `EntitiesInBox` max count `0x400` = MAX_GENTITIES; unlink -> list -> `currentOrigin += move`, `currentAngles(+0x1f4) += amove` -> link; per-candidate
+> `groundEntityNum != pusher` overlap test + `0x22a36` (= `G_TestEntityPosition`, decoded: clipmask `+0x23c` or MASK_SOLID, trace from `ps.origin`/`trBase`, returns `&g_entities[entityNum]` on startsolid)
+> + `0x22b82` (= `G_TryPushingEntity`, writes `trBase` and nudges `client->ps.origin`/`delta_angles[YAW]`); the `trType == 4` (TR_SINE) branch is vanilla's bobbing-mover instakill
+> (`G_Damage(..., 99999, 0, MOD_CRUSH)`); the "linked-list walk" is vanilla's restore loop over `pushed[]`/`pushed_p` (`0x192c94`/`0x192c98`, reset at entry of
+> `0x232f6` = `G_MoverTeam`); `0x23429` = `G_RunMover` (returns if `flags & 0x400` = `FL_TEAMSLAVE`, calls `G_MoverTeam` if either trType != TR_STATIONARY, then `G_RunThink 0x1153`);
+> `0x22b16` = matrix-vector helper (`G_RotatePoint`-style). The "flags 0x400 = hook attached" reading is wrong. Nothing DeFRaG-specific -> nothing to port; oDFs uses the vanilla `g_mover.c`.
+> `0x22eb4` = vanilla MISSIONPACK `G_TryPushingProxMine` (RESOLVED: `AngleVectors`=`0xa186` on `vec3_origin - amove`, then tail-calls `0x22e17` = `G_CheckProxMinePosition`, which uses the vanilla constants 0.125 (`0x3e000000`) and 2.0 (`0x40000000`) times `movedir` at `+0x2a4`; `0x22ab3` = `G_CreateRotationMatrix`). The `candidate+0x234` skip is probably `physicsObject` (+8 shift vs. vanilla layout: `clipmask` is at `+0x23c` here); unverified.
+
+
 **Address:** `0x22fe6`
 **Stack frame:** `enter 0x10b8`
 **Called from:** `0x232f6` (which is called from `0x23429`, the grapple-swing

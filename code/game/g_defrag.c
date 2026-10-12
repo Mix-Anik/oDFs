@@ -13,6 +13,9 @@ int          g_checkpointCount;
 qboolean     g_startTimerReady;
 qboolean     g_stopTimerReady;
 qboolean     g_checkpointReady;
+qboolean     g_hasTeamItem;
+int          g_dfMode = 1;
+qboolean     g_dfVariant;
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -21,23 +24,42 @@ raceTimer_t *G_GetTimerRecord( gclient_t *client ) {
 	return &g_raceTimers[clientNum];
 }
 
+/*
+DeFRaG func_0x13bf (see disasm/G_TRIGGER/finish_handler.md): times under a minute print as "S:mmm", otherwise "M:SS:mmm";
+negative times get a leading '-'.
+*/
 static void G_FormatTime( int ms, char *buf, int bufSize ) {
-	int minutes = ms / 60000;
-	int seconds = (ms % 60000) / 1000;
-	int millis  = ms % 1000;
-	Com_sprintf( buf, bufSize, "%d:%02d.%03d", minutes, seconds, millis );
+	const char *sign = "";
+
+	if ( ms < 0 ) {
+		ms = -ms;
+		sign = "-";
+	}
+	if ( ms < 60000 ) {
+		Com_sprintf( buf, bufSize, "%s%i:%03i", sign, ms / 1000, ms % 1000 );
+	} else {
+		Com_sprintf( buf, bufSize, "%s%i:%02i:%03i", sign, ms / 60000, ( ms % 60000 ) / 1000, ms % 1000 );
+	}
 }
 
+// DeFRaG finish handler (func_0x35ce): the whole-millisecond time plus the sub-millisecond-corrected estimate ("est.")
 static void G_RaceFinished( gentity_t *ent ) {
 	raceTimer_t *t         = G_GetTimerRecord( ent->client );
-	char         timeBuf[32];
+	char         timeBuf[32], estBuf[32], route[MAX_CVAR_VALUE_STRING];
 	int          clientNum = ent - g_entities;
 
-	G_FormatTime( t->bestTime, timeBuf, sizeof(timeBuf) );
+	G_FormatTime( level.time - t->startTime, timeBuf, sizeof(timeBuf) );
+	G_FormatTime( t->bestTime, estBuf, sizeof(estBuf) );
 
-	trap_SendServerCommand( -1, va( "print \"%s^7 reached the finish line in ^2%s^7\n\"",
-	                                ent->client->pers.netname, timeBuf ) );
-	trap_SendServerCommand( clientNum, va( "cp \"^2Finished: %s\"", timeBuf ) );
+	if ( g_dfVariant ) {
+		trap_SendServerCommand( -1, va( "print \"%s^7 reached the finish line in ^2%s^7 (est. %s)\n\"",
+		                                ent->client->pers.netname, timeBuf, estBuf ) );
+	} else {
+		trap_Cvar_VariableStringBuffer( "defrag_route", route, sizeof( route ) );
+		trap_SendServerCommand( clientNum, va( "print \"Time performed by ^2%s^7 on route ^2%s^7 : ^3%s^7 (est. %s)\n\"",
+		                                ent->client->pers.netname, route, timeBuf, estBuf ) );
+	}
+	trap_SendServerCommand( clientNum, va( "cp \"^2Finished: %s\"", estBuf ) );
 }
 
 // ─── init ────────────────────────────────────────────────────────────────────
@@ -48,6 +70,8 @@ void G_InitRaceMode( void ) {
 	g_startTimerReady  = qfalse;
 	g_stopTimerReady   = qfalse;
 	g_checkpointReady  = qfalse;
+	g_hasTeamItem      = qfalse;
+	G_FragsFilterInit();
 	// Clear the SERVERINFO cvars that cgame reads to detect timer entities.
 	// SP_target_* will re-set them to "df" if entities exist on this map.
 	trap_Cvar_Set( "df_ndm_timer_start",      "" );
@@ -66,6 +90,8 @@ void G_StartRace( gentity_t *ent ) {
 	if ( t->initialized == 0 || elapsed >= 750 ) {
 		t->startTime = level.time;
 		t->state     = TIMER_RUNNING;
+		t->fracAccum = 0;	// sub-frame offset is filled in by G_TimerSubFrame() when the trigger crossing can be solved
+		t->fracDelta = 0;
 	}
 }
 
@@ -141,6 +167,125 @@ void G_UpdateRacePs( gentity_t *ent ) {
 // toggling every frame was wrong — it caused startTime to reset each
 // snapshot"). Do not "fix" this to match the qagame bytecode literally.
 
+// ─── 1 ms (sub-frame) timer correction ───────────────────────────────────────
+//
+// Port of DeFRaG func_0x274db's numeric half, see disasm/G_TRIGGER/Touch_Multi_1mstimer.md.
+// When a trigger_multiple changes the race timer state to RUNNING (start) or FINISHED (stop), the
+// moment the player's bounding box crossed the trigger inside the last frame is solved from the pre-move
+// position/velocity and the post-move velocity, and the remainder of the frame (frametime - t, ms)
+// is stored in fracAccum: start -> fracAccum = offset, stop -> fracAccum -= offset. The reported time is
+// (whole-ms elapsed) + round_half(fracAccum), exactly like func_0x37c7.
+
+static int G_RoundHalf( float x ) {
+	return (int)( x + 0.5f );
+}
+
+static void G_1msDebug( const char *msg, float value ) {
+	if ( df_dbg_1mstimer.integer ) {
+		G_Printf( "1mstimer: %s %.10f\n", msg, value );
+	}
+}
+
+// Returns qtrue and the offset (ms) when the crossing could be solved.
+static qboolean G_TimerCrossingOffset( gentity_t *self, gentity_t *other, float *offsetOut ) {
+	gclient_t	*cl = other->client;
+	trace_t		tr;
+	vec3_t		start, pos0, n, vel0, vel1, delta;
+	float		F, up, v0, v1, d, a, t, disc;
+	int			attempt, hop, passEnt;
+
+	F = (float)( cl->ps.commandTime - cl->timerPrevCommandTime );
+	if ( F <= 0 ) {
+		return qfalse;
+	}
+
+	// find the point where the movement pos0 -> pos1 entered the trigger; hop over up to one other
+	// trigger/solid; if the trace hits the world while the player stepped up (0..18 units), retry once from the raised start
+	VectorCopy( cl->timerPos0, pos0 );
+	for ( attempt = 0 ; attempt < 2 ; attempt++ ) {
+		VectorCopy( pos0, start );
+		passEnt = -1;
+		for ( hop = 0 ; hop < 2 ; hop++ ) {
+			trap_Trace( &tr, start, other->r.mins, other->r.maxs, cl->ps.origin, passEnt, CONTENTS_TRIGGER | CONTENTS_SOLID );
+			if ( &g_entities[tr.entityNum] == self || tr.fraction == 1.0f || tr.entityNum == ENTITYNUM_WORLD ) {
+				break;
+			}
+			passEnt = tr.entityNum;
+			VectorCopy( tr.endpos, start );
+		}
+		if ( tr.entityNum != ENTITYNUM_WORLD ) {
+			break;
+		}
+		up = cl->ps.origin[2] - pos0[2];
+		if ( up < 0 || up > 18.0f ) {
+			break;
+		}
+		pos0[2] = cl->ps.origin[2];
+		cl->timerPos0[2] = cl->ps.origin[2];
+		G_1msDebug( "stepping up", up );
+	}
+	if ( &g_entities[tr.entityNum] != self ) {
+		G_1msDebug( "failed to trace for trigger", 0 );
+		return qfalse;
+	}
+	VectorCopy( tr.plane.normal, n );
+	if ( VectorLength( n ) < 1e-5f ) {
+		G_1msDebug( "player inside the trigger, no adjustement", 0 );
+		return qfalse;
+	}
+
+	VectorCopy( cl->timerVel0, vel0 );
+	VectorCopy( cl->ps.velocity, vel1 );		// the touch runs after Pmove, so this is DeFRaG's saved post-move velocity
+	v0 = -DotProduct( vel0, n );
+	v1 = -DotProduct( vel1, n );
+	VectorSubtract( tr.endpos, cl->timerPos0, delta );
+	d = -DotProduct( delta, n );
+	a = 1000.0f * ( v1 - v0 ) / F;
+	if ( v1 <= 1e-5f ) {
+		a = 0;									// obstructed move: cancel acceleration
+	}
+
+	if ( fabs( a ) < 1e-5f ) {
+		if ( v0 <= 1e-5f ) {
+			G_1msDebug( "not moving - defaulting to main timer", 0 );
+			return qfalse;
+		}
+		t = 1000.0f * d / v0;					// linear: d = v0 * t
+	} else {
+		disc = v0 * v0 + 2.0f * a * d;
+		if ( disc < 0 ) {
+			G_1msDebug( "negative discriminant - bailing out", 0 );
+			return qfalse;
+		}
+		t = 2000.0f * d / ( v0 + sqrt( disc ) );	// quadratic: d = v0*t + a*t*t/2
+	}
+	G_1msDebug( "t (ms)", t );
+	*offsetOut = F - t;
+	return qtrue;
+}
+
+void G_TimerSubFrame( gentity_t *self, gentity_t *other, timerState_t stateBefore ) {
+	raceTimer_t	*t = G_GetTimerRecord( other->client );
+	float		offset;
+
+	if ( t->state == stateBefore ) {
+		return;
+	}
+	if ( t->state != TIMER_RUNNING && t->state != TIMER_FINISHED ) {
+		return;
+	}
+	if ( !G_TimerCrossingOffset( self, other, &offset ) ) {
+		return;
+	}
+	if ( t->state == TIMER_RUNNING ) {
+		t->fracAccum = offset;
+		G_1msDebug( "timer offset +=", offset );
+	} else {
+		t->fracAccum -= offset;
+		G_1msDebug( "timer offset -=", offset );
+	}
+}
+
 void G_TimerTick( gentity_t *ent, int elapsed_ms ) {
 	raceTimer_t  *t      = G_GetTimerRecord( ent->client );
 	gclient_t    *client = ent->client;
@@ -160,7 +305,7 @@ void G_TimerTick( gentity_t *ent, int elapsed_ms ) {
 	}
 
 	if ( t->state == TIMER_FINISHED ) {
-		t->bestTime    = level.time - t->startTime;
+		t->bestTime    = level.time - t->startTime + G_RoundHalf( t->fracAccum );
 		t->initialized = 0;
 		// One-shot event: toggle the finish bit; clear the running bit.
 		client->ps.stats[STAT_DEFRAG_FLAGS] ^= 0x8;
@@ -182,7 +327,7 @@ check_state:
 		// Keep bit SET (not XOR'd) so the cgame sees a stable RUNNING signal.
 		client->ps.stats[STAT_DEFRAG_FLAGS] |= 0x4;
 	} else {
-		t->bestTime = level.time - t->startTime;
+		t->bestTime = level.time - t->startTime + G_RoundHalf( t->fracAccum );
 		t->state    = TIMER_IDLE;
 		// Timer not running — clear the running bit.
 		client->ps.stats[STAT_DEFRAG_FLAGS] &= ~0x4;

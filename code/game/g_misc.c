@@ -249,6 +249,7 @@ void Use_Shooter( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
 	vec3_t		dir;
 	float		deg;
 	vec3_t		up, right;
+	qboolean	aimAtActivator = qfalse;
 
 	// see if we have a target
 	if ( ent->enemy ) {
@@ -258,17 +259,69 @@ void Use_Shooter( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
 		VectorCopy( ent->movedir, dir );
 	}
 
-	// randomize a bit
-	PerpendicularVector( up, dir );
-	CrossProduct( up, dir, right );
+	// DeFRaG (func_0x21b5e, see disasm/G_SPAWN/shooters.md): spawnflags 1 aims at the activator instead;
+	// spawnflag 2 leads the target's x/y velocity, spawnflag 4 applies DeFRaG's z lead term (transcribed literally).
+	if ( ( ent->spawnflags & 1 ) && activator ) {
+		vec3_t	pos, vel, u;
+		float	t, k, len;
 
-	deg = crandom() * ent->random;
-	VectorMA( dir, deg, up, dir );
+		aimAtActivator = qtrue;
+		VectorCopy( activator->r.currentOrigin, pos );
+		VectorClear( vel );
+		if ( activator->client ) {
+			VectorCopy( activator->client->ps.velocity, vel );
+		}
+		VectorSubtract( pos, ent->s.origin, dir );
 
-	deg = crandom() * ent->random;
-	VectorMA( dir, deg, right, dir );
+		if ( ( ent->spawnflags & 2 ) || ( ent->spawnflags & 4 ) ) {
+			float speed;
 
-	VectorNormalize( dir );
+			len = VectorLength( dir );
+			switch ( ent->s.weapon ) {
+			case WP_GRENADE_LAUNCHER:	speed = 700.0f; break;
+			case WP_ROCKET_LAUNCHER:	speed = 900.0f; break;
+			case WP_PLASMAGUN:			speed = 2000.0f; break;
+			default:					speed = 0.0f; break;
+			}
+			t = 0.0f;
+			k = 0.0f;
+			if ( speed != 0.0f ) {
+				t = len / speed;
+				k = 0.25f * t * t;
+			}
+			if ( ent->spawnflags & 2 ) {
+				pos[0] += vel[0] * t;
+				pos[1] += vel[1] * t;
+			}
+			if ( ent->spawnflags & 4 ) {
+				float grav = activator->client ? (float)activator->client->ps.gravity : 0.0f;
+				pos[2] += vel[2] - grav * t * k;
+			}
+			VectorSubtract( pos, ent->s.origin, dir );
+		}
+
+		// extra offset along the target's velocity direction: speed key (xy) and count key (z)
+		VectorCopy( vel, u );
+		VectorNormalize( u );
+		dir[0] += ent->speed * u[0];
+		dir[1] += ent->speed * u[1];
+		dir[2] += (float)ent->count * u[2];
+		VectorNormalize( dir );
+	}
+
+	if ( !aimAtActivator ) {
+		// randomize a bit
+		PerpendicularVector( up, dir );
+		CrossProduct( up, dir, right );
+
+		deg = crandom() * ent->random;
+		VectorMA( dir, deg, up, dir );
+
+		deg = crandom() * ent->random;
+		VectorMA( dir, deg, right, dir );
+
+		VectorNormalize( dir );
+	}
 
 	switch ( ent->s.weapon ) {
 	case WP_GRENADE_LAUNCHER:
@@ -279,6 +332,9 @@ void Use_Shooter( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
 		break;
 	case WP_PLASMAGUN:
 		fire_plasma( ent, ent->s.origin, dir );
+		break;
+	case WP_BFG:
+		fire_bfg( ent, ent->s.origin, dir );
 		break;
 	}
 
@@ -335,6 +391,18 @@ Fires at either the target or the current direction.
 void SP_shooter_grenade( gentity_t *ent ) {
 	InitShooter( ent, WP_GRENADE_LAUNCHER);
 }
+
+/*QUAKED shooter_bfg (1 0 0) (-16 -16 -16) (16 16 16)
+DeFRaG addition. Fires at either the target or the current direction.
+*/
+void SP_shooter_bfg( gentity_t *ent ) {
+	InitShooter( ent, WP_BFG );
+}
+
+// DeFRaG's *_targetplayer classnames share the plain spawn bodies; the aim-at-activator behaviour is selected by spawnflags & 1.
+void SP_shooter_rocket_targetplayer( gentity_t *ent ) { InitShooter( ent, WP_ROCKET_LAUNCHER ); }
+void SP_shooter_plasma_targetplayer( gentity_t *ent ) { InitShooter( ent, WP_PLASMAGUN ); }
+void SP_shooter_grenade_targetplayer( gentity_t *ent ) { InitShooter( ent, WP_GRENADE_LAUNCHER ); }
 
 
 #ifdef MISSIONPACK

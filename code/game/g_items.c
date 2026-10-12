@@ -500,6 +500,11 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 		G_AddEvent( other, EV_ITEM_PICKUP, ent->s.modelindex );
 	}
 
+	// DeFRaG (Touch_Item 0x21055): weapon pickups tell the picker's cgame which weapon was grabbed so it can auto-switch (cg_autoswitch)
+	if ( ent->item->giType == IT_WEAPON ) {
+		trap_SendServerCommand( other - g_entities, va( "aswitch %i", ent->item->giTag ) );
+	}
+
 	// powerup pickups are global broadcasts
 	if (!df_mode.integer && (ent->item->giType == IT_POWERUP || ent->item->giType == IT_TEAM)) {
 		// if we want the global sound to play
@@ -874,6 +879,9 @@ void G_SpawnItem (gentity_t *ent, gitem_t *item) {
 	G_SpawnFloat( "wait", "0", &ent->wait );
 
 	RegisterItem( item );
+	if ( item->giType == IT_TEAM ) {
+		g_hasTeamItem = qtrue;	// DeFRaG 0x1318d4: feeds mode auto-detect (fastcaps)
+	}
 	if ( G_ItemDisabled(item) )
 		return;
 

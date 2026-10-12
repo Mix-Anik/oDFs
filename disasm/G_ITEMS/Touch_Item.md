@@ -172,6 +172,7 @@ int Touch_Item(gentity_t *ent, gentity_t *other) {
     else
         G_AddEvent(other, EV_ITEM_PICKUP, ent->s.modelindex);              // 0x2861b, confirmed address
 
+    // **CORRECTION (later pass): the `ne -> 0x2107d` skips when giType != 1, so this block runs for IT_WEAPON pickups; it sends `aswitch <item->giTag>` to the picker. The "me changed to %s^7" string is a stale annotation artifact. See ../CGAME/server_commands.md.**
     // 0x21055-0x2107c: CONFIRMED DeFRaG addition, NOT part of the visibility mechanism —
     // only runs when giType != 1 (not IT_WEAPON). Debug string "aswitch %i" (@ 0x8ecd) plus a call
     // to `0xac4e` (= `va()`-shaped formatter, see G_CLIENT/auth_handshake.md / ClientBegin.md) and a trap call `-0x12` = id 17 = `trap_SendServerCommand` — i.e. "aswitch %i" is a server command sent to a client (target/args not re-decoded). A second nearby debug string

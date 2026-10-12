@@ -90,12 +90,14 @@ vmCvar_t	df_gametype;
 vmCvar_t	df_hook_type;
 vmCvar_t	df_lg_knockback;
 vmCvar_t	df_ndm_damage;
+vmCvar_t	df_ndm_powerups;
 vmCvar_t	df_ndm_weaponsSet;
 vmCvar_t	df_ndm_weaponsPickup;
 vmCvar_t	df_ndm_nopad;
 vmCvar_t	df_ndm_noteleport;
 vmCvar_t	df_ndm_nomover;
 vmCvar_t	g_killWallbug;
+vmCvar_t	df_dbg_1mstimer;
 vmCvar_t	df_mp_InterferenceOff;
 #ifdef MISSIONPACK
 vmCvar_t	g_obeliskHealth;
@@ -202,7 +204,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &df_promode,    	"df_promode",    	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_ob_killobs, 	"df_ob_killobs", 	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_mode,       	"df_mode",       	"1",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
-	{ &df_gametype,   	"df_gametype",   	"1",			CVAR_LATCH, 0, qfalse },
+	{ &df_gametype,   	"df_gametype",   	"0",			CVAR_LATCH, 0, qfalse },
 	{ &df_hook_type,  	"df_hook_Type",  	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_lg_knockback,	"df_lg_Knockback",	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ NULL, 			"defrag_mode",     		"-1",   	CVAR_SERVERINFO, 0, qfalse },
@@ -221,11 +223,13 @@ static cvarTable_t		gameCvarTable[] = {
 	// into 0x131820/0x131824/0x131830; defaults confirmed from the cvar
 	// registration table's string pool). See disasm/G_TRIGGER/func_0x1e60.md.
 	{ &df_ndm_damage,        "df_ndm_damage",        "0",    CVAR_SERVERINFO, 0, qfalse },
+	{ &df_ndm_powerups,      "df_ndm_powerups",      "0",    CVAR_SERVERINFO | CVAR_LATCH, 0, qfalse },
 	{ &df_ndm_weaponsSet,    "df_ndm_weaponsSet",    "1022", CVAR_SERVERINFO, 0, qfalse },
 	{ &df_ndm_weaponsPickup, "df_ndm_weaponsPickup", "0",    CVAR_SERVERINFO, 0, qfalse },
 	{ &df_ndm_nopad,         "df_ndm_nopad",         "0",    CVAR_SERVERINFO, 0, qfalse },
 	{ &df_ndm_nomover,       "df_ndm_nomover",       "0",    CVAR_SERVERINFO, 0, qfalse },
 	{ &g_killWallbug,        "g_killWallbug",        "1",    CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
+	{ &df_dbg_1mstimer,      "df_dbg_1mstimer",      "0",    0, 0, qfalse },
 	{ &df_mp_InterferenceOff, "df_mp_InterferenceOff", "3",   CVAR_SYSTEMINFO | CVAR_LATCH, 0, qfalse },
 	{ &df_ndm_noteleport,    "df_ndm_noteleport",    "0",    CVAR_SERVERINFO, 0, qfalse },
 };
@@ -1989,6 +1993,8 @@ void G_RunFrame( int levelTime ) {
 	// check team votes
 	CheckTeamVote( TEAM_RED );
 	CheckTeamVote( TEAM_BLUE );
+
+	G_FragsFilterPublish();
 
 	// for tracking changes
 	CheckCvars();

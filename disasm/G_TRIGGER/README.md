@@ -26,3 +26,8 @@ For general disassembly methodology, struct layouts, and global addresses see [.
 `df_ndm_timer_start`, `df_ndm_timer_checkpoint`, `df_ndm_timer_stop` are **cvars**
 used internally to detect entity presence. The actual map editor entity classnames are
 `target_startTimer`, `target_stopTimer`, `target_checkpoint`.
+- [target_multimanager.md](target_multimanager.md) — DeFRaG target_multimanager (ported)
+- [target_speed.md](target_speed.md) — DeFRaG target_speed (ported)
+- [target_smallprint.md](target_smallprint.md) — target_smallprint + cgame cpsm (ported)
+- [target_init.md](target_init.md) — DeFRaG target_init (ported)
+- [finish_handler.md](finish_handler.md) — finish handler 0x35ce + time formatter 0x13bf (partly ported)

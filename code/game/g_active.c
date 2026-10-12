@@ -1054,6 +1054,11 @@ void ClientThink_real( gentity_t *ent ) {
 
 	VectorCopy( client->ps.origin, client->oldOrigin );
 
+	// DeFRaG (ClientThink_real, bytecode 0x1aac1): snapshot the pre-Pmove state used by the 1 ms timer correction
+	VectorCopy( client->ps.origin, client->timerPos0 );
+	VectorCopy( client->ps.velocity, client->timerVel0 );
+	client->timerPrevCommandTime = client->ps.commandTime;
+
 #ifdef MISSIONPACK
 		if (level.intermissionQueued != 0 && g_singlePlayer.integer) {
 			if ( level.time - level.intermissionQueued >= 1000  ) {
@@ -1320,6 +1325,9 @@ void ClientEndFrame( gentity_t *ent ) {
 		BG_PlayerStateToEntityState( &ent->client->ps, &ent->s, qtrue );
 	}
 	SendPendingPredictableEvents( &ent->client->ps );
+
+	// DeFRaG target_fragsFilter per-frame score poll
+	G_FragsFilterCheck( ent );
 
 	// set the bit for the reachability area the client is currently in
 //	i = trap_AAS_PointReachabilityAreaIndex( ent->client->ps.origin );
