@@ -189,3 +189,5 @@ the task asked for a final status check.
    neither is a touch dispatcher.
 - [G_Printf_G_Error.md](G_Printf_G_Error.md) — `0x96`/`0xb1` wrappers
 - [vanilla_identified_survey.md](vanilla_identified_survey.md) — survey results: vanilla functions that only differ by hash
+- [func_0x3ccd.md](func_0x3ccd.md) — frame-time/clock-drift sticky flags (writer of 0x1320f4/f8)
+- [CheckTournament.md](CheckTournament.md) — func_0xd1f, vanilla-equivalent warmup state machine

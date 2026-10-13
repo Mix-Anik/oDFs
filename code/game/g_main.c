@@ -161,9 +161,9 @@ static cvarTable_t		gameCvarTable[] = {
 
 	{ &g_dedicated, "dedicated", "0", 0, 0, qfalse  },
 
-	{ &g_speed, "g_speed", "320", 0, 0, qtrue  },
-	{ &g_gravity, "g_gravity", "800", 0, 0, qtrue  },
-	{ &g_knockback, "g_knockback", "1000", 0, 0, qtrue  },
+	{ &g_speed, "g_speed", "320", CVAR_SYSTEMINFO, 0, qtrue  },
+	{ &g_gravity, "g_gravity", "800", CVAR_SYSTEMINFO, 0, qtrue  },
+	{ &g_knockback, "g_knockback", "1000", CVAR_SYSTEMINFO, 0, qtrue  },
 	{ &g_quadfactor, "g_quadfactor", "3", 0, 0, qtrue  },
 	{ &g_weaponRespawn, "g_weaponrespawn", "5", 0, 0, qtrue  },
 	{ &g_weaponTeamRespawn, "g_weaponTeamRespawn", "30", 0, 0, qtrue },
@@ -611,7 +611,7 @@ void G_ShutdownGame( int restart ) {
 	}
 
 	// write all the client session data so we can get it back
-	G_WriteSessionData();
+	G_WriteSessionData( restart );
 
 	if ( trap_Cvar_VariableIntegerValue( "bot_enable" ) ) {
 		BotAIShutdown( restart );
@@ -1114,8 +1114,6 @@ or moved to a new level based on the "nextmap" cvar
 void ExitLevel (void) {
 	int		i;
 	gclient_t *cl;
-	char nextmap[MAX_STRING_CHARS];
-	char d1[MAX_STRING_CHARS];
 
 	//bot interbreeding
 	BotInterbreedEndMatch();
@@ -1133,15 +1131,8 @@ void ExitLevel (void) {
 		return;	
 	}
 
-	trap_Cvar_VariableStringBuffer( "nextmap", nextmap, sizeof(nextmap) );
-	trap_Cvar_VariableStringBuffer( "d1", d1, sizeof(d1) );
-
-	if( !Q_stricmp( nextmap, "map_restart 0" ) && Q_stricmp( d1, "" ) ) {
-		trap_Cvar_Set( "nextmap", "vstr d2" );
-		trap_SendConsoleCommand( EXEC_APPEND, "vstr d1\n" );
-	} else {
-		trap_SendConsoleCommand( EXEC_APPEND, "vstr nextmap\n" );
-	}
+	// DeFRaG ExitLevel (0x990) has no "d1"/"d2" nextmap chaining: it always runs "vstr nextmap"
+	trap_SendConsoleCommand( EXEC_APPEND, "vstr nextmap\n" );
 
 	level.changemap = NULL;
 	level.intermissiontime = 0;
@@ -1158,7 +1149,7 @@ void ExitLevel (void) {
 	}
 
 	// we need to do this here before changing to CON_CONNECTING
-	G_WriteSessionData();
+	G_WriteSessionData( 0 );
 
 	// change all client states to connecting, so the early players into the
 	// next level will know the others aren't done reconnecting

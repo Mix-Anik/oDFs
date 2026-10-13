@@ -473,6 +473,13 @@ Cmd_Kill_f
 */
 void Cmd_Kill_f( gentity_t *ent ) {
 	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		// DeFRaG (0x1e02f): "kill" as a spectator stops following, or else re-begins
+		// the spectator (respawns it at a spawn point) -- see disasm/G_CLIENT/Cmd_Kill.md
+		if ( ent->client->sess.spectatorState == SPECTATOR_FOLLOW ) {
+			StopFollowing( ent );
+		} else {
+			ClientBegin( ent - g_entities );
+		}
 		return;
 	}
 	if (ent->health <= 0) {

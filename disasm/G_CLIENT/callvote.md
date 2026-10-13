@@ -107,3 +107,16 @@ when `0x1317c0 == 0`. `0x130d58` (voteTime) and the yes/no counting use per-clie
 Not ported: oDFs's `Cmd_CallVote_f` is vanilla (`g_allowVote`, vanilla vote list). A faithful port needs the 11 validators, `df_vote_*` cvar
 registration, the unread configstring tail and `CheckVote`'s `df_vote_passVoteOnRatio`. Registering the `cv` alias for the existing command is
 trivial but not done (it would deviate from the table).
+
+## Vote cvar registration — `func_0x34fc` (called once from `G_InitGame`, `0x1b57`)
+Registers with `trap_Cvar_Register(NULL, name, default, CVAR_ARCHIVE /*flags 1*/)` (`-4`):
+| cvar | default |
+|---|---|
+| `df_vote_allowVotes` | `1` |
+| `df_vote_passVoteOnRatio` | `.6` |
+| `df_vote_maxVotes` | `5` |
+| `df_vote_voteDelay` | `30` (seconds, the vote's duration — see CheckVote above) |
+then loops the 11-entry command table at `0x94c` (stride `0x18`) and registers each entry's allow-cvar (`entry+0x8`, e.g. `df_vote_allow_map`) with default **`"0"` for the `gametype` and `interference` entries, `"1"` for all others** (the loop tests `strcmp(entry->name, "gametype")` and `"interference"` via `0xaab7` = Q_stricmp-like). So by default `callvote gametype` and `callvote interference` are disabled; map/devmap/map_restart/nextmap/promode/mode/kick/clientkick/kill_OBs are allowed. Not ported (oDFs keeps vanilla votes); when porting the vote system, register exactly these.
+
+## `func_0x266e(name, tryRaw)` — player lookup by (colour-stripped) name (used by the `kick` validator `0x2fdf`)
+Loops `i = 0 .. level.maxclients-1`, skipping clients whose `pers.connected (client+0x1d4)` is 0 (CON_DISCONNECTED). If `tryRaw != 0`: `Q_stricmp(name, client->pers.netname)` (`0xaab7`; `netname` at `client+0x200`) == 0 → return `&g_entities[i]` (`0x1b2f0 + i*0x43c`). Then (always) copies `netname` into a 0x24-byte buffer (`0xa99f` = Q_strncpyz), runs `Q_CleanStr` (`0xaba7`) on it and compares that with `name` the same way (`0xaab7`); match → return `&g_entities[i]`. Falls through the loop → `NULL` (the caller prints `"Unknown player."`). Identification by use + the two library helpers' call shapes (strncpyz/CleanStr names inferred, bodies not read). oDFs has no equivalent (the vote system is vanilla); needed only when porting `callvote kick`.

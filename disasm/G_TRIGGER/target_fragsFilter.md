@@ -31,7 +31,7 @@ if ( !(*(int*)0x13182c & 6) ) {                      // weaponsPickup disabled (
     w = client->ps.weapon;                           // client+0x90
     if ( w != 1 && w != 10 ) client->ps.ammo[w] = 200;   // client+0x178 + w*4
 }
-func_0x3d37( client );                               // not decoded
+func_0x3d37( client );                               // publishes stats[12] 0x20/0x40 (flags set by 0x3ccd)
 ```
 **Resolves** the long-open `client+0xf8`: it is `ps.persistant[0]` = `PERS_SCORE` (stats base `+0xb8`, 16 entries → `+0xf8`);
 `func_0x274b` (spawn loadout) clearing it at spawn = resetting the score, and the registry fires every `target_fragsFilter`
@@ -50,5 +50,8 @@ as another gate; the rest (what it fires) was **not decoded**. `think 0x2919` (*
 4. `if (f&1) score -= count; if (f&8) score = 0;` then `G_UseTargets(ent, activator)` (`0x28151`).
 Think `0x2919` (re-confirmed): `G_Find(.., targetname, ent->target)` loop; for each found entity whose classname is `"target_stopTimer"`: `0x131800 = min nonzero(count)` and `0x131804 = level.time + 200`; published as `fraglimit` by `0x23f2` (see func_0x23f2.md).
 **oDFs — PORTED:** `g_target.c` (`SP_target_fragsFilter`, `Use_Target_FragsFilter`, think, registry of <=10 unnamed filters, `G_FragsFilterCheck` called from `ClientEndFrame`, `G_FragsFilterPublish` from `G_RunFrame` before `CheckCvars`, `G_FragsFilterInit` from `G_InitRaceMode`), `gentity_t.fragsRegistered`.
-Not ported: the same hook's forced `ammo[weapon] = 200` when `df_ndm_weaponsPickup` is off (oDFs already refills via its own rules; unverified) and the undecoded `0x3d37` part? — `0x3d37` is now decoded: sets/clears `ps.stats[12]` bit `0x20` from global `0x1320f8` and bit `0x40` from `0x1320f4` (unknown writers).
+Not ported: the same hook's forced `ammo[weapon] = 200` when `df_ndm_weaponsPickup` is off (oDFs already refills via its own rules; unverified) and the undecoded `0x3d37` part? — `0x3d37` is now decoded: sets/clears `ps.stats[12]` bit `0x20` from global `0x1320f8` and bit `0x40` from `0x1320f4` (writers: `0x3ccd`, see `G_UTILS/func_0x3ccd.md` — frame-time / clock-drift sticky flags).
 **Behaviour change:** only maps using `target_fragsFilter` (new entity). A filter feeding a `target_stopTimer` sets the `fraglimit` cvar, so reaching that score ends the map exactly like DeFRaG. Revert = remove the spawn entry / `G_FragsFilterPublish` call. Syntax-checked, untested.
+
+## `target_score` use (`0x25457`) — DeFRaG adds to PERS_SCORE directly
+`use(ent, other, activator)`: `client = activator->client; client->ps.persistant[PERS_SCORE] (client+0xf8) += ent->count (ent+0x2f8)` — no `AddScore` (so no warmup gate, no score plum, no team score, no `CalculateRanks`; no NULL check on `activator->client` in the original). **PORTED**: oDFs `Use_Target_Score` (g_target.c) now does the same (with a NULL guard). This matters because oDFs's `AddScore` returns early when `df_mode` is on, which made `target_score` a no-op exactly in the mode where `target_fragsFilter` (polling PERS_SCORE) is used. Revert = restore `AddScore( activator, ent->r.currentOrigin, ent->count )`.

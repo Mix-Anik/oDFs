@@ -96,3 +96,4 @@ These are filled by `func_0x4e9c` which reads from SERVERINFO cvars and parses t
 - [ ] Verify `ps.persistant[14]` (ps+0x130) value requirements
 - [ ] Test timer HUD display with current SERVERINFO cvar setup
 - [server_commands.md](server_commands.md) — DeFRaG cgame server commands (cpsm, aswitch ported; rest listed)
+- [cheat_report.md](cheat_report.md) — cgame 0x59b4 violation reporter + stats[12] 0x20/0x40 consumers

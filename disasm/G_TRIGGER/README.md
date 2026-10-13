@@ -32,3 +32,5 @@ used internally to detect entity presence. The actual map editor entity classnam
 - [target_init.md](target_init.md) — DeFRaG target_init (ported)
 - [finish_handler.md](finish_handler.md) — finish handler 0x35ce + time formatter 0x13bf (partly ported)
 - [multi_trigger_perclient.md](multi_trigger_perclient.md) — per-client trigger wait + respawn timer reset (ported)
+- [target_give.md](target_give.md) — Use_Target_Give with perClientPickupTime stores (ported)
+- [target_teleporter.md](target_teleporter.md) — KEEP_SPEED flag (ported)

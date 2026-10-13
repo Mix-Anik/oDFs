@@ -444,14 +444,25 @@ void hurt_touch( gentity_t *self, gentity_t *other, trace_t *trace ) {
 		return;
 	}
 
-	if ( self->timestamp > level.time ) {
-		return;
-	}
+	// DeFRaG (0x27d3c): the hurt interval is tracked per client (ent+0x32c[clientNum],
+	// the same array items and trigger_multiple use), so one player can't consume another's
+	// tick. Non-client entities still use self->timestamp.
+	{
+		int		interval = ( self->spawnflags & 16 ) ? 1000 : FRAMETIME;
 
-	if ( self->spawnflags & 16 ) {
-		self->timestamp = level.time + 1000;
-	} else {
-		self->timestamp = level.time + FRAMETIME;
+		if ( other->client ) {
+			int		*slot = &self->perClientPickupTime[other->client->ps.clientNum];
+
+			if ( *slot > level.time ) {
+				return;
+			}
+			*slot = level.time + interval;
+		} else {
+			if ( self->timestamp > level.time ) {
+				return;
+			}
+			self->timestamp = level.time + interval;
+		}
 	}
 
 	// play sound

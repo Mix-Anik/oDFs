@@ -44,14 +44,22 @@ void G_WriteClientSessionData( gclient_t *client ) {
 	const char	*s;
 	const char	*var;
 
-	s = va("%i %i %i %i %i %i %i", 
+	// DeFRaG also stores respawnpoint (3 floats) and the chat-ignore mask (2 ints) in
+	// the session string; see disasm/G_CLIENT/session_data.md
+	s = va("%i %i %i %i %i %i %i %f %f %f %i %i %i",
 		client->sess.sessionTeam,
 		client->sess.spectatorNum,
 		client->sess.spectatorState,
 		client->sess.spectatorClient,
 		client->sess.wins,
 		client->sess.losses,
-		client->sess.teamLeader
+		client->sess.teamLeader,
+		client->pers.respawnPoint[0],
+		client->pers.respawnPoint[1],
+		client->pers.respawnPoint[2],
+		(int)client->pers.ignoreMask[0],
+		(int)client->pers.ignoreMask[1],
+		client->sess.lastTeam
 		);
 
 	var = va( "session%i", (int)(client - level.clients) );
@@ -72,19 +80,28 @@ void G_ReadSessionData( gclient_t *client ) {
 	int teamLeader;
 	int spectatorState;
 	int sessionTeam;
+	int ignore0 = 0, ignore1 = 0;
 
 	var = va( "session%i", (int)(client - level.clients) );
 	trap_Cvar_VariableStringBuffer( var, s, sizeof(s) );
 
-	sscanf( s, "%i %i %i %i %i %i %i",
+	sscanf( s, "%i %i %i %i %i %i %i %f %f %f %i %i %i",
 		&sessionTeam,
 		&client->sess.spectatorNum,
 		&spectatorState,
 		&client->sess.spectatorClient,
 		&client->sess.wins,
 		&client->sess.losses,
-		&teamLeader
+		&teamLeader,
+		&client->pers.respawnPoint[0],
+		&client->pers.respawnPoint[1],
+		&client->pers.respawnPoint[2],
+		&ignore0,
+		&ignore1,
+		&client->sess.lastTeam
 		);
+	client->pers.ignoreMask[0] = (unsigned int)ignore0;
+	client->pers.ignoreMask[1] = (unsigned int)ignore1;
 
 	client->sess.sessionTeam = (team_t)sessionTeam;
 	client->sess.spectatorState = (spectatorState_t)spectatorState;
@@ -188,13 +205,17 @@ G_WriteSessionData
 
 ==================
 */
-void G_WriteSessionData( void ) {
+void G_WriteSessionData( int restart ) {
 	int		i;
 
 	trap_Cvar_Set( "session", va("%i", g_gametype.integer) );
 
 	for ( i = 0 ; i < level.maxclients ; i++ ) {
 		if ( level.clients[i].pers.connected == CON_CONNECTED ) {
+			// DeFRaG (0x24825): the saved respawn point only survives a map_restart, not a map change
+			if ( !restart ) {
+				VectorClear( level.clients[i].pers.respawnPoint );
+			}
 			G_WriteClientSessionData( &level.clients[i] );
 		}
 	}

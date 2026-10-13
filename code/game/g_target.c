@@ -45,7 +45,10 @@ void Use_Target_Give( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
 		if ( !t->item ) {
 			continue;
 		}
+		// DeFRaG (0x252fc): make the item available to this client for the touch, then mark it taken
+		t->perClientPickupTime[activator->client->ps.clientNum] = 0;
 		Touch_Item( t, activator, &trace );
+		t->perClientPickupTime[activator->client->ps.clientNum] = -1;
 
 		// make sure it isn't going to respawn or show any events
 		t->nextthink = 0;
@@ -122,7 +125,12 @@ void SP_target_delay( gentity_t *ent ) {
 The activator is given this many points.
 */
 void Use_Target_Score (gentity_t *ent, gentity_t *other, gentity_t *activator) {
-	AddScore( activator, ent->r.currentOrigin, ent->count );
+	// DeFRaG (0x25457): adds straight to PERS_SCORE -- no AddScore() gating (warmup / defrag mode),
+	// no score plum, no CalculateRanks(). target_fragsFilter polls this value.
+	if ( !activator || !activator->client ) {
+		return;
+	}
+	activator->client->ps.persistant[PERS_SCORE] += ent->count;
 }
 
 void SP_target_score( gentity_t *ent ) {
@@ -140,22 +148,17 @@ void SP_target_score( gentity_t *ent ) {
 If "private", only the activator gets the message.  If no checks, all clients get the message.
 */
 void Use_Target_Print (gentity_t *ent, gentity_t *other, gentity_t *activator) {
-	if ( activator->client && ( ent->spawnflags & 4 ) ) {
-		trap_SendServerCommand( activator-g_entities, va("cp \"%s\"", ent->message ));
+	// DeFRaG (0x25485, see disasm/G_TRIGGER/target_smallprint.md): target_print sends the
+	// small "cpsm" print: spawnflags 8 = everybody, otherwise only the activator.
+	// The vanilla team (1/2) and private (4) flags are not honoured.
+	if ( ent->spawnflags & 8 ) {
+		trap_SendServerCommand( -1, va( "cpsm \"%s\"", ent->message ? ent->message : "" ) );
 		return;
 	}
-
-	if ( ent->spawnflags & 3 ) {
-		if ( ent->spawnflags & 1 ) {
-			G_TeamCommand( TEAM_RED, va("cp \"%s\"", ent->message) );
-		}
-		if ( ent->spawnflags & 2 ) {
-			G_TeamCommand( TEAM_BLUE, va("cp \"%s\"", ent->message) );
-		}
+	if ( !activator ) {
 		return;
 	}
-
-	trap_SendServerCommand( -1, va("cp \"%s\"", ent->message ));
+	trap_SendServerCommand( activator - g_entities, va( "cpsm \"%s\"", ent->message ? ent->message : "" ) );
 }
 
 void SP_target_print( gentity_t *ent ) {
@@ -353,11 +356,23 @@ void target_teleporter_use( gentity_t *self, gentity_t *other, gentity_t *activa
 		return;
 	}
 
+	// DeFRaG (0x25881): spawnflags 1 = keep speed. The pre-teleport speed is applied along
+	// the destination's facing after TeleportPlayer() has set its fixed exit velocity.
+	if ( self->spawnflags & 1 ) {
+		float	speed = VectorLength( activator->client->ps.velocity );
+
+		TeleportPlayer( activator, dest->s.origin, dest->s.angles );
+		VectorNormalize( activator->client->ps.velocity );
+		VectorScale( activator->client->ps.velocity, speed, activator->client->ps.velocity );
+		return;
+	}
+
 	TeleportPlayer( activator, dest->s.origin, dest->s.angles );
 }
 
-/*QUAKED target_teleporter (1 0 0) (-8 -8 -8) (8 8 8)
+/*QUAKED target_teleporter (1 0 0) (-8 -8 -8) (8 8 8) KEEP_SPEED
 The activator will be teleported away.
+KEEP_SPEED (DeFRaG): leave with the speed the activator had, instead of the fixed exit speed.
 */
 void SP_target_teleporter( gentity_t *self ) {
 	if (!self->targetname)

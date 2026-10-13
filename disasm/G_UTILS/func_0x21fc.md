@@ -40,7 +40,7 @@
 9. **Tail (decoded this pass, `0x237c`-`0x23f1`)** — `v = trap_Cvar_VariableIntegerValue("sv_fps")` (`0x400c`), then:
    - if `0x1317c0 != 0` (dedicated/variant): if `cvar("defrag_svfpsInitialized") == 0` → set it `"1"`, `sv_fps = 125` (`va("%i",0x7d)`), `g_synchronousClients = "0"` — a one-time defaults push.
    - else (flag 0): if `v != 0 && (v < 60 || v > 140)` → `sv_fps = 125`; then **always** `timelimit = "0"`, and
-     `trap_Cvar_Register(NULL, "defrag_svfps", "0", flags 8)` and `("defrag_clfps","0", flags 8)` (`-4` = id 3 `G_CVAR_REGISTER`; flags value 8 = `CVAR_ROM` in the standard enum).
+     `trap_Cvar_Register(NULL, "defrag_svfps", "0", flags 8)` and `("defrag_clfps","0", flags 8)` (`-4` = id 3 `G_CVAR_REGISTER`; flags value 8 = `CVAR_SYSTEMINFO` (earlier "ROM" label was wrong; see CGAME/cheat_report.md)).
    - finally `func_0x2d02()` (writes `system/checksums/<map>.crc`, see `G_CLIENT/auth_handshake.md`).
    Reading: DeFRaG clamps `sv_fps` to 60..140 (else forces 125) and zeroes `timelimit` on the non-dedicated path, and publishes read-only
    `defrag_svfps`/`defrag_clfps` cvars (zero here; written elsewhere — writers not searched).

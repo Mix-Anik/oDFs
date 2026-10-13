@@ -1083,6 +1083,12 @@ void ClientBegin( int clientNum ) {
 	client->pers.enterTime = level.time;
 	client->pers.teamState.state = TEAM_BEGIN;
 
+	// DeFRaG (0x1d1d6..0x1d20a): changing to a different non-spectator team clears the saved respawn point
+	if ( client->sess.sessionTeam != TEAM_SPECTATOR && client->sess.lastTeam != client->sess.sessionTeam ) {
+		client->sess.lastTeam = client->sess.sessionTeam;
+		VectorClear( client->pers.respawnPoint );
+	}
+
 	// save eflags around this, because changing teams will
 	// cause this to happen with a valid entity, and we
 	// want to make sure the teleport bit is set right

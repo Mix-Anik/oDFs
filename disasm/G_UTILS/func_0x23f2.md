@@ -14,7 +14,7 @@ No args. Decoded structurally from bytecode `0x23f2`-`0x2570` (strings are pool 
   `< 60` → set `60` and broadcast `"print \"^1sv_fps lowest value restricted to %i.^7\n\""`. (The init-time clamp in `func_0x21fc` uses `125` as the fallback;
   this per-frame check clamps to the nearest bound.)
 - If the `df_promode` cvar differs from the cached `0x1317c4`, reset the cvar to the cached value (changing promode at runtime is undone).
-- Mirror `com_maxfps` into the read-only cvar `defrag_clfps` and `sv_fps` into `defrag_svfps` (set only when they change) — these are the writers of those ROM cvars.
+- Mirror `com_maxfps` into the SYSTEMINFO cvar `defrag_clfps` (mirror NOT needed for oDFs: cgame checks gated by defrag_gametype>=5, see CGAME/cheat_report.md) and `sv_fps` into `defrag_svfps` (set only when they change) — these are the writers of those ROM cvars.
 
 ## 3. Dedicated path (`flag != 0`): idle script
 Uses `df_sv_script_idleCfg` (string at `0x130e7c`, flags ARCHIVE) and `df_sv_script_idleDelay` (`0x130d68`, default 50, seconds):

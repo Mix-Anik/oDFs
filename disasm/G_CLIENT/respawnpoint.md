@@ -32,7 +32,7 @@ O3J_SelectSpawnPoint_UseClosest(ent,&origin,&angles); else spot = func_0x270ee(.
   this agrees with the caller's guard. Also the per-candidate skip is `if (!cand->inuse) continue` (`0x44e3 ne → process`),
   not "skip when inuse"; and the +9 z offset was missing from the decode.
 - `ClientBegin.md`'s team-change block that zeroes `+0x2a4/+0x2a8/+0x2ac` therefore **clears the player's saved respawn point
-  when they change team** (not ported: oDFs has no such team-change block).
+  when they change team** (PORTED: `sess.lastTeam`, see session_data.md).
 
 ## oDFs
 **Ported**: `clientPersistant_t.respawnPoint` (`g_local.h`; survives `ClientSpawn`'s pers save/restore, zeroed on connect),
