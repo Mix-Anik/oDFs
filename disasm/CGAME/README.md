@@ -97,3 +97,8 @@ These are filled by `func_0x4e9c` which reads from SERVERINFO cvars and parses t
 - [ ] Test timer HUD display with current SERVERINFO cvar setup
 - [server_commands.md](server_commands.md) — DeFRaG cgame server commands (cpsm, aswitch ported; rest listed)
 - [cheat_report.md](cheat_report.md) — cgame 0x59b4 violation reporter + stats[12] 0x20/0x40 consumers
+- [configstring_contract.md](configstring_contract.md) — which configstrings the DeFRaG cgame reads (only vanilla ones) + GAME_VERSION handshake
+- [entity_events.md](entity_events.md) — CG_EntityEvent 0x1f7e0 numbering vs oDFs enum (identical)
+- [info_keys_contract.md](info_keys_contract.md) — all 50 info keys the DeFRaG cgame reads vs oDFs (only cosmetic ones missing)
+- [playerstate_contract.md](playerstate_contract.md) — DeFRaG-specific ps fields read by the cgame vs oDFs (all matched)
+- [entitystate_contract.md](entitystate_contract.md) — item taken-bits reader IsItemEntityAvailableToClient 0x4e14 (matches oDFs); audit complete

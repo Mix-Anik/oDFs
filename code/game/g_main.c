@@ -103,6 +103,13 @@ vmCvar_t	df_ndm_noteleport;
 vmCvar_t	df_ndm_nomover;
 vmCvar_t	g_killWallbug;
 vmCvar_t	df_dbg_1mstimer;
+vmCvar_t	df_clockCheck;
+vmCvar_t	df_auth;
+vmCvar_t	df_vote_system;
+vmCvar_t	df_forceCvars;
+vmCvar_t	df_enforceSvFps;
+vmCvar_t	df_sv_script_idleCfg;
+vmCvar_t	df_sv_script_idleDelay;
 vmCvar_t	df_mp_InterferenceOff;
 #ifdef MISSIONPACK
 vmCvar_t	g_obeliskHealth;
@@ -241,6 +248,13 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &df_ndm_nomover,       "df_ndm_nomover",       "0",    CVAR_SERVERINFO, 0, qfalse },
 	{ &g_killWallbug,        "g_killWallbug",        "1",    CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
 	{ &df_dbg_1mstimer,      "df_dbg_1mstimer",      "0",    0, 0, qfalse },
+	{ &df_enforceSvFps,      "df_enforceSvFps",      "0",    CVAR_ARCHIVE, 0, qfalse },
+	{ &df_sv_script_idleCfg, "df_sv_script_idleCfg", "",     CVAR_ARCHIVE, 0, qfalse },
+	{ &df_sv_script_idleDelay, "df_sv_script_idleDelay", "50", CVAR_ARCHIVE, 0, qfalse },
+	{ &df_forceCvars,        "df_forceCvars",        "0",    CVAR_ARCHIVE, 0, qfalse },
+	{ &df_vote_system,       "df_vote_system",       "1",    CVAR_ARCHIVE, 0, qfalse },
+	{ &df_auth,              "df_auth",              "0",    CVAR_ARCHIVE, 0, qfalse },
+	{ &df_clockCheck,        "df_clockCheck",        "1",    0, 0, qfalse },
 	{ &df_mp_InterferenceOff, "df_mp_InterferenceOff", "3",   CVAR_SYSTEMINFO | CVAR_LATCH, 0, qfalse },
 	{ &df_ndm_noteleport,    "df_ndm_noteleport",    "0",    CVAR_SERVERINFO, 0, qfalse },
 };
@@ -250,6 +264,9 @@ static int gameCvarTableSize = ARRAY_LEN( gameCvarTable );
 
 void G_InitGame( int levelTime, int randomSeed, int restart );
 void G_RunFrame( int levelTime );
+void G_ClockSanityFrame( void );
+void G_FrameRules( void );
+void G_RegisterVoteCvars( void );
 void G_ShutdownGame( int restart );
 void CheckExitRules( void );
 
@@ -479,6 +496,25 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	srand( randomSeed );
 
 	G_RegisterCvars();
+
+	// DeFRaG G_InitGame (0x1b57, disasm/G_UTILS/G_InitGame_forced_cvars.md): physics/rules cvars forced on every level load.
+	// Overrides operator config, so opt-in: df_forceCvars 1.
+	if ( df_forceCvars.integer ) {
+		trap_Cvar_Set( "g_speed", "320" );
+		trap_Cvar_Set( "g_gravity", "800" );
+		trap_Cvar_Set( "g_knockback", "1000" );
+		trap_Cvar_Set( "g_quadfactor", "3" );
+		trap_Cvar_Set( "g_weaponrespawn", "5" );
+		trap_Cvar_Set( "g_weaponTeamRespawn", "5" );
+		trap_Cvar_Set( "dmflags", "0" );
+		trap_Cvar_Set( "timescale", "1" );
+		trap_Cvar_Set( "g_doWarmup", "0" );
+		trap_Cvar_Set( "fraglimit", "0" );
+		trap_Cvar_Set( "sv_pure", "0" );
+		G_UpdateCvars();
+	}
+
+	G_RegisterVoteCvars();
 
 	G_ProcessIPBans();
 
@@ -817,6 +853,29 @@ int QDECL SortRanks( const void *a, const void *b ) {
 	}
 
 
+	// DeFRaG (0x599): rank by best finish time, ascending; "no time" (0) ranks last. This comes
+	// BEFORE the spectator/score tests, and two untimed clients compare equal right here.
+	if ( !ca->pers.bestFinishTime && !cb->pers.bestFinishTime ) {
+		return 0;
+	}
+	if ( !ca->pers.bestFinishTime ) {
+		return 1;
+	}
+	if ( !cb->pers.bestFinishTime ) {
+		return -1;
+	}
+	if ( ca->pers.bestFinishTime > cb->pers.bestFinishTime ) {
+		return 1;
+	}
+	if ( ca->pers.bestFinishTime < cb->pers.bestFinishTime ) {
+		return -1;
+	}
+	return 0;
+}
+
+#if 0
+/* unreachable vanilla tail kept for reference: with the DeFRaG ordering above every pair returns before here */
+int SortRanksVanillaTail( gclient_t *ca, gclient_t *cb ) {
 	// then spectators
 	if ( ca->sess.sessionTeam == TEAM_SPECTATOR && cb->sess.sessionTeam == TEAM_SPECTATOR ) {
 		if ( ca->sess.spectatorNum > cb->sess.spectatorNum ) {
@@ -845,6 +904,7 @@ int QDECL SortRanks( const void *a, const void *b ) {
 	}
 	return 0;
 }
+#endif
 
 /*
 ============
@@ -1635,12 +1695,83 @@ void CheckTournament( void ) {
 }
 
 
+
+/*
+==================
+CheckDFVote (DeFRaG CheckVote 0x33dc): ratio-based early pass/fail, deadline = level.voteTime
+==================
+*/
+static void G_DFVoteEnd( void ) {
+	level.voteTime = 0;
+	trap_SetConfigstring( CS_VOTE_TIME, "" );
+}
+
+void CheckDFVote( void ) {
+	int		i, yes = 0, no = 0, voters;
+	float	pass, yesRatio, noRatio;
+	char	buf[MAX_CVAR_VALUE_STRING];
+
+	if ( !level.voteTime ) {
+		return;
+	}
+	voters = level.numVotingClients;
+	if ( voters <= 0 ) {
+		trap_SendServerCommand( -1, "print \"Vote failed.\n\"" );
+		G_DFVoteEnd();
+		return;
+	}
+	for ( i = 0; i < level.maxclients; i++ ) {
+		if ( level.clients[i].pers.connected == CON_CONNECTED ) {
+			if ( level.clients[i].pers.dfVote == 1 ) {
+				yes++;
+			} else if ( level.clients[i].pers.dfVote == 2 ) {
+				no++;
+			}
+		}
+	}
+	if ( level.time >= level.voteTime ) {
+		// deadline: non-voters leave the electorate
+		for ( i = 0; i < level.maxclients; i++ ) {
+			if ( level.clients[i].pers.connected == CON_CONNECTED && level.clients[i].pers.dfVote == 0 ) {
+				voters--;
+			}
+		}
+		if ( voters <= 0 ) {
+			G_DFVoteEnd();
+			return;
+		}
+	}
+	yesRatio = (float)yes / voters;
+	noRatio  = (float)no / voters;
+	trap_Cvar_VariableStringBuffer( "df_vote_passVoteOnRatio", buf, sizeof( buf ) );
+	pass = atof( buf );
+	if ( !( yesRatio < pass ) ) {
+		trap_SendServerCommand( -1, "print \"Vote passed.\n\"" );
+		trap_SendConsoleCommand( EXEC_APPEND, va( "%s\n", level.voteString ) );
+		G_DFVoteEnd();
+		return;
+	}
+	if ( !( noRatio < 1.0f - pass ) ) {
+		trap_SendServerCommand( -1, "print \"Vote failed.\n\"" );
+		G_DFVoteEnd();
+		return;
+	}
+	level.voteYes = yes;
+	level.voteNo = no;
+	trap_SetConfigstring( CS_VOTE_YES, va( "%i", yes ) );
+	trap_SetConfigstring( CS_VOTE_NO, va( "%i", no ) );
+}
+
 /*
 ==================
 CheckVote
 ==================
 */
 void CheckVote( void ) {
+	if ( G_DFVotesActive() ) {
+		CheckDFVote();
+		return;
+	}
 	if ( level.voteExecuteTime && level.voteExecuteTime < level.time ) {
 		level.voteExecuteTime = 0;
 		trap_SendConsoleCommand( EXEC_APPEND, va("%s\n", level.voteString ) );
@@ -1908,6 +2039,10 @@ void G_RunFrame( int levelTime ) {
 
 	// get any cvar changes
 	G_UpdateCvars();
+
+	G_SpeedAwardFrame();
+	G_ClockSanityFrame();
+	G_FrameRules();
 
 	//
 	// go through all allocated objects

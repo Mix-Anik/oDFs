@@ -16,3 +16,5 @@
 (`g_dfVariant` branch: broadcast "reached the finish line…"; otherwise "Time performed by … on route … : … (est. …)" to the finisher only — without DeFRaG's `(vX.Y.Z[ beta])` tag and Date/Competition lines).
 Not ported: the `sv_cheats` suppression, the `ClientTimerStop` log line, the `stats` command and the best-time/rank bookkeeping.
 **Behaviour change:** finish-time text changes from `m:ss.mmm` to DeFRaG's `S:mmm` / `M:SS:mmm`; add "(est. …)". Revert = restore the old `G_FormatTime`/`G_RaceFinished` in `g_defrag.c`. Syntax-checked, untested.
+
+**Iter 2 (full-port loop): PORTED** the `sv_cheats` suppression (prints `^1Cheats are ENABLED^7`, returns before ranking) and the `stats` server command (non-variant branch) in `G_RaceFinished`. **Behaviour change:** with `sv_cheats 1` finishes are no longer announced/ranked. Revert: delete those two blocks in `g_defrag.c`. Still unported: `ClientTimerStop` log line (args partly unidentified).

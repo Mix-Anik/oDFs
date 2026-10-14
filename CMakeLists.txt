@@ -103,6 +103,7 @@ if(BUILD_QVM)
                 ${${MODULE_NAME}_SOURCES_ABSOLUTE}
             COMMAND ${CMAKE_COMMAND} -E echo "Assembling ${MODULE_NAME}.qvm..."
             COMMAND ${Q3ASM}
+                -vq3  # VM_MAGIC v1 (Q3 1.32b) format: cgame-proxymod / older loaders reject VM_MAGIC_VER2
                 -o ${VM_OUTPUT_DIR}/${MODULE_NAME}.qvm
                 ${${MODULE_NAME}_ASM_FILES}
             WORKING_DIRECTORY "${QVM_ASM_DIR}"
@@ -121,6 +122,7 @@ if(BUILD_QVM)
     set(CGAME_SOURCES
         code/cgame/cg_main.c
         code/cgame/cg_consolecmds.c
+        code/cgame/cg_defrag.c
         code/cgame/cg_draw.c
         code/cgame/cg_drawtools.c
         code/cgame/cg_effects.c

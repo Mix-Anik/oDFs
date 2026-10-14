@@ -639,6 +639,8 @@ Events will be passed on to the clients for presentation,
 but any server game effects are handled here
 ================
 */
+extern int s_spawnArena;
+
 void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 	int		i, j;
 	int		event;
@@ -726,6 +728,8 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 				}
 			}
 #endif
+			// DeFRaG (0x1a63a): spawn picker is called with client+0x374 (arena number) as tag filter
+			s_spawnArena = ent->client->pers.arena;
 			SelectSpawnPoint( ent->client->ps.origin, origin, angles, qfalse );
 			TeleportPlayer( ent, origin, angles );
 			break;
@@ -1089,6 +1093,11 @@ void ClientThink_real( gentity_t *ent ) {
 	}
 	SendPendingPredictableEvents( &ent->client->ps );
 
+	// DeFRaG speed award tracking (0x1ac53); the original's exact guard was not decoded, so only live players count
+	if ( ent->client->sess.sessionTeam != TEAM_SPECTATOR && ent->health > 0 ) {
+		G_SpeedAwardTrack( ent );
+	}
+
 	if ( !( ent->client->ps.eFlags & EF_FIRING ) ) {
 		client->fireHeld = qfalse;		// for grapple
 	}
@@ -1325,6 +1334,11 @@ void ClientEndFrame( gentity_t *ent ) {
 		BG_PlayerStateToEntityState( &ent->client->ps, &ent->s, qtrue );
 	}
 	SendPendingPredictableEvents( &ent->client->ps );
+
+	// DeFRaG 0x259a head: authentication timeout / delayed request (a dropped client skips the rest of that frame)
+	if ( G_AuthFrame( ent ) ) {
+		return;
+	}
 
 	// DeFRaG target_fragsFilter per-frame score poll
 	G_FragsFilterCheck( ent );

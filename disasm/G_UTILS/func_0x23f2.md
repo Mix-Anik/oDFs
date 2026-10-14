@@ -29,3 +29,5 @@ if the cfg is non-empty: with no connected clients (`0x12a338 == 0`) arm `0x1308
 
 ## oDFs
 Not ported (oDFs has none of these cvars/features except through `df_*` basics). Candidates: the `defrag_clfps`/`defrag_svfps` mirrors and the `sv_fps` clamp are simple; the idle-config script needs the two cvars.
+
+**Iter 4 (full-port loop): PORTED** `G_FrameRules` (g_defrag.c, called from G_RunFrame): sv_fps 60..140 clamp behind new cvar `df_enforceSvFps` (default 0 = off, since it overrides operator config) and the dedicated idle-config script (`df_sv_script_idleCfg` empty by default = inactive; `df_sv_script_idleDelay` 50; `defrag_idle` toggled). Not ported: df_promode runtime lock (oDFs has no cached value/vote path), defrag_svfps/clfps mirrors. Revert: delete `G_FrameRules` call in G_RunFrame. Syntax-checked, untested.

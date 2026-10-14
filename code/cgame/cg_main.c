@@ -225,6 +225,11 @@ static cvarTable_t cvarTable[] = {
 	{ &cg_drawTimer, "cg_drawTimer", "0", CVAR_ARCHIVE  },
 	{ &cg_drawFPS, "cg_drawFPS", "0", CVAR_ARCHIVE  },
 	{ &df_noTargetPrint, "df_noTargetPrint", "0", CVAR_ARCHIVE },
+	{ &df_checkpoints, "df_checkpoints", "2", CVAR_ARCHIVE },
+	{ &df_noEndOfRunStats, "df_noEndOfRunStats", "0", CVAR_ARCHIVE },
+	{ &df_validityChecks, "df_validityChecks", "1", CVAR_ARCHIVE },
+	{ &df_drawCheckpointEvents, "df_drawCheckpointEvents", "1", CVAR_ARCHIVE },
+	{ &df_drawCheckpointStats, "df_drawCheckpointStats", "1", CVAR_ARCHIVE },
 	{ &cg_drawSnapshot, "cg_drawSnapshot", "0", CVAR_ARCHIVE  },
 	{ &cg_draw3dIcons, "cg_draw3dIcons", "1", CVAR_ARCHIVE  },
 	{ &cg_drawIcons, "cg_drawIcons", "1", CVAR_ARCHIVE  },
@@ -1847,6 +1852,7 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	// clear everything
 	memset( &cgs, 0, sizeof( cgs ) );
 	memset( &cg, 0, sizeof( cg ) );
+	CG_DF_Reset();
 	memset( cg_entities, 0, sizeof(cg_entities) );
 	memset( cg_weapons, 0, sizeof(cg_weapons) );
 	memset( cg_items, 0, sizeof(cg_items) );

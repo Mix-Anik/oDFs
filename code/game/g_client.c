@@ -193,7 +193,7 @@ Chooses a player start, deathmatch start, etc
 ============
 */
 // arena number the spawn selection filters on (set from client->pers.arena in ClientSpawn); 0 matches untagged spawn points
-static int s_spawnArena;
+int s_spawnArena;
 
 gentity_t *SelectRandomFurthestSpawnPoint ( const vec3_t avoidPoint, vec3_t origin, vec3_t angles, qboolean isbot ) {
 	gentity_t	*spot;
@@ -1006,6 +1006,8 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 
 	memset( client, 0, sizeof(*client) );
 
+	G_AuthConnect( ent );	// DeFRaG 0x271a (after the client struct was cleared, so ps.clientNum is 0 here)
+
 	client->pers.connected = CON_CONNECTING;
 
 	// check for local client
@@ -1100,6 +1102,7 @@ void ClientBegin( int clientNum ) {
 
 	// DeFRaG (func_0x26e8 -> func_0x3a47): clear this client's race timer record, see disasm/G_CLIENT/auth_handshake.md
 	memset( G_GetTimerRecord( client ), 0, sizeof(raceTimer_t) );
+	G_AuthBegin( ent );	// DeFRaG 0x26e8
 
 	// locate ent at a spawn point
 	ClientSpawn( ent );
@@ -1460,6 +1463,7 @@ void ClientDisconnect( int clientNum ) {
 	ent = g_entities + clientNum;
 	// DeFRaG (func_0x273f): clear this client's race timer record, see disasm/G_CLIENT/func_0x273f.md
 	if ( ent->client ) {
+		G_SpeedAwardDisconnect( ent );
 		memset( G_GetTimerRecord( ent->client ), 0, sizeof(raceTimer_t) );
 	}
 	// DeFRaG (ClientDisconnect): drop this client from every client's ignore mask so a reused slot isn't inherited

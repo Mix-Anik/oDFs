@@ -499,6 +499,7 @@ static consoleCommand_t	commands[] = {
 	{ "scoresUp", CG_scrollScoresUp_f },
 #endif
 	{ "startOrbit", CG_StartOrbit_f },
+	{ "svinfo_report", CG_DF_SvinfoReport_f },
 	//{ "camera", CG_Camera_f },
 	{ "loaddeferred", CG_LoadDeferredPlayers }	
 };

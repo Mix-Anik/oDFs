@@ -1,0 +1,2 @@
+- [demo_exit.md](demo_exit.md) — exit-after-demo handler (0x1a92)
+- [ui_theme_menu.md](ui_theme_menu.md) — df_ui_* theme cvars & mod-settings menu help table

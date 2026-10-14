@@ -174,10 +174,11 @@ static void CG_DrawClientScore( int y, score_t *score, float *color, float fade,
 			" connecting    %s", ci->name);
 	} else if ( ci->team == TEAM_SPECTATOR ) {
 		Com_sprintf(string, sizeof(string),
-			" SPECT %3i %4i %s", score->ping, score->time, ci->name);
+			" SPECT %3i      %s", score->ping, ci->name);
 	} else {
+		// DeFRaG ranks by best finish time (score->score holds it in ms, 0 = no time yet)
 		Com_sprintf(string, sizeof(string),
-			"%5i %4i %4i %s", score->score, score->ping, score->time, ci->name);
+			"%6s %4i      %s", score->score ? CG_DF_FormatTime( score->score ) : "-", score->ping, ci->name);
 	}
 
 	// highlight your position
@@ -411,6 +412,13 @@ qboolean CG_DrawOldScoreboard( void ) {
 				break;
 			}
 		}
+	}
+
+	// DeFRaG footer (cgame 0x668c): speed award
+	if ( cg.speedAwardUps > 0 ) {
+		const char *holder = cg.speedAwardName[0] ? cg.speedAwardName
+			: ( cg.speedAwardClient >= 0 ? cgs.clientinfo[cg.speedAwardClient].name : "" );
+		CG_DrawBigString( 8, SCREEN_HEIGHT - 24, va( "Speed Award: %s ^7: %i ups", holder, cg.speedAwardUps ), fade );
 	}
 
 	// load any models that have been deferred

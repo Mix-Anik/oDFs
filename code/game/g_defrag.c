@@ -42,11 +42,86 @@ static void G_FormatTime( int ms, char *buf, int bufSize ) {
 	}
 }
 
+// ─── speed award (qagame 0x131844 / 0x131848 / 0x13184c / 0x1318cc) ────────
+// Highest horizontal speed above 800 ups; awarded 5 s after the last record, announced in the
+// "scores" command (value, holder, name). See disasm/G_CLIENT/scoreboard.md.
+int  g_speedAwardValue  = 0;
+int  g_speedAwardClient = -1;
+char g_speedAwardName[MAX_NETNAME];
+static int g_speedAwardExpire = 0;
+
+void G_SpeedAwardInit( void ) {
+	g_speedAwardValue  = 0;
+	g_speedAwardClient = -1;
+	g_speedAwardName[0] = 0;
+	g_speedAwardExpire = 0;
+}
+
+// DeFRaG ClientThink_real (0x1ac53..0x1ac83): horizontal speed after Pmove; new maximum above 800 ups
+void G_SpeedAwardTrack( gentity_t *ent ) {
+	vec3_t v;
+	int    speed;
+
+	VectorCopy( ent->client->ps.velocity, v );
+	v[2] = 0;
+	speed = (int)VectorLength( v );
+	if ( speed > 800 && speed > g_speedAwardValue ) {
+		g_speedAwardValue   = speed;
+		g_speedAwardClient  = ent->client->ps.clientNum;
+		g_speedAwardName[0] = 0;
+		g_speedAwardExpire  = level.time + 5000;
+	}
+}
+
+// DeFRaG per-frame rules (0x23f2): 5 s after the last record, log the award and latch the holder's name
+void G_SpeedAwardFrame( void ) {
+	int         clientNum;
+	const char *name;
+
+	if ( !g_dfVariant || !g_speedAwardExpire || level.time < g_speedAwardExpire ) {
+		return;
+	}
+	if ( g_speedAwardName[0] ) {
+		clientNum = -1;
+		name = g_speedAwardName;
+	} else {
+		clientNum = g_speedAwardClient;
+		name = ( clientNum >= 0 ) ? level.clients[clientNum].pers.netname : "";
+	}
+	g_speedAwardExpire = 0;
+	G_LogPrintf( "ClientSpeedAward: %i %i \"%s\"\n", clientNum, g_speedAwardValue, name );
+}
+
+// DeFRaG ClientDisconnect (0x1d863): a holder who leaves keeps their name on the award, the client slot becomes -1
+void G_SpeedAwardDisconnect( gentity_t *ent ) {
+	if ( g_speedAwardClient == ent - g_entities ) {
+		g_speedAwardClient = -1;
+		Q_strncpyz( g_speedAwardName, ent->client->pers.netname, sizeof( g_speedAwardName ) );
+	}
+}
+
+static int g_clockBadFrame;		// 0x1320f4: a frame outside 7..16 ms happened
+static int g_clockBadRatio;		// 0x1320f8: game clock drifted >20% from the wall clock over a 10 s window
+static int g_clockInitTime;		// 0x1320fc
+static int g_clockGameAcc, g_clockRealAcc, g_clockPrevReal;
+
 // DeFRaG finish handler (func_0x35ce): the whole-millisecond time plus the sub-millisecond-corrected estimate ("est.")
 static void G_RaceFinished( gentity_t *ent ) {
 	raceTimer_t *t         = G_GetTimerRecord( ent->client );
 	char         timeBuf[32], estBuf[32], route[MAX_CVAR_VALUE_STRING];
 	int          clientNum = ent - g_entities;
+
+	// DeFRaG 0x35ce: with sv_cheats on no time is announced, logged or ranked
+	if ( trap_Cvar_VariableIntegerValue( "sv_cheats" ) ) {
+		trap_SendServerCommand( clientNum, "print \"^1Cheats are ENABLED^7\n\"" );
+		return;
+	}
+
+	// best finish time of this connection (client+0x2b0); ranks the scoreboard (SortRanks)
+	if ( t->bestTime > 0 && ( !ent->client->pers.bestFinishTime || ent->client->pers.bestFinishTime > t->bestTime ) ) {
+		ent->client->pers.bestFinishTime = t->bestTime;
+		CalculateRanks();
+	}
 
 	G_FormatTime( level.time - t->startTime, timeBuf, sizeof(timeBuf) );
 	G_FormatTime( t->bestTime, estBuf, sizeof(estBuf) );
@@ -55,6 +130,7 @@ static void G_RaceFinished( gentity_t *ent ) {
 		trap_SendServerCommand( -1, va( "print \"%s^7 reached the finish line in ^2%s^7 (est. %s)\n\"",
 		                                ent->client->pers.netname, timeBuf, estBuf ) );
 	} else {
+		trap_SendServerCommand( clientNum, "stats" );	// DeFRaG: triggers the cgame end-of-run stats dump
 		trap_Cvar_VariableStringBuffer( "defrag_route", route, sizeof( route ) );
 		trap_SendServerCommand( clientNum, va( "print \"Time performed by ^2%s^7 on route ^2%s^7 : ^3%s^7 (est. %s)\n\"",
 		                                ent->client->pers.netname, route, timeBuf, estBuf ) );
@@ -62,16 +138,156 @@ static void G_RaceFinished( gentity_t *ent ) {
 	trap_SendServerCommand( clientNum, va( "cp \"^2Finished: %s\"", estBuf ) );
 }
 
+
+// ─── DeFRaG client authentication handshake (disasm/G_CLIENT/auth_handshake.md) ─────────────────────────────
+// Only active on non-dedicated servers (g_dfVariant == qfalse) and when df_auth is set; bots are never asked.
+// A faithful port, including DeFRaG's quirk: the per-client record is picked with ps.clientNum at ClientConnect
+// time (func_0x271a), which is still 0 right after the client memset, so every client shares record 0, only the
+// first word of the record is cleared and the request always goes to client 0.
+#define AUTH_TIMEOUT_MS		1500
+#define AUTH_DELAY_MS		2500
+
+typedef struct authRec_s {
+	int		target;			// +0x0 client the request is sent to
+	int		token;			// +0x4
+	int		deadline;		// +0x8 authentication deadline, 0 = none outstanding
+	int		sendTime;		// +0xc time at which the request is sent, 0 = none pending
+} authRec_t;
+
+static authRec_t g_authRecs[MAX_CLIENTS];		// 0x1313bc, 16-byte stride
+
+extern vmCvar_t df_auth;
+
+// DeFRaG 0x1594: checks the token range and derives the expected reply
+static int G_AuthHash( int token, const char *str ) {
+	int				sum = 0;
+	int				d;
+	const byte		*p;
+
+	if ( !*str ) {
+		return 0;
+	}
+	if ( token < 0x14d || token > 0x18405 ) {
+		return 0;
+	}
+	d = (signed char)( ( token - ( ( token % 100 ) / 10 ) ) % 10 );
+	p = (const byte *)str;
+	do {
+		sum += ( *p - 3 ) - d;
+		p++;
+	} while ( *p );
+	return token - 3 - 3 * sum;
+}
+
+// DeFRaG 0x271a, called from ClientConnect right after the client struct was cleared
+void G_AuthConnect( gentity_t *ent ) {
+	authRec_t *rec;
+
+	if ( !df_auth.integer ) {
+		ent->authRec = NULL;
+		return;
+	}
+	rec = &g_authRecs[ent->client->ps.clientNum];
+	ent->authRec = rec;
+	rec->target = 0;		// memset( rec, 0, 4 )
+}
+
+// DeFRaG 0x26e8, from ClientBegin
+void G_AuthBegin( gentity_t *ent ) {
+	authRec_t *rec = ent->authRec;
+
+	if ( rec && !rec->deadline && !rec->sendTime ) {
+		rec->sendTime = level.time + AUTH_DELAY_MS;
+	}
+}
+
+// DeFRaG 0x2c3f
+static void G_AuthSendRequest( gentity_t *ent ) {
+	authRec_t *rec = ent->authRec;
+
+	if ( g_dfVariant || !rec ) {
+		return;
+	}
+	if ( ent->r.svFlags & SVF_BOT ) {
+		return;
+	}
+	if ( rec->deadline ) {
+		return;
+	}
+	rec->token = rand() % 0xf3e58 + 0x14d;
+	rec->deadline = level.time + AUTH_TIMEOUT_MS;
+	trap_SendServerCommand( rec->target, va( "auth_request %i %i", rec->token, trap_Cvar_VariableIntegerValue( "sv_mapChecksum" ) ) );
+}
+
+// DeFRaG 0x259a (head): returns qtrue when the client was dropped this frame
+qboolean G_AuthFrame( gentity_t *ent ) {
+	authRec_t *rec = ent->authRec;
+
+	if ( !rec ) {
+		return qfalse;
+	}
+	if ( rec->deadline && rec->deadline <= level.time ) {
+		rec->deadline = 0;
+		trap_DropClient( ent->client->ps.clientNum, "dropped: Authentication timed out\n" );
+		return qtrue;
+	}
+	if ( rec->sendTime && rec->sendTime <= level.time ) {
+		rec->sendTime = 0;
+		G_AuthSendRequest( ent );
+	}
+	return qfalse;
+}
+
+// DeFRaG 0x2cab: verify a reply
+static void G_AuthReply( const char *reply, int clientNum ) {
+	authRec_t	*rec = &g_authRecs[clientNum];
+	int			expected;
+
+	if ( !rec->deadline ) {
+		return;
+	}
+	expected = G_AuthHash( rec->token, va( "%i.%02i.%02i", 1, 91, 31 ) );
+	if ( expected == 0 || atoi( reply ) != expected ) {
+		trap_DropClient( clientNum, "dropped: Authentication failed\n" );
+	}
+	rec->deadline = 0;
+}
+
+// DeFRaG 0x2d45: pre-dispatch of "auth_reply <n>" and "notify <text>"; returns qtrue when the command was consumed
+qboolean G_AuthCommand( int clientNum, const char *cmd ) {
+	char	buf[0x400];
+	int		len;
+
+	if ( !Q_stricmp( cmd, "auth_reply" ) ) {
+		trap_Argv( 1, buf, 0xff );
+		// the client appends one random decoy digit to the number
+		len = strlen( buf );
+		if ( len > 0 ) {
+			buf[len - 1] = 0;
+		}
+		G_AuthReply( buf, clientNum );
+		return qtrue;
+	}
+	if ( !Q_stricmp( cmd, "notify" ) ) {
+		trap_Argv( 1, buf, sizeof( buf ) );
+		trap_SendServerCommand( clientNum, va( "print \"%s\"", buf ) );
+		return qtrue;
+	}
+	return qfalse;
+}
+
 // ─── init ────────────────────────────────────────────────────────────────────
 
 void G_InitRaceMode( void ) {
 	memset( g_raceTimers, 0, sizeof(g_raceTimers) );
+	g_clockBadFrame = g_clockBadRatio = g_clockInitTime = g_clockGameAcc = g_clockRealAcc = g_clockPrevReal = 0;
 	g_checkpointCount  = 0;
 	g_startTimerReady  = qfalse;
 	g_stopTimerReady   = qfalse;
 	g_checkpointReady  = qfalse;
 	g_hasTeamItem      = qfalse;
 	G_FragsFilterInit();
+	G_SpeedAwardInit();
 	// Clear the SERVERINFO cvars that cgame reads to detect timer entities.
 	// SP_target_* will re-set them to "df" if entities exist on this map.
 	trap_Cvar_Set( "df_ndm_timer_start",      "" );
@@ -192,6 +408,84 @@ static int G_EncodeRaceTime( int ms, gclient_t *cl ) {
 	return (int)e;
 }
 
+// DeFRaG per-frame rules (func_0x23f2, see disasm/G_UTILS/func_0x23f2.md)
+extern vmCvar_t df_enforceSvFps, df_sv_script_idleCfg, df_sv_script_idleDelay;
+static int g_idleDeadline;		// 0x130854
+
+void G_FrameRules( void ) {
+	char buf[MAX_CVAR_VALUE_STRING];
+	int  v;
+
+	if ( !g_dfVariant ) {
+		// non-dedicated path: sv_fps clamp 60..140 unless cheats (opt-in here, it overrides operator config)
+		if ( df_enforceSvFps.integer && !trap_Cvar_VariableIntegerValue( "sv_cheats" ) ) {
+			v = trap_Cvar_VariableIntegerValue( "sv_fps" );
+			if ( v > 140 ) {
+				trap_Cvar_Set( "sv_fps", "140" );
+				trap_SendServerCommand( -1, "print \"^1sv_fps highest value restricted to 140.^7\n\"" );
+			} else if ( v < 60 ) {
+				trap_Cvar_Set( "sv_fps", "60" );
+				trap_SendServerCommand( -1, "print \"^1sv_fps lowest value restricted to 60.^7\n\"" );
+			}
+		}
+		return;
+	}
+
+	// dedicated path: run df_sv_script_idleCfg after df_sv_script_idleDelay seconds without clients
+	if ( !df_sv_script_idleCfg.string[0] ) {
+		return;
+	}
+	if ( level.numConnectedClients == 0 ) {
+		if ( !g_idleDeadline ) {
+			g_idleDeadline = level.time + 1000 * df_sv_script_idleDelay.integer;
+		} else if ( level.time > g_idleDeadline ) {
+			trap_Cvar_VariableStringBuffer( "defrag_idle", buf, sizeof( buf ) );
+			if ( buf[0] != '1' ) {
+				trap_SendConsoleCommand( EXEC_APPEND, va( "exec %s\n", df_sv_script_idleCfg.string ) );
+				trap_Cvar_Set( "defrag_idle", "1" );
+			}
+		}
+	} else {
+		g_idleDeadline = 0;
+		trap_Cvar_Set( "defrag_idle", "0" );
+	}
+}
+
+// DeFRaG func_0x3ccd: sticky frame-time / clock-drift flags, published as stats[12] bits 0x40 / 0x20
+extern vmCvar_t df_clockCheck;
+
+void G_ClockSanityFrame( void ) {
+	int   d, now;
+	float r;
+
+	if ( !df_clockCheck.integer ) {
+		return;
+	}
+	if ( !g_clockInitTime ) {
+		g_clockInitTime = level.time;
+	}
+	if ( level.time < g_clockInitTime + 2500 ) {
+		return;
+	}
+	d = level.time - level.previousTime;
+	if ( d < 7 || d > 16 ) {
+		g_clockBadFrame = 1;
+	}
+	now = trap_Milliseconds();
+	if ( g_clockPrevReal != 0 ) {
+		g_clockGameAcc += d;
+		g_clockRealAcc += now - g_clockPrevReal;
+	}
+	g_clockPrevReal = now;
+	if ( g_clockRealAcc >= 10000 ) {
+		r = (float)g_clockGameAcc / (float)g_clockRealAcc;
+		if ( r <= 0.8f || r >= 1.2f ) {
+			g_clockBadRatio = 1;
+		}
+		g_clockGameAcc = g_clockRealAcc = 0;
+	}
+}
+
 // DeFRaG func_0x38ba: publish the race time in ps.stats[7]/[8] and "timer initialized" in stats[12] bit 2
 static void G_PublishRaceTime( gentity_t *ent ) {
 	gclient_t	*cl = ent->client;
@@ -202,6 +496,13 @@ static void G_PublishRaceTime( gentity_t *ent ) {
 		cl->ps.stats[STAT_DEFRAG_FLAGS] |= 2;
 	} else {
 		cl->ps.stats[STAT_DEFRAG_FLAGS] &= ~2;
+	}
+
+	if ( g_clockBadFrame ) {
+		cl->ps.stats[STAT_DEFRAG_FLAGS] |= 0x40;
+	}
+	if ( g_clockBadRatio ) {
+		cl->ps.stats[STAT_DEFRAG_FLAGS] |= 0x20;
 	}
 
 	if ( g_dfVariant || trap_Cvar_VariableIntegerValue( "sv_cheats" ) ) {

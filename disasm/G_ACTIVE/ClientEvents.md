@@ -37,9 +37,10 @@ switch value is `ps.events[i & 1]` (an `EV_*` code), not a means-of-death.
    `eType` gate. oDFs had the vanilla check; removed in `g_active.c`.
 2. Teleporter uses `func_0x1c6be` (DeFRaG's furthest-spawn picker, see
    [../G_CLIENT/func_0x1c6be.md](../G_CLIENT/func_0x1c6be.md)) instead of
-   `SelectSpawnPoint`, passing `client+0x374` as the tag filter. **Not ported**:
-   the oDFs `SelectSpawnPoint` is not equivalent and `+0x2f8`/`+0x374`
-   semantics are unconfirmed.
+   `SelectSpawnPoint`, passing `client+0x374` as the tag filter. **PORTED**:
+   oDFs `SelectSpawnPoint` already is the furthest picker and `+0x374` = arena
+   number (arena_command.md); the teleporter now sets `s_spawnArena = pers.arena`
+   first. Revert: delete that line in g_active.c.
 
 ## Still open
 - (Resolved) the old "ClientEvents = `0x273f`" label was wrong; `0x273f` clears a

@@ -30,4 +30,6 @@ Literals: `0x3f4ccccd`=0.8f, `0x3f99999a`=1.2f. The `d` window 7..16 corresponds
 - That these are *anti-cheat / run-validity* markers is an inference from where they go (ps.stats[12] next to the race-timer flags); cgame consumer CONFIRMED in `CGAME/cheat_report.md`: bit 0x20 -> "timescaling reported", bit 0x40 -> "illegal server frame-rate reported" (client-side run-validity warnings).
 
 ## oDFs
-Not ported: no consumer in the DeFRaG cgame confirmed, and oDFs already doesn't publish bits `0x20/0x40`. If wanted: add the function to the per-frame rules and set `ps.stats[12]` bits in the race ps publish.
+**PORTED (full-port loop iter 3)**: `G_ClockSanityFrame` (g_defrag.c, called after `G_SpeedAwardFrame`), bits published in `G_PublishRaceTime`, state reset in `G_InitRaceMode`, cvar `df_clockCheck` (default 1). **Behaviour change:** a frame outside 7..16 ms (e.g. sv_fps outside ~63..142, or a hitch) permanently flags the run -> DeFRaG cgame reports 'illegal server frame-rate'; timescale/stall flags 'timescaling'. Revert: `set df_clockCheck 0`. Syntax-checked, untested.
+
+(Old note:) no consumer in the DeFRaG cgame confirmed, and oDFs already doesn't publish bits `0x20/0x40`. If wanted: add the function to the per-frame rules and set `ps.stats[12]` bits in the race ps publish.

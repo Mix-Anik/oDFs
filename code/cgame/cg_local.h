@@ -534,6 +534,9 @@ typedef struct {
 	int			selectedScore;
 	int			teamScores[2];
 	score_t		scores[MAX_CLIENTS];
+	int			speedAwardUps;			// DeFRaG scoreboard footer: fastest speed this map
+	int			speedAwardClient;		// holder or -1
+	char		speedAwardName[MAX_NAME_LENGTH];
 	qboolean	showScores;
 	qboolean	scoreBoardShowing;
 	int			scoreFadeTime;
@@ -1097,6 +1100,11 @@ extern	vmCvar_t		cg_gibs;
 extern	vmCvar_t		cg_drawTimer;
 extern	vmCvar_t		cg_drawFPS;
 extern	vmCvar_t		df_noTargetPrint;
+extern	vmCvar_t		df_checkpoints;
+extern	vmCvar_t		df_noEndOfRunStats;
+extern	vmCvar_t		df_validityChecks;
+extern	vmCvar_t		df_drawCheckpointEvents;
+extern	vmCvar_t		df_drawCheckpointStats;
 extern	vmCvar_t		cg_drawSnapshot;
 extern	vmCvar_t		cg_draw3dIcons;
 extern	vmCvar_t		cg_drawIcons;
@@ -1283,6 +1291,14 @@ extern  char teamChat2[256];
 void CG_AddLagometerFrameInfo( void );
 void CG_AddLagometerSnapshotInfo( snapshot_t *snap );
 void CG_CenterPrint( const char *str, int y, int charWidth );
+extern int cg_dfOptions;
+const char *CG_DF_FormatTime( int ms );
+void CG_DF_StatsCommand( void );
+void CG_DF_SvinfoReport_f( void );
+void CG_DF_AuthRequest( int token );
+void CG_DF_Reset( void );	// cg_defrag.c
+void CG_DF_SnapshotTransition( const playerState_t *ops, const playerState_t *ps );
+void CG_DF_DrawCheckpointList( void );
 void CG_DrawHead( float x, float y, float w, float h, int clientNum, vec3_t headAngles );
 void CG_DrawActive( stereoFrame_t stereoView );
 float CG_ConvertDistance( float quakeUnits );	// DeFRaG df_unit — see disasm/CGAME/df_unit.md

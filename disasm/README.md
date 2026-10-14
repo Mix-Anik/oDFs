@@ -293,3 +293,4 @@ diverges from vanilla via a `df_promode`-conditional branch that a
 naive hash-only check would not necessarily flag if the branch's two arms
 happened to opcode-match vanilla's single arm (they didn't, in this case —
 `fire_rocket`'s hash did change — but this can't be assumed in general).
+- [scoreboard.md](scoreboard.md) — DeFRaG scores protocol, best-time ranking, speed award (ported)

@@ -65,46 +65,38 @@ CG_ParseScores
 =================
 */
 static void CG_ParseScores( void ) {
-	int		i, powerups;
+	int		i;
 
+	// DeFRaG format (cgame 0x3fb7, disasm/G_CLIENT/scoreboard.md):
+	// scores <n> <speedAwardUps> <speedAwardClient> "<speedAwardName>" { <client> <bestTimeMs> <ping> <followClient> } * n
 	cg.numScores = atoi( CG_Argv( 1 ) );
-	if ( cg.numScores > MAX_CLIENTS ) {
-		cg.numScores = MAX_CLIENTS;
+	if ( cg.numScores < 0 || cg.numScores > MAX_CLIENTS ) {
+		CG_Printf( "DF_SVCmd_ParseScores() failed: number of clients out of range.\n" );
+		cg.numScores = 0;
 	}
 
-	cg.teamScores[0] = atoi( CG_Argv( 2 ) );
-	cg.teamScores[1] = atoi( CG_Argv( 3 ) );
+	cg.speedAwardUps = atoi( CG_Argv( 2 ) );
+	cg.speedAwardClient = atoi( CG_Argv( 3 ) );
+	if ( cg.speedAwardClient < -1 || cg.speedAwardClient >= MAX_CLIENTS ) {
+		CG_Printf( "DF_SVCmd_ParseScores() failed: client number out of range.\n" );
+		cg.speedAwardClient = -1;
+	}
+	Q_strncpyz( cg.speedAwardName, CG_Argv( 4 ), sizeof( cg.speedAwardName ) );
 
 	memset( cg.scores, 0, sizeof( cg.scores ) );
 	for ( i = 0 ; i < cg.numScores ; i++ ) {
-		//
-		cg.scores[i].client = atoi( CG_Argv( i * 14 + 4 ) );
-		cg.scores[i].score = atoi( CG_Argv( i * 14 + 5 ) );
-		cg.scores[i].ping = atoi( CG_Argv( i * 14 + 6 ) );
-		cg.scores[i].time = atoi( CG_Argv( i * 14 + 7 ) );
-		cg.scores[i].scoreFlags = atoi( CG_Argv( i * 14 + 8 ) );
-		powerups = atoi( CG_Argv( i * 14 + 9 ) );
-		cg.scores[i].accuracy = atoi(CG_Argv(i * 14 + 10));
-		cg.scores[i].impressiveCount = atoi(CG_Argv(i * 14 + 11));
-		cg.scores[i].excellentCount = atoi(CG_Argv(i * 14 + 12));
-		cg.scores[i].guantletCount = atoi(CG_Argv(i * 14 + 13));
-		cg.scores[i].defendCount = atoi(CG_Argv(i * 14 + 14));
-		cg.scores[i].assistCount = atoi(CG_Argv(i * 14 + 15));
-		cg.scores[i].perfect = atoi(CG_Argv(i * 14 + 16));
-		cg.scores[i].captures = atoi(CG_Argv(i * 14 + 17));
+		cg.scores[i].client = atoi( CG_Argv( 5 + i * 4 ) );
+		cg.scores[i].score = atoi( CG_Argv( 6 + i * 4 ) );		// best finish time (ms), 0 = none
+		cg.scores[i].ping = atoi( CG_Argv( 7 + i * 4 ) );
+		cg.scores[i].scoreFlags = atoi( CG_Argv( 8 + i * 4 ) );	// follow client or -1
 
 		if ( cg.scores[i].client < 0 || cg.scores[i].client >= MAX_CLIENTS ) {
+			CG_Printf( "DF_SVCmd_ParseScores() failed: client number out of range.\n" );
 			cg.scores[i].client = 0;
 		}
 		cgs.clientinfo[ cg.scores[i].client ].score = cg.scores[i].score;
-		cgs.clientinfo[ cg.scores[i].client ].powerups = powerups;
-
 		cg.scores[i].team = cgs.clientinfo[cg.scores[i].client].team;
 	}
-#ifdef MISSIONPACK
-	CG_SetScoreSelection(NULL);
-#endif
-
 }
 
 /*
@@ -1021,6 +1013,32 @@ static void CG_ServerCommand( void ) {
 				cg.weaponSelect = w;
 			}
 		}
+		return;
+	}
+
+	// DeFRaG dispatcher (cgame 0x3d52, disasm/CGAME/server_commands.md): commands consumed before vanilla handling
+	if ( !strcmp( cmd, "auth_request" ) ) {
+		CG_DF_AuthRequest( atoi( CG_Argv(1) ) );
+		return;
+	}
+	if ( !strcmp( cmd, "chkpt" ) ) {
+		// server-sent checkpoint text, shown like the local checkpoint popup
+		if ( df_drawCheckpointEvents.integer ) {
+			CG_CenterPrint( CG_Argv(1), 200, 10 );
+		}
+		return;
+	}
+	if ( !strcmp( cmd, "df_options" ) ) {
+		cg_dfOptions = atoi( CG_Argv(1) );
+		return;
+	}
+	// the legacy rec/newTime/exec/bestTime/ckpt commands are swallowed
+	if ( !strcmp( cmd, "stats" ) ) {
+		CG_DF_StatsCommand();
+		return;
+	}
+	if ( !strcmp( cmd, "rec" ) || !strcmp( cmd, "newTime" ) || !strcmp( cmd, "exec" )
+		|| !strcmp( cmd, "bestTime" ) || !strcmp( cmd, "ckpt" ) ) {
 		return;
 	}
 

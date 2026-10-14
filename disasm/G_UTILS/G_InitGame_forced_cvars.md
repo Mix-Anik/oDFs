@@ -26,3 +26,5 @@ Then it lowercases `mapname` (`0x420b`, `func_0xaadf`) into a buffer and loops (
 Not ported: forcing these overrides the server operator's config on each map load (physics/timescale/dmflags/sv_pure). oDFs's table defaults already match for `g_speed`,
 `g_gravity`, `g_knockback`, `g_quadfactor`, `g_weaponrespawn`; the only default that differs is `g_weaponTeamRespawn` (30 vs 5, irrelevant outside team modes).
 Candidate for a future decision if exact DeFRaG parity (anti-cheat style forcing) is wanted.
+
+**Iter 5 (full-port loop): PORTED opt-in** in `G_InitGame` (g_main.c): `df_forceCvars 1` (default 0, no behaviour change unless enabled) forces the 11 cvars above on every level load. `defrag_bspcrc` not set (cgame bsp-crc check is gated off for oDFs). Revert: set `df_forceCvars 0`. Syntax-checked, untested.

@@ -38,22 +38,24 @@ void DeathmatchScoreboardMessage( gentity_t *ent ) {
 	int			stringlength;
 	int			i, j;
 	gclient_t	*cl;
-	int			numSorted, scoreFlags, accuracy, perfect;
+	int			numSorted;
 
 	// don't send scores to bots, they don't parse it
 	if ( ent->r.svFlags & SVF_BOT ) {
 		return;
 	}
 
-	// send the latest information on all clients
+	// DeFRaG scoreboard protocol (qagame 0x1d880, parsed by cgame DF_SVCmd_ParseScores 0x3fb7):
+	//   scores <n> <speedAwardUps> <speedAwardClient> "<speedAwardName>" { <client> <bestTimeMs> <ping> <followClient> }*n
+	// see disasm/G_CLIENT/scoreboard.md. (Vanilla sent 14 fields per client + team scores.)
 	string[0] = 0;
 	stringlength = 0;
-	scoreFlags = 0;
 
 	numSorted = level.numConnectedClients;
-	
+
 	for (i=0 ; i < numSorted ; i++) {
 		int		ping;
+		int		follow;
 
 		cl = &level.clients[level.sortedClients[i]];
 
@@ -62,26 +64,14 @@ void DeathmatchScoreboardMessage( gentity_t *ent ) {
 		} else {
 			ping = cl->ps.ping < 999 ? cl->ps.ping : 999;
 		}
-
-		if( cl->accuracy_shots ) {
-			accuracy = cl->accuracy_hits * 100 / cl->accuracy_shots;
+		if ( cl->sess.sessionTeam == TEAM_SPECTATOR && cl->sess.spectatorState == SPECTATOR_FOLLOW ) {
+			follow = cl->sess.spectatorClient;
+		} else {
+			follow = -1;
 		}
-		else {
-			accuracy = 0;
-		}
-		perfect = ( cl->ps.persistant[PERS_RANK] == 0 && cl->ps.persistant[PERS_KILLED] == 0 ) ? 1 : 0;
 
-		Com_sprintf (entry, sizeof(entry),
-			" %i %i %i %i %i %i %i %i %i %i %i %i %i %i", level.sortedClients[i],
-			cl->ps.persistant[PERS_SCORE], ping, (level.time - cl->pers.enterTime)/60000,
-			scoreFlags, g_entities[level.sortedClients[i]].s.powerups, accuracy, 
-			cl->ps.persistant[PERS_IMPRESSIVE_COUNT],
-			cl->ps.persistant[PERS_EXCELLENT_COUNT],
-			cl->ps.persistant[PERS_GAUNTLET_FRAG_COUNT], 
-			cl->ps.persistant[PERS_DEFEND_COUNT], 
-			cl->ps.persistant[PERS_ASSIST_COUNT], 
-			perfect,
-			cl->ps.persistant[PERS_CAPTURES]);
+		Com_sprintf (entry, sizeof(entry), " %i %i %i %i", level.sortedClients[i],
+			cl->pers.bestFinishTime, ping, follow );
 		j = strlen(entry);
 		if (stringlength + j >= sizeof(string))
 			break;
@@ -89,9 +79,8 @@ void DeathmatchScoreboardMessage( gentity_t *ent ) {
 		stringlength += j;
 	}
 
-	trap_SendServerCommand( ent-g_entities, va("scores %i %i %i%s", i, 
-		level.teamScores[TEAM_RED], level.teamScores[TEAM_BLUE],
-		string ) );
+	trap_SendServerCommand( ent-g_entities, va("scores %i %i %i \"%s\"%s", i,
+		g_speedAwardValue, g_speedAwardClient, g_speedAwardName, string ) );
 }
 
 
@@ -1307,6 +1296,253 @@ static const char *gameNames[] = {
 	"Harvester"
 };
 
+
+/*
+==================
+DeFRaG vote system (func_0x3142 callvote/cv, CheckVote 0x33dc), see disasm/G_CLIENT/callvote.md
+
+Active on dedicated/variant servers (g_dfVariant) while df_vote_system is non-zero; otherwise the vanilla vote code runs.
+level.voteTime holds the vote DEADLINE here (df_vote_voteDelay seconds after the call).
+Not ported: the gametype and kill_OBs commands (gametype name switch and df_ob_KillOBs consumer undecoded/absent).
+==================
+*/
+qboolean G_DFVotesActive( void ) {
+	return ( g_dfVariant && df_vote_system.integer ) ? qtrue : qfalse;
+}
+
+typedef struct {
+	const char	*name;
+	const char	*format;		// executed command for commands without a validator
+	const char	*allowCvar;
+	int			needsArg;
+	const char	*usage;
+} dfVoteCmd_t;
+
+static const dfVoteCmd_t dfVoteCmds[] = {
+	{ "map",          "",                  "df_vote_allow_map",          1, "usage: map <map name> - changes the map.\n" },
+	{ "devmap",       "",                  "df_vote_allow_devmap",       1, "usage: devmap <map name> - changes the map with cheats enabled.\n" },
+	{ "map_restart",  "map_restart 3",     "df_vote_allow_map_restart",  0, "" },
+	{ "nextmap",      "vstr nextmap",      "df_vote_allow_nextmap",      0, "" },
+	{ "promode",      "",                  "df_vote_allow_promode",      1, "usage: promode <n> - 0: vq3, 1: cpm.\n" },
+	{ "mode",         "",                  "df_vote_allow_mode",         1, "usage: mode <n> - changes the game mode.\n" },
+	{ "kick",         "",                  "df_vote_allow_kick",         1, "usage: kick <player name> - kicks the specified player.\n" },
+	{ "clientkick",   "",                  "df_vote_allow_clientkick",   1, "usage: clientkick <client num> - kicks the specified client.\n" },
+	{ "interference", "",                  "df_vote_allow_interference", 1,
+	  "usage: interference <n> - changes how players interact with one another.\n  0: full interaction\n  1: interaction only with missiles\n  2: interaction except for missiles\n  3: no interaction\n" },
+};
+#define NUM_DFVOTECMDS ( sizeof( dfVoteCmds ) / sizeof( dfVoteCmds[0] ) )
+
+static const char *dfInterferenceNames[4] = {
+	"full interaction", "interaction only with missiles", "interaction except for missiles", "no interaction"
+};
+
+void G_RegisterVoteCvars( void ) {
+	int i;
+
+	trap_Cvar_Register( NULL, "df_vote_allowVotes",      "1",  CVAR_ARCHIVE );
+	trap_Cvar_Register( NULL, "df_vote_passVoteOnRatio", ".6", CVAR_ARCHIVE );
+	trap_Cvar_Register( NULL, "df_vote_maxVotes",        "5",  CVAR_ARCHIVE );
+	trap_Cvar_Register( NULL, "df_vote_voteDelay",       "30", CVAR_ARCHIVE );
+	for ( i = 0; i < NUM_DFVOTECMDS; i++ ) {
+		trap_Cvar_Register( NULL, dfVoteCmds[i].allowCvar, !Q_stricmp( dfVoteCmds[i].name, "interference" ) ? "0" : "1", CVAR_ARCHIVE );
+	}
+}
+
+static qboolean G_DFVoteDigit( const char *arg, int lo, int hi, int *out ) {
+	if ( arg[0] < '0' || arg[0] > '9' ) {
+		return qfalse;
+	}
+	*out = atoi( arg );
+	return ( *out >= lo && *out <= hi ) ? qtrue : qfalse;
+}
+
+// validators: on success they fill level.voteString (executed) and level.voteDisplayString (shown)
+static qboolean G_DFVoteValidate( gentity_t *ent, const dfVoteCmd_t *cmd, const char *arg ) {
+	char	s[MAX_STRING_CHARS];
+	int		v, num, i;
+	char	clean[MAX_NETNAME];
+
+	Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "%s %s", cmd->name, arg );
+
+	if ( !Q_stricmp( cmd->name, "map" ) || !Q_stricmp( cmd->name, "devmap" ) ) {
+		fileHandle_t f;
+		if ( trap_FS_FOpenFile( va( "maps/%s.bsp", arg ), &f, FS_READ ) < 0 ) {
+			trap_SendServerCommand( ent - g_entities, "print \"Unknown map.\n\"" );
+			return qfalse;
+		}
+		if ( f ) {
+			trap_FS_FCloseFile( f );
+		}
+		trap_Cvar_VariableStringBuffer( "nextmap", s, sizeof( s ) );
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "%s %s; set nextmap \"%s\"", cmd->name, arg, s );
+		return qtrue;
+	}
+	if ( !Q_stricmp( cmd->name, "nextmap" ) ) {
+		trap_Cvar_VariableStringBuffer( "nextmap", s, sizeof( s ) );
+		if ( !s[0] ) {
+			trap_SendServerCommand( ent - g_entities, "print \"Nextmap not set.\n\"" );
+			return qfalse;
+		}
+	}
+	if ( !Q_stricmp( cmd->name, "promode" ) ) {
+		if ( !G_DFVoteDigit( arg, 0, 1, &v ) ) {
+			return qfalse;
+		}
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "df_promode %i; map_restart 3", v );
+		return qtrue;
+	}
+	if ( !Q_stricmp( cmd->name, "mode" ) ) {
+		if ( !G_DFVoteDigit( arg, 1, 7, &v ) ) {
+			return qfalse;
+		}
+		if ( g_dfMode == 2 ) {
+			Com_sprintf( level.voteString, sizeof( level.voteString ), "df_mode_tricksmode %i; map_restart 3", v );
+		} else if ( g_dfMode == 3 ) {
+			Com_sprintf( level.voteString, sizeof( level.voteString ), "df_mode_fastcaps %i; map_restart 3", v );
+		} else {
+			trap_SendServerCommand( ent - g_entities, "print \"Game modes don't apply to the current gametype.\n\"" );
+			return qfalse;
+		}
+		return qtrue;
+	}
+	if ( !Q_stricmp( cmd->name, "kick" ) || !Q_stricmp( cmd->name, "clientkick" ) ) {
+		qboolean byName = !Q_stricmp( cmd->name, "kick" );
+
+		num = -1;
+		if ( byName ) {
+			for ( i = 0; i < level.maxclients; i++ ) {
+				if ( level.clients[i].pers.connected == CON_DISCONNECTED ) {
+					continue;
+				}
+				Q_strncpyz( clean, level.clients[i].pers.netname, sizeof( clean ) );
+				Q_CleanStr( clean );
+				if ( !Q_stricmp( arg, level.clients[i].pers.netname ) || !Q_stricmp( arg, clean ) ) {
+					num = i;
+					break;
+				}
+			}
+			if ( num < 0 ) {
+				trap_SendServerCommand( ent - g_entities, "print \"Unknown player.\n\"" );
+				return qfalse;
+			}
+		} else if ( !G_DFVoteDigit( arg, 0, 63, &num ) ) {
+			trap_SendServerCommand( ent - g_entities, "print \"Client num out of range.\n\"" );
+			return qfalse;
+		}
+		if ( level.clients[num].pers.connected != CON_CONNECTED ) {
+			trap_SendServerCommand( ent - g_entities, byName ? "print \"Player not connected.\n\"" : "print \"Not a connected client.\n\"" );
+			return qfalse;
+		}
+		if ( level.clients[num].pers.localClient ) {
+			trap_SendServerCommand( ent - g_entities, "print \"Cannot kick host player.\n\"" );
+			return qfalse;
+		}
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "clientkick %i", num );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "kick %s", level.clients[num].pers.netname );
+		return qtrue;
+	}
+	if ( !Q_stricmp( cmd->name, "interference" ) ) {
+		if ( !G_DFVoteDigit( arg, 0, 3, &v ) ) {
+			return qfalse;
+		}
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "df_mp_InterferenceOff %i; map_restart 3", v );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "interference %s", dfInterferenceNames[v] );
+		return qtrue;
+	}
+	// map_restart / nextmap: fixed command
+	Com_sprintf( level.voteString, sizeof( level.voteString ), "%s", cmd->format );
+	return qtrue;
+}
+
+void Cmd_DFCallVote_f( gentity_t *ent ) {
+	char	arg1[64], arg2[64], list[MAX_STRING_CHARS];
+	int		i, max, col = 0;
+	const dfVoteCmd_t *cmd = NULL;
+	int		clientNum = ent - g_entities;
+
+	if ( level.voteTime ) {
+		trap_SendServerCommand( clientNum, "print \"A vote is already in progress.\n\"" );
+		return;
+	}
+	if ( !trap_Cvar_VariableIntegerValue( "df_vote_allowVotes" ) ) {
+		trap_SendServerCommand( clientNum, "print \"Voting not allowed here.\n\"" );
+		return;
+	}
+	max = trap_Cvar_VariableIntegerValue( "df_vote_maxVotes" );
+	if ( max && ent->client->pers.voteCount >= max ) {
+		trap_SendServerCommand( clientNum, "print \"You have used up all of your votes.\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg1, sizeof( arg1 ) );
+	trap_Argv( 2, arg2, sizeof( arg2 ) );
+
+	if ( !arg1[0] ) {
+		Q_strncpyz( list, "print \"Available vote commands:^3", sizeof( list ) );
+		for ( i = 0; i < NUM_DFVOTECMDS; i++ ) {
+			if ( !trap_Cvar_VariableIntegerValue( dfVoteCmds[i].allowCvar ) ) {
+				continue;
+			}
+			Q_strcat( list, sizeof( list ), va( col % 3 ? " %-15.15s" : "\n%-15.15s", dfVoteCmds[i].name ) );
+			col++;
+		}
+		Q_strcat( list, sizeof( list ), "^7\n\"" );
+		trap_SendServerCommand( clientNum, list );
+		return;
+	}
+
+	level.voteString[0] = 0;
+	level.voteDisplayString[0] = 0;
+	for ( i = 0; i < level.maxclients; i++ ) {
+		level.clients[i].ps.eFlags &= ~EF_VOTED;
+		level.clients[i].pers.dfVote = 0;
+	}
+
+	// refuse command separators / quotes in the argument (the executed string is built from it)
+	for ( i = 0; arg2[i]; i++ ) {
+		if ( arg2[i] == ';' || arg2[i] == '\n' || arg2[i] == '\r' || arg2[i] == '"' ) {
+			trap_SendServerCommand( clientNum, "print \"Invalid vote string.\n\"" );
+			return;
+		}
+	}
+
+	for ( i = 0; i < NUM_DFVOTECMDS; i++ ) {
+		if ( !Q_stricmp( arg1, dfVoteCmds[i].name ) ) {
+			cmd = &dfVoteCmds[i];
+			break;
+		}
+	}
+	if ( !cmd ) {
+		trap_SendServerCommand( clientNum, "print \"Vote command not recognized.\n\"" );
+		return;
+	}
+	if ( !trap_Cvar_VariableIntegerValue( cmd->allowCvar ) ) {
+		trap_SendServerCommand( clientNum, va( "print \"Vote command ^3%s^7 not allowed here.\n\"", cmd->name ) );
+		return;
+	}
+	if ( cmd->needsArg && !arg2[0] ) {
+		trap_SendServerCommand( clientNum, va( "print \"Missing argument.\n%s\"", cmd->usage ) );
+		return;
+	}
+	if ( !G_DFVoteValidate( ent, cmd, arg2 ) ) {
+		return;
+	}
+
+	level.voteTime = level.time + 1000 * trap_Cvar_VariableIntegerValue( "df_vote_voteDelay" );
+	level.voteExecuteTime = 0;
+	ent->client->ps.eFlags |= EF_VOTED;
+	ent->client->pers.dfVote = 1;
+	ent->client->pers.voteCount++;
+	level.voteYes = 1;
+	level.voteNo = 0;
+
+	trap_SendServerCommand( -1, va( "print \"%s ^7called a vote: %s.\n\"", ent->client->pers.netname, level.voteDisplayString ) );
+	trap_SetConfigstring( CS_VOTE_TIME, va( "%i", level.voteTime ) );
+	trap_SetConfigstring( CS_VOTE_STRING, level.voteDisplayString );
+	trap_SetConfigstring( CS_VOTE_YES, "1" );
+	trap_SetConfigstring( CS_VOTE_NO, "0" );
+}
+
 /*
 ==================
 Cmd_CallVote_f
@@ -1317,6 +1553,11 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 	int		i;
 	char	arg1[MAX_STRING_TOKENS];
 	char	arg2[MAX_STRING_TOKENS];
+
+	if ( G_DFVotesActive() ) {
+		Cmd_DFCallVote_f( ent );
+		return;
+	}
 
 	if ( !g_allowVote.integer ) {
 		trap_SendServerCommand( ent-g_entities, "print \"Voting not allowed here.\n\"" );
@@ -1474,6 +1715,8 @@ void Cmd_Vote_f( gentity_t *ent ) {
 	ent->client->ps.eFlags |= EF_VOTED;
 
 	trap_Argv( 1, msg, sizeof( msg ) );
+
+	ent->client->pers.dfVote = ( tolower( msg[0] ) == 'y' || msg[0] == '1' ) ? 1 : 2;
 
 	if ( tolower( msg[0] ) == 'y' || msg[0] == '1' ) {
 		level.voteYes++;
@@ -1985,6 +2228,10 @@ void ClientCommand( int clientNum ) {
 
 	trap_Argv( 0, cmd, sizeof( cmd ) );
 
+	if ( G_AuthCommand( clientNum, cmd ) ) {	// DeFRaG 0x2d45 pre-dispatch (auth_reply / notify)
+		return;
+	}
+
 	if (Q_stricmp (cmd, "say") == 0) {
 		Cmd_Say_f (ent, SAY_ALL, qfalse);
 		return;
@@ -2062,7 +2309,7 @@ void ClientCommand( int clientNum ) {
 		Cmd_Team_f (ent);
 	else if (Q_stricmp (cmd, "where") == 0)
 		Cmd_Where_f (ent);
-	else if (Q_stricmp (cmd, "callvote") == 0)
+	else if (Q_stricmp (cmd, "callvote") == 0 || Q_stricmp (cmd, "cv") == 0)
 		Cmd_CallVote_f (ent);
 	else if (Q_stricmp (cmd, "vote") == 0)
 		Cmd_Vote_f (ent);
