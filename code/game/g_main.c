@@ -108,6 +108,7 @@ vmCvar_t	df_auth;
 vmCvar_t	df_vote_system;
 vmCvar_t	df_forceCvars;
 vmCvar_t	df_enforceSvFps;
+vmCvar_t	df_lockPromode;
 vmCvar_t	df_sv_script_idleCfg;
 vmCvar_t	df_sv_script_idleDelay;
 vmCvar_t	df_mp_InterferenceOff;
@@ -249,10 +250,18 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_killWallbug,        "g_killWallbug",        "1",    CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
 	{ &df_dbg_1mstimer,      "df_dbg_1mstimer",      "0",    0, 0, qfalse },
 	{ &df_enforceSvFps,      "df_enforceSvFps",      "0",    CVAR_ARCHIVE, 0, qfalse },
+	// info-key cvars from the DeFRaG table (G_UTILS/cvar_table.md), flags as decoded; consumers: df_competition has none in qagame
+	{ NULL,                  "df_competition",       "",     CVAR_SERVERINFO | CVAR_LATCH, 0, qfalse },
+	{ NULL,                  "o3j_version",          "1016", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ROM | CVAR_CHEAT, 0, qfalse },
+	{ NULL,                  "defrag_obs",           "",     CVAR_SYSTEMINFO | CVAR_LATCH | CVAR_ROM, 0, qfalse },
+	{ &df_lockPromode,      "df_lockPromode",       "0",    CVAR_ARCHIVE, 0, qfalse },
+	// not CVAR_ROM: the stock engine rejects trap_Cvar_Set on ROM cvars (DeFRaG's engine allows it)
+	{ NULL,                  "defrag_svfps",         "0",    CVAR_SYSTEMINFO, 0, qfalse },
+	{ NULL,                  "defrag_clfps",         "0",    CVAR_SYSTEMINFO, 0, qfalse },
 	{ &df_sv_script_idleCfg, "df_sv_script_idleCfg", "",     CVAR_ARCHIVE, 0, qfalse },
 	{ &df_sv_script_idleDelay, "df_sv_script_idleDelay", "50", CVAR_ARCHIVE, 0, qfalse },
 	{ &df_forceCvars,        "df_forceCvars",        "0",    CVAR_ARCHIVE, 0, qfalse },
-	{ &df_vote_system,       "df_vote_system",       "1",    CVAR_ARCHIVE, 0, qfalse },
+	{ &df_vote_system,       "df_vote_system",       "1",    CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qfalse },
 	{ &df_auth,              "df_auth",              "0",    CVAR_ARCHIVE, 0, qfalse },
 	{ &df_clockCheck,        "df_clockCheck",        "1",    0, 0, qfalse },
 	{ &df_mp_InterferenceOff, "df_mp_InterferenceOff", "3",   CVAR_SYSTEMINFO | CVAR_LATCH, 0, qfalse },

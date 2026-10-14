@@ -500,6 +500,24 @@ static consoleCommand_t	commands[] = {
 #endif
 	{ "startOrbit", CG_StartOrbit_f },
 	{ "svinfo_report", CG_DF_SvinfoReport_f },
+	{ "svinfo_summary", CG_DF_SvinfoSummary_f },
+	{ "replay", CG_DF_Replay_f },
+	{ "varMath", CG_DF_VarMath_f },
+	{ "info", CG_DF_Info_f },
+	{ "help", CG_DF_Help_f },
+	{ "commands", CG_DF_Help_f },
+	{ "?", CG_DF_Help_f },
+	{ "read", CG_DF_Read_f },
+	{ "df_ndm_timer_aliases", CG_DF_TimerAliases_f },
+	{ "savepos", CG_DF_SavePos_f },
+	{ "displaymessage", CG_DF_DisplayMessage_f },
+	{ "resetjumpmeter", CG_DF_ResetJumpMeter_f },
+	{ "varCommand", CG_DF_VarCommand_f },
+	{ "varCycle", CG_DF_VarCycle_f },
+	{ "varCycleOnce", CG_DF_VarCycleOnce_f },
+	{ "varJoin", CG_DF_VarJoin_f },
+	{ "varFormat", CG_DF_VarFormat_f },
+	{ "varSave", CG_DF_VarSave_f },
 	//{ "camera", CG_Camera_f },
 	{ "loaddeferred", CG_LoadDeferredPlayers }	
 };
@@ -579,6 +597,23 @@ void CG_InitConsoleCommands( void ) {
 	trap_AddCommand ("callteamvote");
 	trap_AddCommand ("teamvote");
 	trap_AddCommand ("stats");
+	trap_AddCommand ("varMath");
+	trap_AddCommand ("svinfo_summary");
+	trap_AddCommand ("replay");
+	trap_AddCommand ("info");
+	trap_AddCommand ("help");
+	trap_AddCommand ("commands");
+	trap_AddCommand ("read");
+	trap_AddCommand ("df_ndm_timer_aliases");
+	trap_AddCommand ("savepos");
+	trap_AddCommand ("displaymessage");
+	trap_AddCommand ("resetjumpmeter");
+	trap_AddCommand ("varCommand");
+	trap_AddCommand ("varCycle");
+	trap_AddCommand ("varCycleOnce");
+	trap_AddCommand ("varJoin");
+	trap_AddCommand ("varFormat");
+	trap_AddCommand ("varSave");
 	trap_AddCommand ("teamtask");
 	trap_AddCommand ("loaddefered");	// spelled wrong, but not changing for demo
 }

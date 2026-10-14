@@ -1303,7 +1303,7 @@ DeFRaG vote system (func_0x3142 callvote/cv, CheckVote 0x33dc), see disasm/G_CLI
 
 Active on dedicated/variant servers (g_dfVariant) while df_vote_system is non-zero; otherwise the vanilla vote code runs.
 level.voteTime holds the vote DEADLINE here (df_vote_voteDelay seconds after the call).
-Not ported: the gametype and kill_OBs commands (gametype name switch and df_ob_KillOBs consumer undecoded/absent).
+gametype ported (iter 28, df_vote_allow_gametype default 0). kill_OBs ported iter 29 (consumer already existed: pm.obs_disabled = df_ob_killobs).
 ==================
 */
 qboolean G_DFVotesActive( void ) {
@@ -1324,6 +1324,8 @@ static const dfVoteCmd_t dfVoteCmds[] = {
 	{ "map_restart",  "map_restart 3",     "df_vote_allow_map_restart",  0, "" },
 	{ "nextmap",      "vstr nextmap",      "df_vote_allow_nextmap",      0, "" },
 	{ "promode",      "",                  "df_vote_allow_promode",      1, "usage: promode <n> - 0: vq3, 1: cpm.\n" },
+	{ "gametype",     "",                  "df_vote_allow_gametype",     1, "usage: gametype <n> - 1: Defrag, 2: Tricks Mode, 3: Fast Caps.\n" },
+	{ "kill_OBs",    "",                  "df_vote_allow_killobs",      1, "usage: kill_OBs <0|1> - 1 disables overbounces.\n" },
 	{ "mode",         "",                  "df_vote_allow_mode",         1, "usage: mode <n> - changes the game mode.\n" },
 	{ "kick",         "",                  "df_vote_allow_kick",         1, "usage: kick <player name> - kicks the specified player.\n" },
 	{ "clientkick",   "",                  "df_vote_allow_clientkick",   1, "usage: clientkick <client num> - kicks the specified client.\n" },
@@ -1331,6 +1333,11 @@ static const dfVoteCmd_t dfVoteCmds[] = {
 	  "usage: interference <n> - changes how players interact with one another.\n  0: full interaction\n  1: interaction only with missiles\n  2: interaction except for missiles\n  3: no interaction\n" },
 };
 #define NUM_DFVOTECMDS ( sizeof( dfVoteCmds ) / sizeof( dfVoteCmds[0] ) )
+
+// data table 0x8c0 (indices 0..7; 8.. are the short names df/tm/fc/mp..)
+static const char *dfGametypeNames[8] = {
+	"Auto-config mode", "Defrag", "Tricks Mode", "Fast Caps", "Reserved", "MP Defrag", "MP Tricks Mode", "MP Fast Caps"
+};
 
 static const char *dfInterferenceNames[4] = {
 	"full interaction", "interaction only with missiles", "interaction except for missiles", "no interaction"
@@ -1344,7 +1351,7 @@ void G_RegisterVoteCvars( void ) {
 	trap_Cvar_Register( NULL, "df_vote_maxVotes",        "5",  CVAR_ARCHIVE );
 	trap_Cvar_Register( NULL, "df_vote_voteDelay",       "30", CVAR_ARCHIVE );
 	for ( i = 0; i < NUM_DFVOTECMDS; i++ ) {
-		trap_Cvar_Register( NULL, dfVoteCmds[i].allowCvar, !Q_stricmp( dfVoteCmds[i].name, "interference" ) ? "0" : "1", CVAR_ARCHIVE );
+		trap_Cvar_Register( NULL, dfVoteCmds[i].allowCvar, ( !Q_stricmp( dfVoteCmds[i].name, "interference" ) || !Q_stricmp( dfVoteCmds[i].name, "gametype" ) ) ? "0" : "1", CVAR_ARCHIVE );
 	}
 }
 
@@ -1389,6 +1396,23 @@ static qboolean G_DFVoteValidate( gentity_t *ent, const dfVoteCmd_t *cmd, const 
 			return qfalse;
 		}
 		Com_sprintf( level.voteString, sizeof( level.voteString ), "df_promode %i; map_restart 3", v );
+		return qtrue;
+	}
+	if ( !Q_stricmp( cmd->name, "gametype" ) ) {
+		// validator 0x2ee7: digit 1..3, display name from the string table at data 0x8c0 (index = value)
+		if ( !G_DFVoteDigit( arg, 1, 3, &v ) ) {
+			return qfalse;
+		}
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "df_gametype %i; map_restart 3", v );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "gametype %s", dfGametypeNames[v] );
+		return qtrue;
+	}
+	if ( !Q_stricmp( cmd->name, "kill_OBs" ) ) {
+		// validator 0x3107: digit 0..1 (display stays the default "kill_OBs <arg>")
+		if ( !G_DFVoteDigit( arg, 0, 1, &v ) ) {
+			return qfalse;
+		}
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "df_ob_killobs %i; map_restart 3", v );
 		return qtrue;
 	}
 	if ( !Q_stricmp( cmd->name, "mode" ) ) {

@@ -5749,7 +5749,40 @@ vmCvar_t	ui_realCaptureLimit;
 vmCvar_t	ui_realWarmUp;
 vmCvar_t	ui_serverStatusTimeOut;
 
+// DeFRaG ui cvars (ui.dis table 0x30.., see disasm/UI/ui_cvar_table.md); registered with DeFRaG's defaults, the menu code that consumes them is not ported
+vmCvar_t	df_demos_UICompatibility;
+vmCvar_t	df_demos_CurrentPath;
+vmCvar_t	df_demos_CurrentListVars;
+vmCvar_t	df_ui_CustomMenu;
+vmCvar_t	df_ui_DisplayCVarName;
+vmCvar_t	df_ui_TextColorLabel;
+vmCvar_t	df_ui_TextColorValue;
+vmCvar_t	df_ui_TextColorMedium;
+vmCvar_t	df_ui_TextColorBig;
+vmCvar_t	df_ui_TextColorDisabled;
+vmCvar_t	df_ui_TextColorHighlight;
+vmCvar_t	df_ui_PulseColor;
+vmCvar_t	df_ui_ListbarColor;
+vmCvar_t	df_ui_StatusColor;
+vmCvar_t	df_ui_CursorColor;
+
 static cvarTable_t		cvarTable[] = {
+	// DeFRaG additions
+	{ &df_demos_UICompatibility, "df_demos_UICompatibility", "1", CVAR_ARCHIVE },
+	{ &df_demos_CurrentPath, "df_demos_CurrentPath", "", CVAR_TEMP },
+	{ &df_demos_CurrentListVars, "df_demos_CurrentListVars", "0 0", CVAR_TEMP },
+	{ &df_ui_CustomMenu, "df_ui_CustomMenu", "2", CVAR_ARCHIVE },
+	{ &df_ui_DisplayCVarName, "df_ui_DisplayCVarName", "1", CVAR_ARCHIVE },
+	{ &df_ui_TextColorLabel, "df_ui_TextColorLabel", "1.00 1.00 0.00 1.00", CVAR_ARCHIVE },
+	{ &df_ui_TextColorValue, "df_ui_TextColorValue", "1.00 0.00 0.00 1.00", CVAR_ARCHIVE },
+	{ &df_ui_TextColorMedium, "df_ui_TextColorMedium", "0.00 0.00 1.00 1.00", CVAR_ARCHIVE },
+	{ &df_ui_TextColorBig, "df_ui_TextColorBig", "1.00 0.00 0.00 1.00", CVAR_ARCHIVE },
+	{ &df_ui_TextColorDisabled, "df_ui_TextColorDisabled", "0.50 0.50 0.50 1.00", CVAR_ARCHIVE },
+	{ &df_ui_TextColorHighlight, "df_ui_TextColorHighlight", "1.00 1.00 0.00 1.00", CVAR_ARCHIVE },
+	{ &df_ui_PulseColor, "df_ui_PulseColor", "1.00 1.00 1.00 1.00", CVAR_ARCHIVE },
+	{ &df_ui_ListbarColor, "df_ui_ListbarColor", "1.00 0.00 0.00 0.30", CVAR_ARCHIVE },
+	{ &df_ui_StatusColor, "df_ui_StatusColor", "1.00 1.00 1.00 1.00", CVAR_ARCHIVE },
+	{ &df_ui_CursorColor, "df_ui_CursorColor", "0.50 0.80 1.00 1.00", CVAR_ARCHIVE },
 	{ &ui_ffa_fraglimit, "ui_ffa_fraglimit", "20", CVAR_ARCHIVE },
 	{ &ui_ffa_timelimit, "ui_ffa_timelimit", "0", CVAR_ARCHIVE },
 

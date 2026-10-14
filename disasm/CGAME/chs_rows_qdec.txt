@@ -1,0 +1,1773 @@
+enter 0x968
+c323  l90 = 1219668
+c326  ld8 = 1219796
+c32d  t1 = fn_782f(l974, 45496)
+c335  t2 = fn_782f(l978, 45496)
+c33d  t3 = fn_782f(l97c, 45496)
+c342  if (l970 != 0) goto Lc345
+c344  goto Lf330
+Lc345:
+c34b  t4 = fn_782f(l90, 45496)
+c353  t5 = fn_782f(ld8, 45496)
+c357  l114 = 0
+c35b  l110 = l114
+c35f  l10c = l114
+c363  lf8 = l114
+c367  le4 = l114
+c36b  ld4 = l114
+c36f  l68 = l114
+c372  l118 = 0
+c376  lfc = l118
+c37a  lec = l118
+c37e  le8 = l118
+c382  l60 = l118
+c386  l58 = l118
+c38a  l3c = l118
+c38d  l50 = 1219924
+c390  l94 = 1219956
+c393  l54 = 1219962
+c396  l40 = 1219968
+c39d  t6 = fn_782f(l50, 45496)
+c3a5  t7 = fn_782f(l94, 45496)
+c3ad  t8 = fn_782f(l54, 45496)
+c3b5  t9 = fn_782f(l40, 45496)
+c3b9  l11c = 0
+c3bd  le0 = l11c
+c3c1  l64 = l11c
+c3c8  l5c = (l970 / *(6500))
+c3cf  ld0 = (l970 % *(6500))
+c3d4  if (l5c <= *(6504)) goto Lc3d9
+c3d8  l5c = *(6504)
+Lc3d9:
+c3dc  if (l5c <= 0) goto Lc3e0
+c3df  le0 = 1
+Lc3e0:
+c3e6  t10 = fn_782f(l94, 45492)
+c3ea  l64 = 0
+c3ec  goto Lc3f7
+c3f6  l64 = (l64 + (l5c + le0))
+Lc3f7:
+c403  t11 = fn_782f(l54, 45483, l64, l5c)
+c407  l64 = 4
+c409  goto Lc414
+c413  l64 = (l64 + (l5c + le0))
+Lc414:
+c420  t12 = fn_782f(l40, 45483, l64, l5c)
+c425  if (*(1218660) != 0) goto Lc43a
+c42b  memcpy(&l6c, (*(851180) + 64), 0xc)
+c431  memcpy(&l78, (*(851180) + 76), 0xc)
+c437  memcpy(&l84, (*(851180) + 196), 0xc)
+c439  goto Lc443
+Lc43a:
+c43c  memcpy(&l6c, 958800, 0xc)
+c43f  memcpy(&l78, 958812, 0xc)
+c442  memcpy(&l84, 958932, 0xc)
+Lc443:
+c447  t13 = fn_13e70(&lf4)
+c448  l120 = t13
+c44c  lf0 = l120
+c454  ldc = ((313712 * lf4) + 1221300)
+c458  if (lf0 == 0) goto Lc46d
+c45f  t14 = fn_13eb1(ldc, &l78)
+c466  memcpy(&l6c, (ldc + 312928), 0xc)
+c46c  memcpy(&l84, (ldc + 312940), 0xc)
+Lc46d:
+c470  if (ld0 == 900) goto Lf2ee
+c473  l128 = 901
+c478  if (ld0 == l128) goto Lf2f8
+c47d  if (ld0 > l128) goto Lc48e
+c481  if (ld0 < 0) goto Lc494
+c485  if (ld0 > 330) goto Lc494
+c48d  goto *(((ld0 << 2) + 6896))
+Lc48e:
+c491  if (ld0 == 999) goto Lf31c
+c493  goto Lc494
+Lc494:
+c49a  t15 = fn_782f(l974, 45496)
+c4a2  t16 = fn_782f(l978, 45496)
+c4aa  t17 = fn_782f(l97c, 45496)
+c4ad  goto Lf330
+c4b4  t18 = fn_782f(l974, 45477)
+c4b9  l130 = l78
+c4c6  l3c = ((l130 *f l130) +f (l7c *f l7c))
+c4cc  t19 = trap106(l3c)
+c4cd  l134 = t19
+c4d1  l3c = l134
+c4dc  t20 = fn_782f(l978, l54, l3c)
+c4e0  t21 = fn_41b6()
+c4e1  l138 = t21
+c4e9  t22 = fn_782f(l978, l138)
+c4ec  goto Lf330
+c4f3  t23 = fn_782f(l974, 45470)
+c4fb  l68 = *((*(851180) + 228))
+c505  t24 = fn_782f(l978, 45467, l68)
+c508  goto Lf330
+c50f  t25 = fn_782f(l974, 45461)
+c517  l68 = *((*(851180) + 240))
+c521  t26 = fn_782f(l978, 45467, l68)
+c524  goto Lf330
+c52b  t27 = fn_782f(l974, 45456)
+c53b  l68 = *(((*((*(851180) + 188)) << 2) + (*(851180) + 420)))
+c545  t28 = fn_782f(l978, 45467, l68)
+c548  goto Lf330
+c552  t29 = fn_782f(l974, 45451, l980)
+c55a  l68 = *((*(851180) + 228))
+c561  ld4 = *((*(851180) + 240))
+c571  t30 = fn_782f(l978, 45444, l68, l980, ld4)
+c574  goto Lf330
+c57d  l130 = l980
+c585  t31 = fn_782f(l974, 45436, l130, l130)
+c58d  l68 = *((*(851180) + 228))
+c594  ld4 = *((*(851180) + 240))
+c5a3  le4 = *(((*((*(851180) + 188)) << 2) + (*(851180) + 420)))
+c5af  l134 = l980
+c5bd  t32 = fn_782f(l978, 45425, l68, l134, ld4, l134, le4)
+c5c0  goto Lf330
+c5c7  t33 = fn_782f(l974, 45417)
+c5d0  t34 = fn_8444(&l98, &l6c, &l84)
+c5d8  l44 = (la4 -f l6c)
+c5df  l48 = (la8 -f l70)
+c5e6  l4c = (lac -f l74)
+c5eb  t35 = fn_825f(&l44)
+c5ec  l130 = t35
+c5f0  l3c = l130
+c5fb  t36 = fn_782f(l978, l54, l3c)
+c5fe  goto Lf330
+c605  t37 = fn_782f(l974, 45410)
+c60e  t38 = fn_8444(&l98, &l6c, &l84)
+c616  l44 = (la4 -f l6c)
+c61d  l48 = (la8 -f l70)
+c624  l4c = (lac -f l74)
+c628  l3c = l4c
+c633  t39 = fn_782f(l978, l54, l3c)
+c636  goto Lf330
+c63d  t40 = fn_782f(l974, 45401)
+c646  t41 = fn_8444(&l98, &l6c, &l84)
+c64e  l44 = (la4 -f l6c)
+c655  l48 = (la8 -f l70)
+c65c  l4c = (lac -f l74)
+c661  t42 = fn_3086a(&l44)
+c662  l130 = t42
+c666  l3c = l130
+c671  t43 = fn_782f(l978, l54, l3c)
+c674  goto Lf330
+c67b  t44 = fn_782f(l974, 45388)
+c67f  memcpy(&l130, &l6c, 0xc)
+c68a  l138 = (l138 +f f(*((*(851180) + 208))))
+c692  t45 = fn_83e3(&l98, &l130, &l84)
+c69a  l44 = (la4 -f l130)
+c6a1  l48 = (la8 -f l134)
+c6a8  l4c = (lac -f l138)
+c6ad  t46 = fn_3086a(&l44)
+c6ae  l13c = t46
+c6b2  l3c = l13c
+c6bd  t47 = fn_782f(l978, l54, l3c)
+c6c0  goto Lf330
+c6c9  l130 = l980
+c6d1  t48 = fn_782f(l974, 45372, l130, l130)
+c6da  t49 = fn_8444(&l98, &l6c, &l84)
+c6e2  l44 = (la4 -f l6c)
+c6e9  l48 = (la8 -f l70)
+c6f0  l4c = (lac -f l74)
+c6f5  t50 = fn_825f(&l44)
+c6f6  l134 = t50
+c6fa  l3c = l134
+c6fe  l58 = l4c
+c703  t51 = fn_3086a(&l44)
+c704  l138 = t51
+c708  l60 = l138
+c714  l140 = l980
+c722  t52 = fn_782f(l50, 45361, l40, l140, l40, l140, l40)
+c734  t53 = fn_782f(l978, l50, l3c, l58, l60)
+c737  goto Lf330
+c740  l13c = l980
+c748  t54 = fn_782f(l974, 45341, l13c, l13c)
+c751  t55 = fn_8444(&l98, &l6c, &l84)
+c759  l44 = (la4 -f l6c)
+c760  l48 = (la8 -f l70)
+c767  l4c = (lac -f l74)
+c76c  t56 = fn_825f(&l44)
+c76d  l140 = t56
+c771  l3c = l140
+c775  l58 = l4c
+c778  memcpy(&l130, &l6c, 0xc)
+c783  l138 = (l138 +f f(*((*(851180) + 208))))
+c78b  t57 = fn_83e3(&l98, &l130, &l84)
+c793  l44 = (la4 -f l130)
+c79a  l48 = (la8 -f l134)
+c7a1  l4c = (lac -f l138)
+c7a6  t58 = fn_3086a(&l44)
+c7a7  l144 = t58
+c7ab  l60 = l144
+c7b7  l14c = l980
+c7c5  t59 = fn_782f(l50, 45361, l40, l14c, l40, l14c, l40)
+c7d7  t60 = fn_782f(l978, l50, l3c, l58, l60)
+c7da  goto Lf330
+c7e1  t61 = fn_782f(l974, 45332)
+c7ea  t62 = fn_8444(&l98, &l6c, &l84)
+c7ef  l3c = la4
+c7f3  l58 = la8
+c7f7  l60 = lac
+c807  t63 = fn_782f(l50, 45321, l40, l40, l40)
+c819  t64 = fn_782f(l978, l50, l3c, l58, l60)
+c81c  goto Lf330
+c823  t65 = fn_782f(l974, 45313)
+c828  l3c = l78
+c833  t66 = fn_782f(l978, l54, l3c)
+c836  goto Lf330
+c83d  t67 = fn_782f(l974, 45305)
+c842  l3c = l7c
+c84d  t68 = fn_782f(l978, l54, l3c)
+c850  goto Lf330
+c857  t69 = fn_782f(l974, 45297)
+c85c  l3c = l80
+c867  t70 = fn_782f(l978, l54, l3c)
+c86a  goto Lf330
+c871  t71 = fn_782f(l974, 45288)
+c876  l130 = l78
+c885  t72 = trap106(((l130 *f l130) +f (l7c *f l7c)))
+c886  l134 = t72
+c88a  l3c = l134
+c895  t73 = fn_782f(l978, l54, l3c)
+c898  goto Lf330
+c89f  t74 = fn_782f(l974, 45278)
+c8a4  l130 = l78
+c8b9  t75 = trap106((((l130 *f l130) +f (l7c *f l7c)) +f (l80 *f l80)))
+c8ba  l134 = t75
+c8be  l3c = l134
+c8c9  t76 = fn_782f(l978, l54, l3c)
+c8cc  goto Lf330
+c8d3  t77 = fn_782f(l974, 45270)
+c8db  l130 = 0
+c8e3  t78 = fn_31c8d(&l84, &l44, l130, l130)
+c8e7  l4c = 0
+c8eb  t79 = fn_31819(&l44)
+c8f9  l3c = ((l78 *f l44) +f (l7c *f l48))
+c904  t80 = fn_782f(l978, l54, l3c)
+c907  goto Lf330
+c90e  t81 = fn_782f(l974, 45262)
+c914  l130 = 0
+c91e  t82 = fn_31c8d(&l84, l130, &l44, l130)
+c922  l4c = 0
+c926  t83 = fn_31819(&l44)
+c934  l3c = ((l78 *f l44) +f (l7c *f l48))
+c93b  t84 = fn_782f(l90, 46859)
+c943  t85 = fn_782f(ld8, 46859)
+c948  if (l3c >=f 0) goto Lc951
+c94f  t86 = fn_782f(l90, 45260)
+Lc951:
+c954  if (l3c <=f 0) goto Lc95d
+c95b  t87 = fn_782f(ld8, 45258)
+Lc95d:
+c96c  t88 = fn_782f(l50, 45251, l94, l54, l94)
+c973  t89 = fn_2f6c7(l3c)
+c974  l138 = t89
+c985  t90 = fn_782f(l978, l50, l90, l138, ld8)
+c988  goto Lf330
+c992  t91 = fn_782f(l974, 45240, l980)
+c99d  t92 = fn_31c8d(&l84, &l44, &l100, 0)
+c9a1  l4c = 0
+c9a5  t93 = fn_31819(&l44)
+c9b3  l3c = ((l78 *f l44) +f (l7c *f l48))
+c9b6  l108 = 0
+c9ba  t94 = fn_31819(&l100)
+c9c8  l58 = ((l78 *f l100) +f (l7c *f l104))
+c9cf  t95 = fn_782f(l90, 46859)
+c9d7  t96 = fn_782f(ld8, 46859)
+c9dc  if (l58 >=f 0) goto Lc9e5
+c9e3  t97 = fn_782f(l90, 45260)
+Lc9e5:
+c9e8  if (l58 <=f 0) goto Lc9f1
+c9ef  t98 = fn_782f(ld8, 45258)
+Lc9f1:
+ca06  t99 = fn_782f(l50, 45361, l40, l980, l94, l40, l94)
+ca0d  t100 = fn_2f6c7(l58)
+ca0e  l138 = t100
+ca22  t101 = fn_782f(l978, l50, l3c, l90, l138, ld8)
+ca25  goto Lf330
+ca2e  l130 = l980
+ca36  t102 = fn_782f(l974, 45225, l130, l130)
+ca3b  l134 = l78
+ca48  l3c = ((l134 *f l134) +f (l7c *f l7c))
+ca4e  t103 = trap106(l3c)
+ca4f  l138 = t103
+ca53  l3c = l138
+ca5d  t104 = fn_31c8d(&l84, &l44, &l100, 0)
+ca61  l4c = 0
+ca65  t105 = fn_31819(&l44)
+ca73  l58 = ((l78 *f l44) +f (l7c *f l48))
+ca76  l108 = 0
+ca7a  t106 = fn_31819(&l100)
+ca88  l60 = ((l78 *f l100) +f (l7c *f l104))
+ca8f  t107 = fn_782f(l90, 46859)
+ca97  t108 = fn_782f(ld8, 46859)
+ca9c  if (l60 >=f 0) goto Lcaa5
+caa3  t109 = fn_782f(l90, 45260)
+Lcaa5:
+caa8  if (l60 <=f 0) goto Lcab1
+caaf  t110 = fn_782f(ld8, 45258)
+Lcab1:
+cabc  l140 = l980
+cad0  t111 = fn_782f(l50, 45210, l40, l140, l40, l140, l94, l40, l94)
+cad7  t112 = fn_2f6c7(l60)
+cad8  l148 = t112
+caef  t113 = fn_782f(l978, l50, l3c, l58, l90, l148, ld8)
+caf2  goto Lf330
+caf9  t114 = fn_782f(l974, 45204)
+cafe  l3c = l84
+cb09  t115 = fn_782f(l978, l54, l3c)
+cb0c  goto Lf330
+cb13  t116 = fn_782f(l974, 45200)
+cb18  l3c = l88
+cb23  t117 = fn_782f(l978, l54, l3c)
+cb26  goto Lf330
+cb2d  t118 = fn_782f(l974, 45195)
+cb32  l3c = l8c
+cb3d  t119 = fn_782f(l978, l54, l3c)
+cb40  goto Lf330
+cb47  t120 = fn_782f(l974, 45189)
+cb4c  l3c = l6c
+cb57  t121 = fn_782f(l978, l54, l3c)
+cb5a  goto Lf330
+cb61  t122 = fn_782f(l974, 45183)
+cb66  l3c = l70
+cb71  t123 = fn_782f(l978, l54, l3c)
+cb74  goto Lf330
+cb7b  t124 = fn_782f(l974, 45177)
+cb80  l3c = l74
+cb8b  t125 = fn_782f(l978, l54, l3c)
+cb8e  goto Lf330
+cb95  t126 = fn_782f(l974, 45166)
+cb9a  l3c = *(960212)
+cba5  t127 = fn_782f(l978, l54, l3c)
+cba8  goto Lf330
+cbaf  t128 = fn_782f(l974, 45155)
+cbb4  l3c = *(960216)
+cbbf  t129 = fn_782f(l978, l54, l3c)
+cbc2  goto Lf330
+cbc9  t130 = fn_782f(l974, 45144)
+cbd2  l3c = (*(960220) +f f(*(958944)))
+cbdd  t131 = fn_782f(l978, l54, l3c)
+cbe0  goto Lf330
+cbea  t132 = fn_782f(l974, 45139, l980)
+cbef  l3c = l84
+cbf3  l58 = l88
+cc03  t133 = fn_782f(l50, 45251, l40, l980, l40)
+cc12  t134 = fn_782f(l978, l50, l3c, l58)
+cc15  goto Lf330
+cc1c  t135 = fn_782f(l974, 45135)
+cc21  l3c = l6c
+cc25  l58 = l70
+cc29  l60 = l74
+cc39  t136 = fn_782f(l50, 45321, l40, l40, l40)
+cc4b  t137 = fn_782f(l978, l50, l3c, l58, l60)
+cc4e  goto Lf330
+cc58  t138 = fn_782f(l974, 45126, l980)
+cc5d  l3c = l6c
+cc61  l58 = l70
+cc65  l60 = l74
+cc69  le8 = l84
+cc6d  lec = l88
+cc86  t139 = fn_782f(l50, 45108, l40, l40, l40, l40, l980, l40)
+cc9e  t140 = fn_782f(l978, l50, l3c, l58, l60, le8, lec)
+cca1  goto Lf330
+ccab  t141 = fn_782f(l974, 45094, l980)
+ccb0  l3c = *(960212)
+ccb4  l58 = *(960216)
+ccbc  l60 = (*(960220) +f f(*(958944)))
+ccc0  le8 = *(960556)
+ccc4  lec = *(960560)
+ccdd  t142 = fn_782f(l50, 45108, l40, l40, l40, l40, l980, l40)
+ccf5  t143 = fn_782f(l978, l50, l3c, l58, l60, le8, lec)
+ccf8  goto Lf330
+ccff  t144 = fn_782f(l974, 45079)
+cd04  l3c = l6c
+cd08  l58 = l70
+cd0c  l60 = l74
+cd1c  t145 = fn_782f(l50, 45070, l40, l40, l40)
+cd2e  t146 = fn_782f(l978, l50, l3c, l58, l60)
+cd31  goto Lf330
+cd38  t147 = fn_782f(l974, 45050)
+cd3d  l3c = *(960212)
+cd41  l58 = *(960216)
+cd49  l60 = (*(960220) +f f(*(958944)))
+cd59  t148 = fn_782f(l50, 45070, l40, l40, l40)
+cd6b  t149 = fn_782f(l978, l50, l3c, l58, l60)
+cd6e  goto Lf330
+cd75  t150 = fn_782f(l974, 45037)
+cd7a  l3c = l84
+cd7e  l58 = l88
+cd82  l60 = l8c
+cd92  t151 = fn_782f(l50, 45070, l40, l40, l40)
+cda4  t152 = fn_782f(l978, l50, l3c, l58, l60)
+cda7  goto Lf330
+cdae  t153 = fn_782f(l974, 45022)
+cdb3  l3c = l78
+cdb7  l58 = l7c
+cdbb  l60 = l80
+cdcb  t154 = fn_782f(l50, 45070, l40, l40, l40)
+cddd  t155 = fn_782f(l978, l50, l3c, l58, l60)
+cde0  goto Lf330
+cde7  t156 = fn_782f(l974, 45018)
+cdf1  t157 = fn_bbe9(l974, 0, 2)
+cdfb  t158 = fn_bbe9(l974, 0, 1)
+ce02  l130 = 0
+ce0a  t159 = fn_bbe9(l974, l130, l130)
+ce0f  l134 = l974
+ce19  t160 = fn_782f(l134, 45014, l134)
+ce23  t161 = fn_bbe9(l978, 1, 2)
+ce2a  l138 = 1
+ce32  t162 = fn_bbe9(l978, l138, l138)
+ce3c  t163 = fn_bbe9(l978, 1, 0)
+ce3f  goto Lf330
+ce46  t164 = fn_782f(l974, 45018)
+ce50  t165 = fn_bbe9(l974, 0, 12)
+ce5a  t166 = fn_bbe9(l974, 0, 11)
+ce5f  l130 = l974
+ce69  t167 = fn_782f(l130, 45014, l130)
+ce73  t168 = fn_bbe9(l978, 1, 12)
+ce7d  t169 = fn_bbe9(l978, 1, 11)
+ce80  goto Lf330
+ce87  t170 = fn_782f(l974, 45018)
+ce91  t171 = fn_bbe9(l974, 0, 3)
+ce9b  t172 = fn_bbe9(l974, 0, 4)
+cea5  t173 = fn_bbe9(l974, 0, 5)
+ceaf  t174 = fn_bbe9(l974, 0, 6)
+ceb4  l130 = l974
+cebe  t175 = fn_782f(l130, 45014, l130)
+cec8  t176 = fn_bbe9(l978, 1, 3)
+ced2  t177 = fn_bbe9(l978, 1, 4)
+cedc  t178 = fn_bbe9(l978, 1, 5)
+cee6  t179 = fn_bbe9(l978, 1, 6)
+cee9  goto Lf330
+cef0  t180 = fn_782f(l974, 45018)
+cefa  t181 = fn_bbe9(l974, 0, 13)
+cf04  t182 = fn_bbe9(l974, 0, 14)
+cf0e  t183 = fn_bbe9(l974, 0, 15)
+cf18  t184 = fn_bbe9(l974, 0, 16)
+cf1d  l130 = l974
+cf27  t185 = fn_782f(l130, 45014, l130)
+cf31  t186 = fn_bbe9(l978, 1, 13)
+cf3b  t187 = fn_bbe9(l978, 1, 14)
+cf45  t188 = fn_bbe9(l978, 1, 15)
+cf4f  t189 = fn_bbe9(l978, 1, 16)
+cf52  goto Lf330
+cf59  t190 = fn_782f(l974, 45018)
+cf63  t191 = fn_bbe9(l974, 0, 7)
+cf6d  t192 = fn_bbe9(l974, 0, 8)
+cf77  t193 = fn_bbe9(l974, 0, 9)
+cf81  t194 = fn_bbe9(l974, 0, 10)
+cf86  l130 = l974
+cf90  t195 = fn_782f(l130, 45014, l130)
+cf9a  t196 = fn_bbe9(l978, 1, 7)
+cfa4  t197 = fn_bbe9(l978, 1, 8)
+cfae  t198 = fn_bbe9(l978, 1, 9)
+cfb8  t199 = fn_bbe9(l978, 1, 10)
+cfbb  goto Lf330
+cfc2  t200 = fn_782f(l974, 45018)
+cfcc  t201 = fn_bbe9(l974, 0, 2)
+cfd6  t202 = fn_bbe9(l974, 0, 1)
+cfdd  l130 = 0
+cfe5  t203 = fn_bbe9(l974, l130, l130)
+cfef  t204 = fn_bbe9(l974, 0, 3)
+cff9  t205 = fn_bbe9(l974, 0, 4)
+d003  t206 = fn_bbe9(l974, 0, 5)
+d00d  t207 = fn_bbe9(l974, 0, 6)
+d017  t208 = fn_bbe9(l974, 0, 12)
+d021  t209 = fn_bbe9(l974, 0, 11)
+d02b  t210 = fn_bbe9(l974, 0, 13)
+d035  t211 = fn_bbe9(l974, 0, 14)
+d03f  t212 = fn_bbe9(l974, 0, 15)
+d049  t213 = fn_bbe9(l974, 0, 16)
+d04e  l134 = l974
+d058  t214 = fn_782f(l134, 45014, l134)
+d062  t215 = fn_bbe9(l978, 1, 2)
+d069  l138 = 1
+d071  t216 = fn_bbe9(l978, l138, l138)
+d07b  t217 = fn_bbe9(l978, 1, 0)
+d085  t218 = fn_bbe9(l978, 1, 3)
+d08f  t219 = fn_bbe9(l978, 1, 4)
+d099  t220 = fn_bbe9(l978, 1, 5)
+d0a3  t221 = fn_bbe9(l978, 1, 6)
+d0ad  t222 = fn_bbe9(l978, 1, 12)
+d0b7  t223 = fn_bbe9(l978, 1, 11)
+d0c1  t224 = fn_bbe9(l978, 1, 13)
+d0cb  t225 = fn_bbe9(l978, 1, 14)
+d0d5  t226 = fn_bbe9(l978, 1, 15)
+d0df  t227 = fn_bbe9(l978, 1, 16)
+d0e2  goto Lf330
+d0e9  t228 = fn_782f(l974, 45018)
+d0f3  t229 = fn_bbe9(l974, 0, 2)
+d0fd  t230 = fn_bbe9(l974, 0, 1)
+d104  l130 = 0
+d10c  t231 = fn_bbe9(l974, l130, l130)
+d116  t232 = fn_bbe9(l974, 0, 3)
+d120  t233 = fn_bbe9(l974, 0, 4)
+d12a  t234 = fn_bbe9(l974, 0, 5)
+d134  t235 = fn_bbe9(l974, 0, 6)
+d13e  t236 = fn_bbe9(l974, 0, 12)
+d148  t237 = fn_bbe9(l974, 0, 11)
+d152  t238 = fn_bbe9(l974, 0, 13)
+d15c  t239 = fn_bbe9(l974, 0, 14)
+d166  t240 = fn_bbe9(l974, 0, 15)
+d170  t241 = fn_bbe9(l974, 0, 16)
+d17a  t242 = fn_bbe9(l974, 0, 7)
+d184  t243 = fn_bbe9(l974, 0, 8)
+d18e  t244 = fn_bbe9(l974, 0, 9)
+d198  t245 = fn_bbe9(l974, 0, 10)
+d19d  l134 = l974
+d1a7  t246 = fn_782f(l134, 45014, l134)
+d1b1  t247 = fn_bbe9(l978, 1, 2)
+d1b8  l138 = 1
+d1c0  t248 = fn_bbe9(l978, l138, l138)
+d1ca  t249 = fn_bbe9(l978, 1, 0)
+d1d4  t250 = fn_bbe9(l978, 1, 3)
+d1de  t251 = fn_bbe9(l978, 1, 4)
+d1e8  t252 = fn_bbe9(l978, 1, 5)
+d1f2  t253 = fn_bbe9(l978, 1, 6)
+d1fc  t254 = fn_bbe9(l978, 1, 12)
+d206  t255 = fn_bbe9(l978, 1, 11)
+d210  t256 = fn_bbe9(l978, 1, 13)
+d21a  t257 = fn_bbe9(l978, 1, 14)
+d224  t258 = fn_bbe9(l978, 1, 15)
+d22e  t259 = fn_bbe9(l978, 1, 16)
+d238  t260 = fn_bbe9(l978, 1, 7)
+d242  t261 = fn_bbe9(l978, 1, 8)
+d24c  t262 = fn_bbe9(l978, 1, 9)
+d256  t263 = fn_bbe9(l978, 1, 10)
+d259  goto Lf330
+d260  t264 = fn_782f(l974, 45018)
+d26a  t265 = fn_bbe9(l974, 0, 2)
+d274  t266 = fn_bbe9(l974, 0, 1)
+d27b  l130 = 0
+d283  t267 = fn_bbe9(l974, l130, l130)
+d28d  t268 = fn_bbe9(l974, 0, 4)
+d297  t269 = fn_bbe9(l974, 0, 5)
+d2a1  t270 = fn_bbe9(l974, 0, 2)
+d2ab  t271 = fn_bbe9(l974, 0, 6)
+d2b0  l134 = l974
+d2ba  t272 = fn_782f(l134, 45014, l134)
+d2c4  t273 = fn_bbe9(l978, 1, 2)
+d2cb  l138 = 1
+d2d3  t274 = fn_bbe9(l978, l138, l138)
+d2dd  t275 = fn_bbe9(l978, 1, 0)
+d2e7  t276 = fn_bbe9(l978, 1, 4)
+d2f1  t277 = fn_bbe9(l978, 1, 5)
+d2fb  t278 = fn_bbe9(l978, 1, 2)
+d305  t279 = fn_bbe9(l978, 1, 6)
+d308  goto Lf330
+d30f  t280 = fn_782f(l974, 45018)
+d319  t281 = fn_bbe9(l974, 0, 2)
+d323  t282 = fn_bbe9(l974, 0, 1)
+d32a  l130 = 0
+d332  t283 = fn_bbe9(l974, l130, l130)
+d33c  t284 = fn_bbe9(l974, 0, 4)
+d346  t285 = fn_bbe9(l974, 0, 5)
+d350  t286 = fn_bbe9(l974, 0, 6)
+d35a  t287 = fn_bbe9(l974, 0, 12)
+d364  t288 = fn_bbe9(l974, 0, 11)
+d36e  t289 = fn_bbe9(l974, 0, 14)
+d378  t290 = fn_bbe9(l974, 0, 15)
+d382  t291 = fn_bbe9(l974, 0, 16)
+d387  l134 = l974
+d391  t292 = fn_782f(l134, 45014, l134)
+d39b  t293 = fn_bbe9(l978, 1, 2)
+d3a2  l138 = 1
+d3aa  t294 = fn_bbe9(l978, l138, l138)
+d3b4  t295 = fn_bbe9(l978, 1, 0)
+d3be  t296 = fn_bbe9(l978, 1, 4)
+d3c8  t297 = fn_bbe9(l978, 1, 5)
+d3d2  t298 = fn_bbe9(l978, 1, 6)
+d3dc  t299 = fn_bbe9(l978, 1, 12)
+d3e6  t300 = fn_bbe9(l978, 1, 11)
+d3f0  t301 = fn_bbe9(l978, 1, 14)
+d3fa  t302 = fn_bbe9(l978, 1, 15)
+d404  t303 = fn_bbe9(l978, 1, 16)
+d407  goto Lf330
+d40e  t304 = fn_782f(l974, 45018)
+d418  t305 = fn_bbe9(l974, 0, 2)
+d422  t306 = fn_bbe9(l974, 0, 1)
+d429  l130 = 0
+d431  t307 = fn_bbe9(l974, l130, l130)
+d43b  t308 = fn_bbe9(l974, 0, 12)
+d445  t309 = fn_bbe9(l974, 0, 11)
+d44a  l134 = l974
+d454  t310 = fn_782f(l134, 45014, l134)
+d45e  t311 = fn_bbe9(l978, 1, 2)
+d465  l138 = 1
+d46d  t312 = fn_bbe9(l978, l138, l138)
+d477  t313 = fn_bbe9(l978, 1, 0)
+d481  t314 = fn_bbe9(l978, 1, 12)
+d48b  t315 = fn_bbe9(l978, 1, 11)
+d48e  goto Lf330
+d495  t316 = fn_782f(l974, 45018)
+d49f  t317 = fn_bbe9(l974, 0, 1)
+d4a6  l130 = 0
+d4ae  t318 = fn_bbe9(l974, l130, l130)
+d4b3  l134 = l974
+d4bd  t319 = fn_782f(l134, 45014, l134)
+d4c4  l138 = 1
+d4cc  t320 = fn_bbe9(l978, l138, l138)
+d4d6  t321 = fn_bbe9(l978, 1, 0)
+d4d9  goto Lf330
+d4e3  t322 = fn_782f(l974, 45007, *(6512))
+d4ed  t323 = fn_bbe9(l978, 1, 0)
+d4f0  goto Lf330
+d4fa  t324 = fn_782f(l974, 45007, *(6516))
+d501  l130 = 1
+d509  t325 = fn_bbe9(l978, l130, l130)
+d50c  goto Lf330
+d516  t326 = fn_782f(l974, 45007, *(6520))
+d520  t327 = fn_bbe9(l978, 1, 2)
+d523  goto Lf330
+d52d  t328 = fn_782f(l974, 45007, *(6556))
+d537  t329 = fn_bbe9(l978, 1, 11)
+d53a  goto Lf330
+d544  t330 = fn_782f(l974, 45007, *(6560))
+d54e  t331 = fn_bbe9(l978, 1, 12)
+d551  goto Lf330
+d55b  t332 = fn_782f(l974, 45007, *(6524))
+d565  t333 = fn_bbe9(l978, 1, 3)
+d568  goto Lf330
+d572  t334 = fn_782f(l974, 45007, *(6528))
+d57c  t335 = fn_bbe9(l978, 1, 4)
+d57f  goto Lf330
+d589  t336 = fn_782f(l974, 45007, *(6532))
+d593  t337 = fn_bbe9(l978, 1, 5)
+d596  goto Lf330
+d5a0  t338 = fn_782f(l974, 45007, *(6536))
+d5aa  t339 = fn_bbe9(l978, 1, 6)
+d5ad  goto Lf330
+d5b7  t340 = fn_782f(l974, 45007, *(6564))
+d5c1  t341 = fn_bbe9(l978, 1, 13)
+d5c4  goto Lf330
+d5ce  t342 = fn_782f(l974, 45007, *(6568))
+d5d8  t343 = fn_bbe9(l978, 1, 14)
+d5db  goto Lf330
+d5e5  t344 = fn_782f(l974, 45007, *(6572))
+d5ef  t345 = fn_bbe9(l978, 1, 15)
+d5f2  goto Lf330
+d5fc  t346 = fn_782f(l974, 45007, *(6576))
+d606  t347 = fn_bbe9(l978, 1, 16)
+d609  goto Lf330
+d613  t348 = fn_782f(l974, 45007, *(6540))
+d61d  t349 = fn_bbe9(l978, 1, 7)
+d620  goto Lf330
+d62a  t350 = fn_782f(l974, 45007, *(6544))
+d634  t351 = fn_bbe9(l978, 1, 8)
+d637  goto Lf330
+d641  t352 = fn_782f(l974, 45007, *(6548))
+d64b  t353 = fn_bbe9(l978, 1, 9)
+d64e  goto Lf330
+d658  t354 = fn_782f(l974, 45007, *(6552))
+d662  t355 = fn_bbe9(l978, 1, 10)
+d665  goto Lf330
+d66c  t356 = fn_782f(l974, 44992)
+d671  l3c = *(1184112)
+d675  l58 = *(1183840)
+d682  t357 = fn_782f(l50, 44986, l40, l40)
+d691  t358 = fn_782f(l978, l50, l3c, l58)
+d694  goto Lf330
+d696  goto Ld699
+d698  goto Lf330
+Ld699:
+d69b  l138 = 1221300
+d6a2  t359 = fn_782f(l974, 44954)
+d6b0  t360 = fn_782f(l978, 44948, *(1221240), *(1221248))
+d6b3  goto Lf330
+d6b5  goto Ld6b8
+d6b7  goto Lf330
+Ld6b8:
+d6ba  l138 = 1221300
+d6c1  t361 = fn_782f(l974, 44932)
+d6c9  l13c = *((l138 + 164))
+d6cd  if (l13c == 0) goto Ld6d8
+d6d1  if (l13c == 1) goto Ld6ed
+d6d5  if (l13c == 2) goto Ld70f
+d6d7  goto Ld6d8
+Ld6d8:
+d6e9  t362 = fn_782f(l978, 44929, *(((*((l138 + 164)) << 2) + 8408)))
+d6ec  goto Lf330
+Ld6ed:
+d6f5  l144 = l138
+d70b  t363 = fn_782f(l978, 44913, *(((*((l144 + 164)) << 2) + 8408)), l144, *((l144 + 136)))
+d70e  goto Lf330
+Ld70f:
+d717  l148 = l138
+d72c  l14c = *((l148 + 168))
+d742  t364 = fn_782f(l978, 44888, *(((*((l148 + 164)) << 2) + 8408)), l148, l14c, *(((624 * l14c) + (l148 + 180))), *((l148 + 312204)))
+d745  goto Lf330
+d747  goto Ld74a
+d749  goto Lf330
+Ld74a:
+d74c  l138 = 1221300
+d753  t365 = fn_782f(l974, 44850)
+d75d  l13c = l138
+d771  t366 = fn_782f(l978, 44841, *((l13c + 312192)), *((l13c + 312200)), *((l13c + 312196)))
+d774  goto Lf330
+d776  goto Ld779
+d778  goto Lf330
+Ld779:
+d77b  l138 = 1221300
+d782  t367 = fn_782f(l974, 44792)
+d78c  l13c = l138
+d7ac  t368 = fn_782f(l978, 44774, *((l13c + 312216)), *((l13c + 312208)), *((l13c + 312212)), *((l13c + 312220)), *((l13c + 312204)))
+d7af  goto Lf330
+d7b1  goto Ld7b4
+d7b3  goto Lf330
+Ld7b4:
+d7b6  l138 = 1535012
+d7bd  t369 = fn_782f(l974, 44758)
+d7c5  l13c = *((l138 + 164))
+d7c9  if (l13c == 0) goto Ld7d4
+d7cd  if (l13c == 1) goto Ld7e9
+d7d1  if (l13c == 2) goto Ld80b
+d7d3  goto Ld7d4
+Ld7d4:
+d7e5  t370 = fn_782f(l978, 44929, *(((*((l138 + 164)) << 2) + 8408)))
+d7e8  goto Lf330
+Ld7e9:
+d7f1  l144 = l138
+d807  t371 = fn_782f(l978, 44913, *(((*((l144 + 164)) << 2) + 8408)), l144, *((l144 + 136)))
+d80a  goto Lf330
+Ld80b:
+d813  l148 = l138
+d828  l14c = *((l148 + 168))
+d83e  t372 = fn_782f(l978, 44888, *(((*((l148 + 164)) << 2) + 8408)), l148, l14c, *(((624 * l14c) + (l148 + 180))), *((l148 + 312204)))
+d841  goto Lf330
+d843  goto Ld846
+d845  goto Lf330
+Ld846:
+d848  l138 = 1535012
+d84f  t373 = fn_782f(l974, 44720)
+d859  l13c = l138
+d86d  t374 = fn_782f(l978, 44841, *((l13c + 312192)), *((l13c + 312200)), *((l13c + 312196)))
+d870  goto Lf330
+d872  goto Ld875
+d874  goto Lf330
+Ld875:
+d877  l138 = 1535012
+d87e  t375 = fn_782f(l974, 44671)
+d888  l13c = l138
+d8a8  t376 = fn_782f(l978, 44774, *((l13c + 312216)), *((l13c + 312208)), *((l13c + 312212)), *((l13c + 312220)), *((l13c + 312204)))
+d8ab  goto Lf330
+d8b2  t377 = fn_782f(l974, 44659)
+d8b6  l3c = 0
+d8bb  t378 = fn_1406f(2)
+d8bc  l13c = t378
+d8c0  l138 = l13c
+d8c8  ldc = ((313712 * l138) + 1221300)
+d8cf  t379 = fn_13eb1(ldc, &l44)
+d8d4  l140 = l44
+d8e3  t380 = trap106(((l140 *f l140) +f (l48 *f l48)))
+d8e4  l144 = t380
+d8e8  l3c = l144
+d8f3  t381 = fn_782f(l978, l54, l3c)
+d8f6  goto Lf330
+d8fd  t382 = fn_782f(l974, 44645)
+d903  t383 = fn_1406f(0)
+d904  l13c = t383
+d908  l138 = l13c
+d910  t384 = fn_14029(l138, 0)
+d911  l140 = t384
+d915  l3c = l140
+d920  t385 = fn_782f(l978, l54, l3c)
+d923  goto Lf330
+d92a  t386 = fn_782f(l974, 44632)
+d930  t387 = fn_1406f(1)
+d931  l13c = t387
+d935  l138 = l13c
+d93d  t388 = fn_14029(l138, 1)
+d93e  l140 = t388
+d942  l3c = l140
+d94d  t389 = fn_782f(l978, l54, l3c)
+d950  goto Lf330
+d957  t390 = fn_782f(l974, 44617)
+d95d  t391 = fn_1406f(2)
+d95e  l13c = t391
+d962  l138 = l13c
+d96a  t392 = fn_14029(l138, 2)
+d96b  l140 = t392
+d96f  l3c = l140
+d97a  t393 = fn_782f(l978, l54, l3c)
+d97d  goto Lf330
+d986  l13c = l980
+d98e  t394 = fn_782f(l974, 44595, l13c, l13c)
+d994  t395 = fn_1406f(2)
+d995  l140 = t395
+d999  l138 = l140
+d9a1  t396 = fn_14029(l138, 0)
+d9a2  l144 = t396
+d9a6  l3c = l144
+d9ae  t397 = fn_14029(l138, 1)
+d9af  l148 = t397
+d9b3  l58 = l148
+d9bb  t398 = fn_14029(l138, 2)
+d9bc  l14c = t398
+d9c0  l60 = l14c
+d9cc  l154 = l980
+d9da  t399 = fn_782f(l50, 45361, l40, l154, l40, l154, l40)
+d9ec  t400 = fn_782f(l978, l50, l3c, l58, l60)
+d9ef  goto Lf330
+d9f6  t401 = fn_782f(l974, 44585)
+d9fc  t402 = fn_1406f(2)
+d9fd  l148 = t402
+da01  l144 = l148
+da08  t403 = fn_140b0(&l138, l144)
+da19  t404 = fn_782f(l50, 45321, l40, l40, l40)
+da2b  t405 = fn_782f(l978, l50, l138, l13c, l140)
+da2e  goto Lf330
+da35  t406 = fn_782f(l974, 44571)
+da3b  t407 = fn_1406f(2)
+da3c  l13c = t407
+da40  l138 = l13c
+da48  t408 = fn_14029(l138, 2)
+da49  l140 = t408
+da4d  l3c = l140
+da51  l68 = l138
+da5a  if (*(((313712 * l138) + 1221464)) != 2) goto Lda61
+da60  l68 = (l68 + 1)
+Lda61:
+da6a  t409 = fn_782f(l978, 45467, l68)
+da6d  goto Lf330
+da74  t410 = fn_782f(l974, 44531)
+da78  l68 = 624
+da7b  ld4 = 312000
+da7e  le4 = 1560000
+da8e  t411 = fn_782f(l978, 44841, l68, ld4, le4)
+da91  goto Lf330
+da98  t412 = fn_782f(l974, 44508)
+da9e  t413 = fn_1406f(2)
+da9f  l13c = t413
+daa3  l138 = l13c
+daa9  t414 = fn_13e18(l138)
+daaa  l140 = t414
+daae  l68 = l140
+dab4  t415 = fn_13e44(l138)
+dab5  l144 = t415
+dab9  ld4 = l144
+dac6  t416 = fn_782f(l978, 44500, l68, ld4)
+dac9  goto Lf330
+dad0  t417 = fn_782f(l974, 44482)
+dad5  t418 = trap70(&l138)
+dada  if (l140 == 0) goto Ldadf
+dade  if (l140 != 12) goto Ldae4
+Ldadf:
+dae1  l15c = 12
+dae3  goto Ldaea
+Ldae4:
+dae9  l15c = (l140 % 12)
+Ldaea:
+daed  if (l140 < 12) goto Ldb01
+dafd  t419 = fn_782f(l978, 44465, l15c, l13c, l138)
+db00  goto Lf330
+Ldb01:
+db10  t420 = fn_782f(l978, 44448, l15c, l13c, l138)
+db13  goto Lf330
+db1a  t421 = fn_782f(l974, 44438)
+db1f  t422 = trap70(&l138)
+db30  t423 = fn_782f(l978, 44424, l140, l13c, l138)
+db33  goto Lf330
+db3a  t424 = fn_782f(l974, 44409)
+db3f  t425 = trap70(&l138)
+db54  t426 = fn_782f(l978, 44398, (l148 + 1), l144, (l14c + 1900))
+db57  goto Lf330
+db5e  t427 = fn_782f(l974, 44368)
+db63  t428 = trap70(&l138)
+db68  if (l140 == 0) goto Ldb6d
+db6c  if (l140 != 12) goto Ldb72
+Ldb6d:
+db6f  l15c = 12
+db71  goto Ldb78
+Ldb72:
+db77  l15c = (l140 % 12)
+Ldb78:
+db7b  if (l140 < 12) goto Ldb9c
+db98  t429 = fn_782f(l978, 44338, (l148 + 1), l144, (l14c + 1900), l15c, l13c, l138)
+db9b  goto Lf330
+Ldb9c:
+dbb8  t430 = fn_782f(l978, 44308, (l148 + 1), l144, (l14c + 1900), l15c, l13c, l138)
+dbbb  goto Lf330
+dbc2  t431 = fn_782f(l974, 44286)
+dbc7  t432 = trap70(&l138)
+dbe5  t433 = fn_782f(l978, 44259, (l148 + 1), l144, (l14c + 1900), l140, l13c, l138)
+dbe8  goto Lf330
+dbef  t434 = fn_782f(l974, 44244)
+dbf4  t435 = trap70(&l138)
+dc09  t436 = fn_782f(l978, 44398, l144, (l148 + 1), (l14c + 1900))
+dc0c  goto Lf330
+dc13  t437 = fn_782f(l974, 44214)
+dc18  t438 = trap70(&l138)
+dc1d  if (l140 == 0) goto Ldc22
+dc21  if (l140 != 12) goto Ldc27
+Ldc22:
+dc24  l15c = 12
+dc26  goto Ldc2d
+Ldc27:
+dc2c  l15c = (l140 % 12)
+Ldc2d:
+dc30  if (l140 < 12) goto Ldc51
+dc4d  t439 = fn_782f(l978, 44338, l144, (l148 + 1), (l14c + 1900), l15c, l13c, l138)
+dc50  goto Lf330
+Ldc51:
+dc6d  t440 = fn_782f(l978, 44308, l144, (l148 + 1), (l14c + 1900), l15c, l13c, l138)
+dc70  goto Lf330
+dc77  t441 = fn_782f(l974, 44192)
+dc7c  t442 = trap70(&l138)
+dc9a  t443 = fn_782f(l978, 44259, l144, (l148 + 1), (l14c + 1900), l140, l13c, l138)
+dc9d  goto Lf330
+dca4  t444 = fn_782f(l974, 44171)
+dca9  t445 = trap70(&l138)
+dcbe  t446 = fn_782f(l978, 44158, (l14c + 1900), (l148 + 1), l144)
+dcc1  goto Lf330
+dcc8  t447 = fn_782f(l974, 44139)
+dccd  t448 = trap70(&l138)
+dcde  t449 = fn_782f(l978, 44126, l140, l13c, l138)
+dce1  goto Lf330
+dce8  t450 = fn_782f(l974, 44122)
+dcec  t451 = fn_108a9()
+dced  l138 = t451
+dcf1  l3c = l138
+dcfc  t452 = fn_782f(l978, l54, l3c)
+dcff  goto Lf330
+dd06  t453 = fn_782f(l974, 44117)
+dd13  l68 = *(((68 * *((*(851180) + 184))) + 961632))
+dd1d  t454 = fn_782f(l978, 45467, l68)
+dd20  goto Lf330
+dd29  l138 = l980
+dd37  t455 = fn_782f(l974, 44091, l138, l138, l138, l138)
+dd40  t456 = trap6(44080, 1219668, 128)
+dd46  t457 = fn_2f5b8(1219668)
+dd47  l13c = t457
+dd4b  l68 = l13c
+dd53  t458 = trap6(44073, 1219668, 128)
+dd59  t459 = fn_2f5b8(1219668)
+dd5a  l140 = t459
+dd5e  ld4 = l140
+dd62  le4 = *(81316)
+dd66  if (*(76964) == 0) goto Ldd6b
+dd6a  lf8 = *(76692)
+Ldd6b:
+dd72  t460 = trap6(44063, 1219668, 128)
+dd78  t461 = fn_2f428(1219668)
+dd79  l144 = t461
+dd7d  l3c = l144
+dd89  l148 = l980
+dda3  t462 = fn_782f(l978, 44041, l68, l148, ld4, l148, le4, l148, lf8, l148, l3c)
+dda6  goto Lf330
+ddaf  l138 = l980
+ddc0  t463 = fn_782f(l974, 44011, l138, l138, l138, l138, l138)
+ddc4  t464 = fn_108a9()
+ddc5  l13c = t464
+ddc9  l3c = l13c
+ddd1  t465 = trap6(44080, 1219668, 128)
+ddd7  t466 = fn_2f5b8(1219668)
+ddd8  l140 = t466
+dddc  l68 = l140
+dde4  t467 = trap6(44073, 1219668, 128)
+ddea  t468 = fn_2f5b8(1219668)
+ddeb  l144 = t468
+ddef  ld4 = l144
+ddf3  le4 = *(81316)
+ddf7  if (*(76964) == 0) goto Lddfc
+ddfb  lf8 = *(76692)
+Lddfc:
+de03  t469 = trap6(44063, 1219668, 128)
+de09  t470 = fn_2f428(1219668)
+de0a  l148 = t470
+de0e  l58 = l148
+de1b  l14c = l980
+de3b  t471 = fn_782f(l978, 43984, i(l3c), l14c, l68, l14c, ld4, l14c, le4, l14c, lf8, l14c, l58)
+de3e  goto Lf330
+de45  t472 = fn_782f(l974, 43967)
+de4b  t473 = fn_d6c(0)
+de4c  l144 = t473
+de50  l138 = l144
+de58  t474 = fn_32784(l138, 46838)
+de59  l148 = t474
+de5d  l13c = l148
+de65  t475 = fn_32784(l138, 43955)
+de66  l14c = t475
+de6a  l140 = l14c
+de77  t476 = fn_782f(l978, 43947, l13c, l140)
+de7a  goto Lf330
+de81  t477 = fn_782f(l974, 46838)
+de87  t478 = fn_d6c(0)
+de88  l140 = t478
+de8c  l138 = l140
+de94  t479 = fn_32784(l138, 46838)
+de95  l144 = t479
+de99  l13c = l144
+dea3  t480 = fn_782f(l978, 44929, l13c)
+dea6  goto Lf330
+dead  t481 = fn_782f(l974, 43940)
+deb3  t482 = fn_d6c(0)
+deb4  l140 = t482
+deb8  l138 = l140
+dec0  t483 = fn_32784(l138, 43955)
+dec1  l144 = t483
+dec5  l13c = l144
+decf  t484 = fn_782f(l978, 44929, l13c)
+ded2  goto Lf330
+ded9  t485 = fn_782f(l974, 43928)
+dee8  t486 = fn_782f(l978, 44929, ((1728 * *(958920)) + 1017708))
+deeb  goto Lf330
+def2  t487 = fn_782f(l974, 43905)
+df01  t488 = fn_782f(l978, 44929, ((1728 * *(958920)) + 1017708))
+df08  t489 = fn_326ae(l978)
+df09  l138 = t489
+df13  t490 = fn_782f(l978, 44929, l138)
+df16  goto Lf330
+df1d  t491 = fn_782f(l974, 43890)
+df23  t492 = fn_3086a(2791220)
+df24  l138 = t492
+df28  l3c = l138
+df33  t493 = fn_782f(l978, l54, l3c)
+df36  goto Lf330
+df3d  t494 = fn_782f(l974, 43881)
+df42  l3c = *(2791256)
+df4d  t495 = fn_782f(l978, l54, l3c)
+df50  goto Lf330
+df57  t496 = fn_782f(l974, 43869)
+df5c  l3c = *(2791260)
+df67  t497 = fn_782f(l978, l54, l3c)
+df6a  goto Lf330
+df71  t498 = fn_782f(l974, 43853)
+df76  l3c = *(2791264)
+df81  t499 = fn_782f(l978, l54, l3c)
+df84  goto Lf330
+df8b  t500 = fn_782f(l974, 43836)
+df90  l3c = *(2791268)
+df9b  t501 = fn_782f(l978, l54, l3c)
+df9e  goto Lf330
+dfa5  t502 = fn_782f(l974, 43819)
+dfaa  l3c = *(2791272)
+dfb5  t503 = fn_782f(l978, l54, l3c)
+dfb8  goto Lf330
+dfbf  t504 = fn_782f(l974, 43800)
+dfc4  l3c = *(2791284)
+dfcf  t505 = fn_782f(l978, l54, l3c)
+dfd2  goto Lf330
+dfd9  t506 = fn_782f(l974, 43781)
+dfde  l3c = *(2791288)
+dfe9  t507 = fn_782f(l978, l54, l3c)
+dfec  goto Lf330
+dff3  t508 = fn_782f(l974, 43770)
+dff8  l3c = *(2791276)
+e003  t509 = fn_782f(l978, l54, l3c)
+e006  goto Lf330
+e00d  t510 = fn_782f(l974, 43756)
+e012  l3c = *(2791280)
+e01d  t511 = fn_782f(l978, l54, l3c)
+e020  goto Lf330
+e02a  t512 = fn_782f(l974, 43738, l980)
+e02f  l3c = *(2791200)
+e033  l58 = *(2791196)
+e043  t513 = fn_782f(l50, 45251, l40, l980, l40)
+e052  t514 = fn_782f(l978, l50, l3c, l58)
+e055  goto Lf330
+e05e  l138 = l980
+e066  t515 = fn_782f(l974, 43713, l138, l138)
+e06b  l3c = *(2791268)
+e06f  l58 = *(2791272)
+e074  t516 = fn_3086a(2791220)
+e075  l13c = t516
+e079  l60 = l13c
+e085  l144 = l980
+e093  t517 = fn_782f(l50, 45361, l40, l144, l40, l144, l40)
+e0a5  t518 = fn_782f(l978, l50, l3c, l58, l60)
+e0a8  goto Lf330
+e0b1  l138 = l980
+e0b9  t519 = fn_782f(l974, 43685, l138, l138)
+e0bf  t520 = fn_3086a(2791220)
+e0c0  l13c = t520
+e0c4  l3c = l13c
+e0c8  l58 = *(2791256)
+e0cc  l60 = *(2791260)
+e0d8  l144 = l980
+e0e6  t521 = fn_782f(l50, 45361, l40, l144, l40, l144, l40)
+e0f8  t522 = fn_782f(l978, l50, l3c, l58, l60)
+e0fb  goto Lf330
+e104  l138 = l980
+e10c  t523 = fn_782f(l974, 43658, l138, l138)
+e111  l3c = *(2791284)
+e115  l58 = *(2791288)
+e11a  t524 = fn_3086a(2791220)
+e11b  l13c = t524
+e11f  l60 = l13c
+e12b  l144 = l980
+e139  t525 = fn_782f(l50, 45361, l40, l144, l40, l144, l40)
+e14b  t526 = fn_782f(l978, l50, l3c, l58, l60)
+e14e  goto Lf330
+e157  l138 = l980
+e15f  t527 = fn_782f(l974, 43628, l138, l138)
+e165  t528 = fn_3086a(2791220)
+e166  l13c = t528
+e16a  l3c = l13c
+e16e  l58 = *(2791276)
+e172  l60 = *(2791280)
+e17e  l144 = l980
+e18c  t529 = fn_782f(l50, 45361, l40, l144, l40, l144, l40)
+e19e  t530 = fn_782f(l978, l50, l3c, l58, l60)
+e1a1  goto Lf330
+e1aa  l138 = l980
+e1b2  t531 = fn_782f(l974, 43597, l138, l138)
+e1b7  l3c = *(2791284)
+e1bc  t532 = fn_3086a(2791220)
+e1bd  l13c = t532
+e1c1  l58 = l13c
+e1c5  l60 = *(2791268)
+e1d1  l144 = l980
+e1df  t533 = fn_782f(l50, 45361, l40, l144, l40, l144, l40)
+e1f1  t534 = fn_782f(l978, l50, l3c, l58, l60)
+e1f4  goto Lf330
+e1fd  l138 = l980
+e20b  t535 = fn_782f(l974, 43559, l138, l138, l138, l138)
+e210  l3c = *(2791284)
+e214  l58 = *(2791288)
+e219  t536 = fn_3086a(2791220)
+e21a  l13c = t536
+e21e  l60 = l13c
+e222  le8 = *(2791268)
+e226  lec = *(2791272)
+e232  l144 = l980
+e24c  t537 = fn_782f(l50, 43540, l40, l144, l40, l144, l40, l144, l40, l144, l40)
+e264  t538 = fn_782f(l978, l50, l3c, l58, l60, le8, lec)
+e267  goto Lf330
+e270  l138 = l980
+e27e  t539 = fn_782f(l974, 43497, l138, l138, l138, l138)
+e283  l3c = *(2791276)
+e287  l58 = *(2791280)
+e28c  t540 = fn_3086a(2791220)
+e28d  l13c = t540
+e291  l60 = l13c
+e295  le8 = *(2791256)
+e299  lec = *(2791260)
+e2a5  l144 = l980
+e2bf  t541 = fn_782f(l50, 43540, l40, l144, l40, l144, l40, l144, l40, l144, l40)
+e2d7  t542 = fn_782f(l978, l50, l3c, l58, l60, le8, lec)
+e2da  goto Lf330
+e2e1  t543 = fn_782f(l974, 43485)
+e2e6  l3c = *(2791200)
+e2f1  t544 = fn_782f(l978, l54, l3c)
+e2f4  goto Lf330
+e2fb  t545 = fn_782f(l974, 43474)
+e300  l3c = *(2791196)
+e30b  t546 = fn_782f(l978, l54, l3c)
+e30e  goto Lf330
+e315  t547 = fn_782f(l974, 43462)
+e31d  t548 = fn_1601c(2, l978)
+e320  goto Lf330
+e327  t549 = fn_782f(l974, 43450)
+e32f  t550 = fn_1601c(3, l978)
+e332  goto Lf330
+e339  t551 = fn_782f(l974, 43438)
+e341  t552 = fn_1601c(0, l978)
+e344  goto Lf330
+e34b  t553 = fn_782f(l974, 43426)
+e353  t554 = fn_1601c(1, l978)
+e356  goto Lf330
+e35d  t555 = fn_782f(l974, 43416)
+e369  t556 = fn_782f(l978, l54, *(2790956))
+e36c  goto Lf330
+e373  t557 = fn_782f(l974, 43406)
+e37f  t558 = fn_782f(l978, l54, *(2790960))
+e382  goto Lf330
+e389  t559 = fn_782f(l974, 43396)
+e395  t560 = fn_782f(l978, l54, *(2790948))
+e398  goto Lf330
+e39f  t561 = fn_782f(l974, 43386)
+e3ab  t562 = fn_782f(l978, l54, *(2790952))
+e3ae  goto Lf330
+e3b5  t563 = fn_782f(l974, 43380)
+e3bb  t564 = fn_85c0(0)
+e3bc  l138 = t564
+e3c0  if (l138 == 0) goto Le3cb
+e3c7  t565 = fn_782f(l978, 43371)
+e3ca  goto Lf330
+Le3cb:
+e3cf  t566 = fn_85c0(32)
+e3d0  l13c = t566
+e3d4  if (l13c == 0) goto Le3e6
+e3d8  l140 = l978
+e3e2  t567 = fn_782f(l140, 43366, l140)
+e3e5  goto Le410
+Le3e6:
+e3ea  t568 = fn_85c0(64)
+e3eb  l144 = t568
+e3ef  if (l144 == 0) goto Le401
+e3f3  l148 = l978
+e3fd  t569 = fn_782f(l148, 43361, l148)
+e400  goto Le410
+Le401:
+e404  l14c = l978
+e40e  t570 = fn_782f(l14c, 43356, l14c)
+Le410:
+e414  t571 = fn_85c0(8)
+e415  l150 = t571
+e419  if (l150 == 0) goto Le42b
+e41d  l154 = l978
+e427  t572 = fn_782f(l154, 43352, l154)
+e42a  goto Le43a
+Le42b:
+e42e  l158 = l978
+e438  t573 = fn_782f(l158, 43348, l158)
+Le43a:
+e43e  t574 = fn_85c0(1)
+e43f  l15c = t574
+e443  if (l15c == 0) goto Le455
+e447  l160 = l978
+e451  t575 = fn_782f(l160, 43343, l160)
+e454  goto Le47f
+Le455:
+e459  t576 = fn_85c0(2)
+e45a  l164 = t576
+e45e  if (l164 == 0) goto Le470
+e462  l168 = l978
+e46c  t577 = fn_782f(l168, 43338, l168)
+e46f  goto Le47f
+Le470:
+e473  l16c = l978
+e47d  t578 = fn_782f(l16c, 43356, l16c)
+Le47f:
+e483  t579 = fn_85c0(16)
+e484  l170 = t579
+e488  if (l170 == 0) goto Le49a
+e48c  l174 = l978
+e496  t580 = fn_782f(l174, 43333, l174)
+e499  goto Le4a9
+Le49a:
+e49d  l178 = l978
+e4a7  t581 = fn_782f(l178, 43356, l178)
+Le4a9:
+e4ad  t582 = fn_85c0(512)
+e4ae  l17c = t582
+e4b2  if (l17c == 0) goto Le4c4
+e4b6  l180 = l978
+e4c0  t583 = fn_782f(l180, 43328, l180)
+e4c3  goto Le4d3
+Le4c4:
+e4c7  l184 = l978
+e4d1  t584 = fn_782f(l184, 43356, l184)
+Le4d3:
+e4d7  t585 = fn_85c0(256)
+e4d8  l188 = t585
+e4dc  if (l188 == 0) goto Le4ee
+e4e0  l18c = l978
+e4ea  t586 = fn_782f(l18c, 43324, l18c)
+e4ed  goto Lf330
+Le4ee:
+e4f1  l190 = l978
+e4fb  t587 = fn_782f(l190, 43348, l190)
+e4fe  goto Lf330
+e505  t588 = fn_782f(l974, 43311)
+e50c  t589 = fn_782f(&l138, 43309)
+e513  t590 = fn_782f(&l13e, 46903)
+e51a  t591 = fn_782f(&l13a, 43307)
+e521  t592 = fn_782f(&l13c, 46891)
+e528  t593 = fn_782f(&l140, 46899)
+e52f  t594 = fn_782f(&l146, 43305)
+e536  t595 = fn_782f(&l142, 43303)
+e53d  t596 = fn_782f(&l144, 43301)
+e542  if (ld0 != 151) goto Le573
+e549  t597 = fn_782f(l974, 43380)
+e550  t598 = fn_782f(&l138, 45496)
+e557  t599 = fn_782f(&l13e, 45496)
+e55e  t600 = fn_782f(&l13a, 45496)
+e565  t601 = fn_782f(&l13c, 45496)
+e569  *(byte*)(&l138) = 135
+e56c  *(byte*)(&l13e) = 134
+e56f  *(byte*)(&l13a) = 136
+e572  *(byte*)(&l13c) = 141
+Le573:
+e576  if (ld0 != 153) goto Le59b
+e57d  t602 = fn_782f(l974, 43287)
+e584  t603 = fn_85a1(&l138, 43278)
+e58b  t604 = fn_85a1(&l13e, 43272)
+e592  t605 = fn_85a1(&l13a, 43262)
+e599  t606 = fn_85a1(&l13c, 43251)
+Le59b:
+e59f  t607 = fn_85c0(0)
+e5a0  l148 = t607
+e5a4  if (l148 == 0) goto Le5af
+e5ab  t608 = fn_782f(l978, 43243)
+e5ae  goto Lf330
+Le5af:
+e5b3  t609 = fn_85c0(32)
+e5b4  l14c = t609
+e5b8  if (l14c == 0) goto Le5cc
+e5bc  l150 = l978
+e5c8  t610 = fn_782f(l150, 43237, l150, &l140)
+e5cb  goto Le5f8
+Le5cc:
+e5d0  t611 = fn_85c0(64)
+e5d1  l154 = t611
+e5d5  if (l154 == 0) goto Le5e9
+e5d9  l158 = l978
+e5e5  t612 = fn_782f(l158, 43237, l158, &l146)
+e5e8  goto Le5f8
+Le5e9:
+e5ec  l15c = l978
+e5f6  t613 = fn_782f(l15c, 43356, l15c)
+Le5f8:
+e5fc  t614 = fn_85c0(8)
+e5fd  l160 = t614
+e601  if (l160 == 0) goto Le615
+e605  l164 = l978
+e611  t615 = fn_782f(l164, 45497, l164, &l13a)
+e614  goto Le624
+Le615:
+e618  l168 = l978
+e622  t616 = fn_782f(l168, 43348, l168)
+Le624:
+e628  t617 = fn_85c0(1)
+e629  l16c = t617
+e62d  if (l16c == 0) goto Le641
+e631  l170 = l978
+e63d  t618 = fn_782f(l170, 45497, l170, &l138)
+e640  goto Le66d
+Le641:
+e645  t619 = fn_85c0(2)
+e646  l174 = t619
+e64a  if (l174 == 0) goto Le65e
+e64e  l178 = l978
+e65a  t620 = fn_782f(l178, 45497, l178, &l13e)
+e65d  goto Le66d
+Le65e:
+e661  l17c = l978
+e66b  t621 = fn_782f(l17c, 43348, l17c)
+Le66d:
+e671  t622 = fn_85c0(16)
+e672  l180 = t622
+e676  if (l180 == 0) goto Le68a
+e67a  l184 = l978
+e686  t623 = fn_782f(l184, 43237, l184, &l13c)
+e689  goto Le699
+Le68a:
+e68d  l188 = l978
+e697  t624 = fn_782f(l188, 43356, l188)
+Le699:
+e69d  t625 = fn_85c0(512)
+e69e  l18c = t625
+e6a2  if (l18c == 0) goto Le6b6
+e6a6  l190 = l978
+e6b2  t626 = fn_782f(l190, 43237, l190, &l144)
+e6b5  goto Le6c5
+Le6b6:
+e6b9  l194 = l978
+e6c3  t627 = fn_782f(l194, 43356, l194)
+Le6c5:
+e6c9  t628 = fn_85c0(256)
+e6ca  l198 = t628
+e6ce  if (l198 == 0) goto Le6e2
+e6d2  l19c = l978
+e6de  t629 = fn_782f(l19c, 45497, l19c, &l142)
+e6e1  goto Lf330
+Le6e2:
+e6e5  l1a0 = l978
+e6ef  t630 = fn_782f(l1a0, 43348, l1a0)
+e6f2  goto Lf330
+e6fa  t631 = trap6(43225, &l13c, 1024)
+e703  t632 = trap6(&l13c, &l540, 1024)
+e707  l940 = &l540
+e70a  l53c = &l940
+e712  t633 = fn_32168(l53c, 1)
+e713  l944 = t633
+e717  l138 = l944
+e71a  l44 = 0
+e71d  l48 = 0
+e720  l4c = 0
+e728  t634 = fn_325be(l138, 43213)
+e729  l948 = t634
+e72d  if (l948 != 0) goto Le78e
+e735  t635 = fn_32168(l53c, 1)
+e736  l94c = t635
+e73a  l138 = l94c
+e740  t636 = fn_2f5b8(l138)
+e741  l950 = t636
+e746  l3c = f(l950)
+e74e  t637 = fn_32168(l53c, 1)
+e74f  l954 = t637
+e753  l138 = l954
+e759  t638 = fn_2f5b8(l138)
+e75a  l958 = t638
+e75f  l58 = f(l958)
+e767  t639 = fn_32168(l53c, 1)
+e768  l95c = t639
+e76c  l138 = l95c
+e772  t640 = fn_2f5b8(l138)
+e773  l960 = t640
+e778  l60 = f(l960)
+e77f  l44 = (l3c -f l6c)
+e786  l48 = (l58 -f l70)
+e78d  l4c = (l60 -f l74)
+Le78e:
+e791  if (ld0 != 160) goto Le7b4
+e798  t641 = fn_782f(l974, 43197)
+e79d  l94c = l44
+e7a6  t642 = trap106((l94c *f l94c))
+e7a7  l950 = t642
+e7b1  l3c = (l950 +f (l48 *f l48))
+e7b3  goto Le876
+Le7b4:
+e7b7  if (ld0 != 161) goto Le7c6
+e7be  t643 = fn_782f(l974, 43182)
+e7c3  l3c = l4c
+e7c5  goto Le876
+Le7c6:
+e7c9  if (ld0 != 162) goto Le7f2
+e7d0  t644 = fn_782f(l974, 43165)
+e7d5  l94c = l44
+e7de  t645 = trap106((l94c *f l94c))
+e7df  l950 = t645
+e7ef  l3c = ((l950 +f (l48 *f l48)) +f (l4c *f l4c))
+e7f1  goto Le876
+Le7f2:
+e7f5  if (ld0 != 163) goto Le876
+e7fe  l94c = l980
+e806  t646 = fn_782f(l974, 43141, l94c, l94c)
+e80b  l950 = l44
+e81a  t647 = trap106(((l950 *f l950) +f (l48 *f l48)))
+e81b  l954 = t647
+e81f  l3c = l954
+e823  l58 = l4c
+e827  l958 = l44
+e83c  t648 = trap106((((l958 *f l958) +f (l48 *f l48)) +f (l4c *f l4c)))
+e83d  l95c = t648
+e841  l60 = l95c
+e850  l964 = l980
+e85e  t649 = fn_782f(l50, 43121, l94, l40, l964, l40, l964, l40)
+e872  t650 = fn_782f(l978, l50, &l13c, l3c, l58, l60)
+e875  goto Lf330
+Le876:
+e882  t651 = fn_782f(l50, 43109, l94, l40)
+e890  t652 = fn_782f(l978, l50, &l13c, l3c)
+e893  goto Lf330
+e89a  t653 = fn_782f(l974, 43097)
+e8a1  l68 = (*(958748) / 1000)
+e8a7  ld4 = (l68 / 60)
+e8ad  l68 = (l68 % 60)
+e8b3  le4 = (l68 / 10)
+e8b9  l68 = (l68 % 10)
+e8bf  lf8 = (*(958748) % 1000)
+e8d2  t654 = fn_782f(l978, 43084, ld4, le4, l68, lf8)
+e8d5  goto Lf330
+e8dc  t655 = fn_782f(l974, 43067)
+e8e7  t656 = fn_782f(l978, 45467, *(958748))
+e8ea  goto Lf330
+e8f1  t657 = fn_782f(l974, 43050)
+e8fc  t658 = fn_782f(l978, 45467, *(1011528))
+e8ff  goto Lf330
+e906  t659 = fn_782f(l974, 43016)
+e910  l68 = ((*(958748) - *(1011528)) / 1000)
+e916  ld4 = (l68 / 60)
+e91c  l68 = (l68 % 60)
+e922  le4 = (l68 / 10)
+e928  l68 = (l68 % 10)
+e931  lf8 = ((*(958748) - *(1011528)) % 1000)
+e944  t660 = fn_782f(l90, 43084, ld4, le4, l68, lf8)
+e94f  t661 = fn_782f(l978, 44929, l90)
+e952  goto Lf330
+e959  t662 = fn_782f(l974, 42987)
+e963  l68 = ((*(958748) - *(1011528)) / 1000)
+e969  ld4 = (l68 / 60)
+e96f  l68 = (l68 % 60)
+e975  le4 = (l68 / 10)
+e97b  l68 = (l68 % 10)
+e984  lf8 = ((*(958748) - *(1011528)) % 1000)
+e994  t663 = fn_782f(l90, 42979, ld4, le4, l68)
+e99f  t664 = fn_782f(l978, 44929, l90)
+e9a2  goto Lf330
+e9a9  t665 = fn_782f(l974, 42969)
+e9b1  l138 = 0
+e9b9  t666 = fn_31c8d(&l84, &l44, l138, l138)
+e9be  t667 = fn_31819(&l44)
+e9ca  t668 = fn_782f(l978, l54, l44)
+e9cd  goto Lf330
+e9d4  t669 = fn_782f(l974, 42959)
+e9dc  l138 = 0
+e9e4  t670 = fn_31c8d(&l84, &l44, l138, l138)
+e9e9  t671 = fn_31819(&l44)
+e9f5  t672 = fn_782f(l978, l54, l48)
+e9f8  goto Lf330
+e9ff  t673 = fn_782f(l974, 42949)
+ea07  l138 = 0
+ea0f  t674 = fn_31c8d(&l84, &l44, l138, l138)
+ea14  t675 = fn_31819(&l44)
+ea20  t676 = fn_782f(l978, l54, l4c)
+ea23  goto Lf330
+ea2a  t677 = fn_782f(l974, 42935)
+ea32  l138 = 0
+ea3a  t678 = fn_31c8d(&l84, &l44, l138, l138)
+ea3f  t679 = fn_31819(&l44)
+ea50  t680 = fn_782f(l50, 45070, l40, l40, l40)
+ea62  t681 = fn_782f(l978, l50, l44, l48, l4c)
+ea65  goto Lf330
+ea6c  t682 = fn_782f(l974, 42919)
+ea74  l138 = 0
+ea7c  t683 = fn_31c8d(&l84, &l44, l138, l138)
+ea80  l4c = 0
+ea84  t684 = fn_31819(&l44)
+ea90  t685 = fn_782f(l978, l54, l44)
+ea93  goto Lf330
+ea9a  t686 = fn_782f(l974, 42903)
+eaa2  l138 = 0
+eaaa  t687 = fn_31c8d(&l84, &l44, l138, l138)
+eaae  l4c = 0
+eab2  t688 = fn_31819(&l44)
+eabe  t689 = fn_782f(l978, l54, l48)
+eac1  goto Lf330
+eac8  t690 = fn_782f(l974, 46692)
+eacd  if (*(851152) == 0) goto Lf330
+ead6  t691 = trap6(42885, l978, 128)
+eade  t692 = fn_8cfa(l978, 0)
+eae6  t693 = fn_8c53(l978, 0)
+eae9  goto Lf330
+eaf0  t694 = fn_782f(l974, 46679)
+eaf5  if (*(851152) == 0) goto Lf330
+eafe  t695 = trap6(42885, l978, 128)
+eb01  goto Lf330
+eb08  t696 = fn_782f(l974, 42864)
+eb0d  l68 = *(1183300)
+eb11  if (l68 < 0) goto Lf330
+eb15  if (l68 >= 64) goto Lf330
+eb1f  t697 = fn_2f24d(((1728 * l68) + 1017708))
+eb20  l13c = t697
+eb24  if (l13c == 0) goto Lf330
+eb32  t698 = fn_782f(l978, 44929, ((1728 * l68) + 1017708))
+eb35  goto Lf330
+eb3c  t699 = fn_782f(l974, 42832)
+eb41  l68 = *(1183300)
+eb45  if (l68 < 0) goto Lf330
+eb49  if (l68 >= 64) goto Lf330
+eb53  t700 = fn_2f24d(((1728 * l68) + 1017708))
+eb54  l13c = t700
+eb58  if (l13c == 0) goto Lf330
+eb66  t701 = fn_782f(l978, 44929, ((1728 * l68) + 1017708))
+eb6d  t702 = fn_326ae(l978)
+eb6e  l140 = t702
+eb78  t703 = fn_782f(l978, 44929, l140)
+eb7b  goto Lf330
+eb82  t704 = fn_782f(l974, 46846)
+eb89  t705 = fn_1024(*(1168004))
+eb8a  l138 = t705
+eb8e  l90 = l138
+eb94  t706 = fn_2f24d(l90)
+eb95  l13c = t706
+eba2  t707 = fn_324a6(l978, l90, (l13c + 1))
+eba5  goto Lf330
+ebac  t708 = fn_782f(l974, 42822)
+ebb0  t709 = fn_4f8c()
+ebb1  l138 = t709
+ebb5  if (l138 == 0) goto Lebdc
+ebb8  t710 = fn_4f8c()
+ebb9  l13c = t710
+ebbf  t711 = fn_1024(l13c)
+ebc0  l140 = t711
+ebc4  l90 = l140
+ebca  t712 = fn_2f24d(l90)
+ebcb  l144 = t712
+ebd8  t713 = fn_324a6(l978, l90, (l144 + 1))
+ebdb  goto Lf330
+Lebdc:
+ebe2  t714 = fn_782f(l978, 42814)
+ebe5  goto Lf330
+ebec  t715 = fn_782f(l974, 42798)
+ebf0  t716 = fn_4f8c()
+ebf1  l138 = t716
+ebf5  if (l138 == 0) goto Lec1f
+ebf8  t717 = fn_4f8c()
+ebf9  l13c = t717
+ec02  t718 = fn_1024((l13c - *(1168004)))
+ec03  l140 = t718
+ec07  l90 = l140
+ec0d  t719 = fn_2f24d(l90)
+ec0e  l144 = t719
+ec1b  t720 = fn_324a6(l978, l90, (l144 + 1))
+ec1e  goto Lf330
+Lec1f:
+ec24  t721 = fn_1024(*(1168004))
+ec25  l13c = t721
+ec29  l90 = l13c
+ec2f  t722 = fn_2f24d(l90)
+ec30  l140 = t722
+ec3d  t723 = fn_324a6(l978, l90, (l140 + 1))
+ec40  goto Lf330
+ec47  t724 = fn_782f(l974, 42786)
+ec4c  if (*(1159984) != 1) goto Lec61
+ec54  t725 = fn_4247(*(1167944), 1)
+ec55  l138 = t725
+ec5d  t726 = fn_782f(l978, l138)
+ec60  goto Lf330
+Lec61:
+ec68  t727 = fn_4247(*(1167944), 0)
+ec69  l13c = t727
+ec71  t728 = fn_782f(l978, l13c)
+ec74  goto Lf330
+ec7b  t729 = fn_782f(l974, 42776)
+ec80  if (*(1159984) != 1) goto Lec95
+ec88  t730 = fn_4247(*(1167940), 1)
+ec89  l138 = t730
+ec91  t731 = fn_782f(l978, l138)
+ec94  goto Lf330
+Lec95:
+ec9c  t732 = fn_4247(*(1167940), 0)
+ec9d  l13c = t732
+eca5  t733 = fn_782f(l978, l13c)
+eca8  goto Lf330
+ecaf  t734 = fn_782f(l974, 42763)
+ecb4  if (*(1159984) != 1) goto Lecc9
+ecbc  t735 = fn_4247(*(1167952), 1)
+ecbd  l138 = t735
+ecc5  t736 = fn_782f(l978, l138)
+ecc8  goto Lf330
+Lecc9:
+ecd0  t737 = fn_4247(*(1167952), 0)
+ecd1  l13c = t737
+ecd9  t738 = fn_782f(l978, l13c)
+ecdc  goto Lf330
+ece3  t739 = fn_782f(l974, 42750)
+ece8  if (*(1159984) != 1) goto Lecfd
+ecf0  t740 = fn_4247(*(1167948), 1)
+ecf1  l138 = t740
+ecf9  t741 = fn_782f(l978, l138)
+ecfc  goto Lf330
+Lecfd:
+ed04  t742 = fn_4247(*(1167948), 0)
+ed05  l13c = t742
+ed0d  t743 = fn_782f(l978, l13c)
+ed10  goto Lf330
+ed17  t744 = fn_782f(l974, 42741)
+ed21  t745 = fn_4247(*(1167924), *(1159984))
+ed22  l138 = t745
+ed2a  t746 = fn_782f(l978, l138)
+ed2d  goto Lf330
+ed37  t747 = fn_782f(l974, 42730, l980)
+ed48  t748 = fn_782f(l978, 45444, *(1167928), l980, *(1167932))
+ed4b  goto Lf330
+ed52  t749 = fn_782f(l974, 42718)
+ed5d  t750 = fn_782f(l978, 45467, *(1167936))
+ed60  goto Lf330
+ed67  t751 = fn_782f(l974, 42704)
+ed73  t752 = fn_782f(l978, 45467, i(*(1167920)))
+ed76  goto Lf330
+ed7d  t753 = fn_782f(l974, 42696)
+ed87  t754 = fn_782f(l978, 44929, 1164612)
+ed8a  goto Lf330
+ed91  t755 = fn_782f(l974, 42689)
+ed96  if (*(1168024) == 0) goto Leda1
+ed9d  t756 = fn_782f(l978, 42686)
+eda0  goto Lf330
+Leda1:
+eda7  t757 = fn_782f(l978, 42682)
+edaa  goto Lf330
+edb1  t758 = fn_782f(l974, 42674)
+edbc  l138 = 100
+edce  t759 = fn_32755(42661, (*(1168028) / 10000), ((*(1168028) / l138) % l138), (*(1168028) % l138))
+edcf  l13c = t759
+edd9  t760 = fn_782f(l978, 45467, l13c)
+eddc  goto Lf330
+ede3  t761 = fn_782f(l974, 42652)
+edee  t762 = fn_782f(l978, 45467, *(1168032))
+edf1  goto Lf330
+edf8  t763 = fn_782f(l974, 42638)
+ee03  t764 = fn_782f(l978, 45467, *(1168036))
+ee06  goto Lf330
+ee0d  t765 = fn_782f(l974, 42629)
+ee18  t766 = fn_782f(l978, 45467, *(1168040))
+ee1b  goto Lf330
+ee22  t767 = fn_782f(l974, 42617)
+ee27  if (*(1168044) == 0) goto Lee32
+ee2e  t768 = fn_782f(l978, 42686)
+ee31  goto Lf330
+Lee32:
+ee38  t769 = fn_782f(l978, 42682)
+ee3b  goto Lf330
+ee42  t770 = fn_782f(l974, 42609)
+ee47  if (*(1168048) != 0) goto Lee52
+ee4e  t771 = fn_782f(l978, 42605)
+ee51  goto Lf330
+Lee52:
+ee58  t772 = fn_782f(l978, 42601)
+ee5b  goto Lf330
+ee62  t773 = fn_782f(l974, 42589)
+ee67  if (*(1168052) == 0) goto Lee72
+ee6e  t774 = fn_782f(l978, 42686)
+ee71  goto Lf330
+Lee72:
+ee78  t775 = fn_782f(l978, 42682)
+ee7b  goto Lf330
+ee82  t776 = fn_782f(l974, 46838)
+ee8c  t777 = fn_782f(l978, 44929, 1168060)
+ee8f  goto Lf330
+ee96  t778 = fn_782f(l974, 42583)
+eea0  t779 = fn_782f(l978, 44929, 1168124)
+eea3  goto Lf330
+eeaa  t780 = fn_782f(l974, 42571)
+eeb4  t781 = fn_782f(l978, 44929, 1168140)
+eeb7  goto Lf330
+eebe  t782 = fn_782f(l974, 42559)
+eec8  t783 = fn_782f(l978, 44929, 1168400)
+eecb  goto Lf330
+eed2  t784 = fn_782f(l974, 42550)
+eedc  t785 = fn_782f(l978, 44929, 1168656)
+eedf  goto Lf330
+eee6  t786 = fn_782f(l974, 42541)
+eef0  t787 = fn_782f(l978, 44929, 1168720)
+eef3  goto Lf330
+eefa  t788 = fn_782f(l974, 42534)
+eeff  if (*(1168396) == 0) goto Lef0a
+ef06  t789 = fn_782f(l978, 42686)
+ef09  goto Lf330
+Lef0a:
+ef10  t790 = fn_782f(l978, 42682)
+ef13  goto Lf330
+ef1a  t791 = fn_782f(l974, 42526)
+ef1f  if (*(1168796) == 0) goto Lef2a
+ef26  t792 = fn_782f(l978, 42686)
+ef29  goto Lf330
+Lef2a:
+ef30  t793 = fn_782f(l978, 42682)
+ef33  goto Lf330
+ef3a  t794 = fn_782f(l974, 44073)
+ef45  t795 = fn_782f(l978, 45467, *(1168784))
+ef48  goto Lf330
+ef4f  t796 = fn_782f(l974, 42515)
+ef5a  t797 = fn_782f(l978, 45467, *(1168792))
+ef5d  goto Lf330
+ef64  t798 = fn_782f(l974, 42508)
+ef6f  t799 = fn_782f(l978, 45467, *(1168788))
+ef72  goto Lf330
+ef79  t800 = fn_782f(l974, 44080)
+ef84  t801 = fn_782f(l978, 45467, *(1168800))
+ef87  goto Lf330
+ef91  t802 = fn_782f(l974, 42493, *(6512))
+ef9f  t803 = fn_782f(l978, 42481, *(1219600), *(1219532))
+efa2  goto Lf330
+efac  t804 = fn_782f(l974, 42493, *(6516))
+efba  t805 = fn_782f(l978, 42481, *(1219604), *(1219536))
+efbd  goto Lf330
+efc7  t806 = fn_782f(l974, 42493, *(6520))
+efd5  t807 = fn_782f(l978, 42481, *(1219608), *(1219540))
+efd8  goto Lf330
+efe2  t808 = fn_782f(l974, 42493, *(6556))
+eff0  t809 = fn_782f(l978, 42481, *(1219644), *(1219576))
+eff3  goto Lf330
+effd  t810 = fn_782f(l974, 42493, *(6560))
+f00b  t811 = fn_782f(l978, 42481, *(1219648), *(1219580))
+f00e  goto Lf330
+f018  t812 = fn_782f(l974, 42493, *(6524))
+f026  t813 = fn_782f(l978, 42481, *(1219612), *(1219544))
+f029  goto Lf330
+f033  t814 = fn_782f(l974, 42493, *(6528))
+f041  t815 = fn_782f(l978, 42481, *(1219616), *(1219548))
+f044  goto Lf330
+f04e  t816 = fn_782f(l974, 42493, *(6532))
+f05c  t817 = fn_782f(l978, 42481, *(1219620), *(1219552))
+f05f  goto Lf330
+f069  t818 = fn_782f(l974, 42493, *(6536))
+f077  t819 = fn_782f(l978, 42481, *(1219624), *(1219556))
+f07a  goto Lf330
+f084  t820 = fn_782f(l974, 42493, *(6564))
+f092  t821 = fn_782f(l978, 42481, *(1219652), *(1219584))
+f095  goto Lf330

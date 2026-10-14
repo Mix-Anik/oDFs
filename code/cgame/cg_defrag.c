@@ -4,48 +4,12 @@
 // 0x1c8b event derivation (stats[12] bit toggles), 0x5248 time capture.
 #include "cg_local.h"
 
-#define DF_MAX_CHECKPOINTS	33		// 0x84 / 4: size of the DeFRaG checkpoint time buffer
-
 vmCvar_t	df_checkpoints;				// 2 = delta vs reference run, 3 = total time, else split time
 vmCvar_t	df_drawCheckpointEvents;	// popup on each checkpoint
 vmCvar_t	df_drawCheckpointStats;		// list of the last checkpoints on the HUD
 
-static int	cpTimes[DF_MAX_CHECKPOINTS];	// 0x11d6b8: checkpoint times of the current run (ms)
+int			cg_dfOptionsSet;				// "df_options" received
 int			cg_dfOptions;				// 0x11d2b8: set by the "df_options" server command (unused by DeFRaG's own qagame)
-static int	cpLast = -1;					// 0x11d738: index of the newest checkpoint, -1 = none
-
-// DeFRaG ms -> string (cgame 0x1024): "S:mmm" below one minute, "M:SS:mmm" otherwise, leading '-' for negatives
-const char *CG_DF_FormatTime( int ms ) {
-	static char	buf[2][32];
-	static int	idx;
-	char		*s;
-	const char	*sign = "";
-
-	idx ^= 1;
-	s = buf[idx];
-	if ( ms < 0 ) {
-		ms = -ms;
-		sign = "-";
-	}
-	if ( ms < 60000 ) {
-		Com_sprintf( s, sizeof( buf[0] ), "%s%i:%03i", sign, ms / 1000, ms % 1000 );
-	} else {
-		Com_sprintf( s, sizeof( buf[0] ), "%s%i:%02i:%03i", sign, ms / 60000, ( ms / 1000 ) % 60, ms % 1000 );
-	}
-	return s;
-}
-
-// text DeFRaG shows for checkpoint i (0x50b6 / 0x5153). The reference run (mode 2 "delta") is not tracked, which is
-// the case where DeFRaG itself falls back to the split time (A[0] == 0).
-static const char *CG_DF_CheckpointText( int i ) {
-	if ( df_checkpoints.integer == 3 ) {
-		return CG_DF_FormatTime( cpTimes[i] );
-	}
-	if ( cpLast != 0 && i > 0 ) {
-		return CG_DF_FormatTime( cpTimes[i] - cpTimes[i - 1] );
-	}
-	return CG_DF_FormatTime( cpTimes[i] );
-}
 
 // race time published by the server in ps.stats[7]/[8]; only the plain form (dedicated/variant servers,
 // defrag_gametype >= 5) is read here -- the obfuscated form (cgame 0x5fd7) is not decoded on this side.
@@ -184,13 +148,19 @@ static void CG_DF_Validate( const playerState_t *ops, const playerState_t *ps ) 
 
 
 // ---- end-of-run statistics (cgame 0x4388 dump, trackers 0x3a4a / 0x4677) ----
-// Not ported: "Highest Jump" (tracker 0x458e) and the per-axis counters.
+// Not ported: the per-axis counters (0x11d238/3c/40).
 vmCvar_t	df_noEndOfRunStats;
 
 static qboolean	runActive;			// 0x11d288
 static float	statMaxSpeed;		// 0x11d230
 static float	statDistance;		// 0x11d234
+static int		statHealthSpent, statArmorSpent, statShots;		// 0x11d238 / 3c / 40 (cgame 0x4677)
 static int		statStartTime;		// race time at the last start (ms)
+// jump tracker (cgame 0x458e), globals 0x11d244..0x11d264
+static float	jumpDist, jumpMaxRise, jumpLongest, jumpHighest;	// 0x11d244 / 248 / 24c / 250
+static vec3_t	jumpTakeoff;		// 0x11d258
+static int		jumpTracking;		// 0x11d254
+static int		jumpTeleBit;		// 0x11d264
 
 static float CG_DF_HorizontalLength( const vec3_t v ) {
 	return sqrt( v[0] * v[0] + v[1] * v[1] );
@@ -199,6 +169,73 @@ static float CG_DF_HorizontalLength( const vec3_t v ) {
 static void CG_DF_ResetStats( void ) {
 	statMaxSpeed = 0;
 	statDistance = 0;
+	statHealthSpent = statArmorSpent = statShots = 0;
+	jumpLongest = 0;		// 0x4370 clears 0x11d24c / 0x11d250 (not 0x11d244 / 0x11d248)
+	jumpHighest = 0;
+}
+
+// cgame 0x4545: box trace 5 units below the snapshot origin (mins -15 -15 -24, maxs 15 15 32,
+// mask SOLID|PLAYERCLIP|BODY); returns qtrue and the contact point when it hits something
+static qboolean CG_DF_GroundContact( const playerState_t *ps, vec3_t out ) {
+	static const vec3_t mins = { -15, -15, -24 }, maxs = { 15, 15, 32 };
+	trace_t	tr;
+	vec3_t	end;
+
+	VectorCopy( ps->origin, end );
+	end[2] -= 5;
+	trap_CM_BoxTrace( &tr, ps->origin, end, mins, maxs, 0, CONTENTS_SOLID | CONTENTS_PLAYERCLIP | CONTENTS_BODY );
+	if ( tr.fraction >= 1.0f ) {
+		return qfalse;
+	}
+	VectorCopy( tr.endpos, out );
+	return qtrue;
+}
+
+// cgame 0x458e, every snapshot: horizontal distance / rise since take-off; "Highest Jump" = max rise
+// (the original also accumulates while 0xcfcd0 = cg.demoPlayback is set)
+static void CG_DF_TrackJump( const playerState_t *ps ) {
+	vec3_t	pos, d;
+	int		onGround, tele;
+	float	rise;
+
+	onGround = CG_DF_GroundContact( ps, pos );
+	tele = ps->eFlags & EF_TELEPORT_BIT;
+	if ( tele != jumpTeleBit ) {
+		if ( !onGround ) {
+			VectorCopy( ps->origin, jumpTakeoff );
+		}
+		jumpTracking = onGround;
+		jumpTeleBit = tele;
+	}
+	if ( jumpTracking ) {
+		if ( onGround ) {
+			VectorCopy( pos, jumpTakeoff );
+		} else {
+			jumpDist = jumpMaxRise = 0;
+			jumpTracking = 0;
+		}
+	}
+	if ( jumpTracking || ps->stats[STAT_HEALTH] <= 0 ) {		// 0x45d5: only computed while airborne (0x11d254 == 0)
+		return;
+	}
+	VectorSubtract( onGround ? pos : ps->origin, jumpTakeoff, d );
+	rise = d[2];
+	d[2] = 0;
+	jumpDist = VectorLength( d );
+	if ( rise > jumpMaxRise || rise < -100.0f - jumpMaxRise / 4.0f ) {
+		jumpMaxRise = rise;
+	}
+	if ( runActive || cg.demoPlayback ) {
+		if ( jumpDist > jumpLongest ) {
+			jumpLongest = jumpDist;
+		}
+		if ( jumpMaxRise > jumpHighest ) {
+			jumpHighest = jumpMaxRise;
+		}
+	}
+	if ( onGround ) {
+		jumpTracking = 1;
+	}
 }
 
 // per snapshot while a run is active: max horizontal speed, horizontal distance travelled
@@ -206,6 +243,7 @@ static void CG_DF_TrackStats( const playerState_t *ops, const playerState_t *ps,
 	vec3_t	d;
 	float	speed;
 
+	CG_DF_TrackJump( ps );
 	if ( !runActive ) {
 		return;
 	}
@@ -218,6 +256,14 @@ static void CG_DF_TrackStats( const playerState_t *ops, const playerState_t *ps,
 	}
 	VectorSubtract( ps->origin, ops->origin, d );
 	statDistance += CG_DF_HorizontalLength( d );
+	// 0x46dd: health lost between the two snapshots; the armor counter (0x11d23c) is DeFRaG's own bug: it adds (prev - prev) = 0
+	if ( ops->stats[STAT_HEALTH] > ps->stats[STAT_HEALTH] ) {
+		statHealthSpent += ops->stats[STAT_HEALTH] - ps->stats[STAT_HEALTH];
+	}
+	// 0x4731: same weapon, ammo dropped by exactly 1 -> one shot fired
+	if ( ops->weapon == ps->weapon && ops->ammo[ops->weapon] == ps->ammo[ps->weapon] + 1 ) {
+		statShots++;
+	}
 }
 
 static const char *CG_DF_StatSuffixSpeed( float ups ) {
@@ -268,6 +314,13 @@ void CG_DF_PrintStats( int runMs ) {
 		CG_Printf( " (%i miles)", (int)CG_ConvertDistance( statDistance ) );
 	}
 	CG_Printf( "\n" );
+	CG_Printf( " Highest Jump   : %i units", (int)jumpHighest );
+	if ( df_unit.integer == 1 ) {
+		CG_Printf( " (%i meters)", (int)CG_ConvertDistance( jumpHighest ) );
+	} else if ( df_unit.integer == 2 ) {
+		CG_Printf( " (%i miles)", (int)CG_ConvertDistance( jumpHighest ) );
+	}
+	CG_Printf( "\n" );
 }
 
 // the "stats" server command (finish handler, non-variant servers)
@@ -282,6 +335,347 @@ void CG_DF_StatsCommand( void ) {
 	runActive = qfalse;
 }
 
+
+// ---- jump meters (cgame 0x2e7c..0x2fcc, flags df_drawJumpmeters 0x11c210: 1 height row, 2 distance row, 4 auto-hide) ----
+vmCvar_t	df_drawJumpmeters;
+static int	meterH, meterD;			// 0x11ccdc / 0x11cce0 latched values
+static int	meterExpiry, meterShow;	// 0x11cce4 / 0x11cce8
+
+static const char *CG_DF_MeterText( float value ) {
+	// 0x4247(value, df_unit == 1): metres or plain units
+	if ( df_unit.integer == 1 ) {
+		return va( "%im", (int)CG_ConvertDistance( value ) );
+	}
+	return va( "%iu", (int)value );
+}
+
+static void CG_DF_MeterRow( float *y, const char *label, int labelX, int value ) {
+	vec4_t		color;
+	const char	*s;
+
+	color[0] = color[1] = color[2] = color[3] = 1.0f;
+	CG_DrawStringExt( labelX, (int)( *y + 2 ), label, color, qfalse, qtrue, 16, 16, 0 );
+	*y += 16;
+	s = CG_DF_MeterText( (float)value );
+	CG_DrawStringExt( 635 - 16 * (int)strlen( s ), (int)( *y + 2 ), s, color, qfalse, qtrue, 16, 16, 0 );
+	*y += 20;
+}
+
+void CG_DF_DrawJumpMeters( float y ) {
+	int		flags = df_drawJumpmeters.integer;
+	int		big = jumpMaxRise > 100.0f || jumpMaxRise < -100.0f || jumpDist > 400.0f;
+
+	if ( !flags ) {
+		return;
+	}
+	if ( !( flags & 4 ) ) {
+		meterH = (int)jumpMaxRise;
+		meterD = (int)jumpDist;
+	} else if ( !meterShow ) {
+		if ( !jumpTracking && big ) {
+			meterShow = 1;
+		}
+	} else if ( meterExpiry ) {
+		if ( !jumpTracking && big ) {
+			meterExpiry = 0;
+		}
+		if ( meterExpiry < cg.time ) {
+			meterExpiry = 0;
+			meterShow = 0;
+		}
+	} else if ( jumpTracking || ( jumpMaxRise < 100.0f && jumpMaxRise > -100.0f && jumpDist < 400.0f ) ) {
+		meterExpiry = cg.time + 1000;
+	} else {
+		meterH = (int)jumpMaxRise;
+		meterD = (int)jumpDist;
+	}
+	if ( ( flags & 1 ) && ( !( flags & 4 ) || meterShow ) ) {
+		CG_DF_MeterRow( &y, "Height", 539, meterH );
+	}
+	if ( ( flags & 2 ) && ( !( flags & 4 ) || meterShow ) ) {
+		CG_DF_MeterRow( &y, "Distance", 507, meterD );
+	}
+}
+
+// ---- keymaps (cgame 0xa0be): while df_keymaps is 1, every frame the console command stored in the cvar of each pressed movement
+// direction is executed (df_keymaps_forward/back/moveleft/moveright/moveup/movedown).  The right/left mapping is DeFRaG's literal one:
+// rightmove > 0 runs df_keymaps_moveleft, rightmove < 0 runs df_keymaps_moveright.
+vmCvar_t	df_keymaps;
+vmCvar_t	df_keymaps_dir[6];
+
+void CG_DF_Keymaps( void ) {
+	usercmd_t	cmd;
+	char		buf[1024];
+	int			i, v;
+
+	if ( df_keymaps.integer != 1 ) {
+		return;
+	}
+	trap_GetUserCmd( trap_GetCurrentCmdNumber(), &cmd );
+	for ( i = 0; i < 6; i++ ) {
+		switch ( i ) {
+		case 0: v = cmd.forwardmove > 0; break;
+		case 1: v = cmd.forwardmove < 0; break;
+		case 2: v = cmd.rightmove > 0; break;
+		case 3: v = cmd.rightmove < 0; break;
+		case 4: v = cmd.upmove > 0; break;
+		default: v = cmd.upmove < 0; break;
+		}
+		if ( !v ) {
+			continue;
+		}
+		Q_strncpyz( buf, df_keymaps_dir[i].string, sizeof( buf ) );
+		if ( buf[0] ) {
+			trap_SendConsoleCommand( va( "%s\n", buf ) );
+		}
+	}
+}
+
+// ---- cvar transitions (cgame 0x9d7f, cvar df_transitions): smoothly animate cvars -------------------------------------------------
+// df_transitions is a list (COM_Parse tokens, at most 5) of cvar NAMES; each of those cvars holds a six-token definition
+//   <targetCvar> <from> <to> <rate> <mode> <progress>
+// from/to/rate/mode accept "$cvar" references.  Every frame progress advances by |rate|/100 * dt (rate < 0: units per second, scaled by
+// 1000/|to-from|), the target cvar is set to from + progress*(to-from) (clamped between the two) and the definition cvar is rewritten
+// with the new progress.  mode 0 = once, 1 = restart when finished, 2 = ping-pong.
+// DeFRaG sets the target through its `varMath` console command; oDFs sets the cvar directly.
+vmCvar_t	df_transitions;
+static int	trLastTime;			// 0x1203c8, used by 0x8e4a
+
+static float CG_DF_TrToken( const char **p, char *raw, int rawSize ) {
+	const char	*t = COM_Parse( p );
+	char		buf[256];
+
+	Q_strncpyz( raw, t, rawSize );
+	Q_strncpyz( buf, t, sizeof( buf ) );
+	CG_DF_ExpandVar( buf, sizeof( buf ) );
+	return atof( buf );
+}
+
+void CG_DF_Transitions( void ) {
+	char		list[1024], entry[1024], def[1024], target[256], raw[4][256], out[1024];
+	const char	*lp, *dp, *tok;
+	float		dt, a, b, rate, mode, prog, rem, v, lo, hi, per;
+	int			count, i, bad;
+
+	dt = 0.001f * ( cg.time - trLastTime );
+	trLastTime = cg.time;
+	Q_strncpyz( list, df_transitions.string, sizeof( list ) );
+	if ( !list[0] || !strcmp( list, "0" ) ) {
+		return;
+	}
+	lp = list;
+	for ( count = 0; count < 5; count++ ) {
+		tok = COM_Parse( &lp );
+		if ( !tok[0] ) {
+			break;
+		}
+		Q_strncpyz( entry, tok, sizeof( entry ) );
+		trap_Cvar_VariableStringBuffer( entry, def, sizeof( def ) );
+		if ( !def[0] ) {
+			break;
+		}
+		dp = def;
+		bad = 0;
+		tok = COM_Parse( &dp );
+		if ( !tok[0] ) bad = 1;
+		Q_strncpyz( target, tok, sizeof( target ) );
+		a = CG_DF_TrToken( &dp, raw[0], sizeof( raw[0] ) );
+		if ( !raw[0][0] ) bad = 1;
+		b = CG_DF_TrToken( &dp, raw[1], sizeof( raw[1] ) );
+		if ( !raw[1][0] ) bad = 1;
+		rate = CG_DF_TrToken( &dp, raw[2], sizeof( raw[2] ) );
+		if ( !raw[2][0] ) bad = 1;
+		mode = CG_DF_TrToken( &dp, raw[3], sizeof( raw[3] ) );
+		if ( !raw[3][0] ) bad = 1;
+		tok = COM_Parse( &dp );
+		if ( !tok[0] ) bad = 1;
+		prog = atof( tok );
+
+		per = fabs( b - a );
+		rem = per >= 1.0f ? 1000.0f / (float)(int)per : 1000.0f;		// (the original divides by zero when from == to)
+		if ( prog >= 1.0f ) {
+			if ( mode == 1.0f ) {
+				prog = 0;
+			} else if ( mode == 2.0f ) {
+				v = a; a = b; b = v;
+				Q_strncpyz( out, raw[0], sizeof( out ) );
+				Q_strncpyz( raw[0], raw[1], sizeof( raw[0] ) );
+				Q_strncpyz( raw[1], out, sizeof( raw[1] ) );
+				prog = 0;
+			}
+		}
+		if ( prog >= 1.0f || bad ) {
+			continue;
+		}
+		v = ( fabs( rate ) / 100.0f ) * dt;
+		prog += rate >= 0 ? v : v * rem;
+		if ( prog < 0 ) prog = 0;
+		if ( prog > 1.0f ) prog = 1.0f;
+		v = a + prog * ( b - a );
+		if ( mode == 0 ) {
+			if ( prog <= 0 ) v = a;
+			if ( prog >= 1.0f ) v = b;
+		}
+		lo = a < b ? a : b;
+		hi = a < b ? b : a;
+		if ( v < lo ) v = lo;
+		if ( v > hi ) v = hi;
+		trap_Cvar_Set( target, va( "%f", v ) );
+		Com_sprintf( out, sizeof( out ), "%s %s %s %s %s %f", target, raw[0], raw[1], raw[2], raw[3], prog );
+		trap_Cvar_Set( entry, out );
+		(void)i;
+	}
+}
+
+// ---- console commands savepos (0xae76), displaymessage (0xaf72), resetjumpmeter (0x16282) ----------------------------------------
+
+// savepos [option]: stores a `placeplayer x y z pitch yaw roll vx vy vz` command line in the cvar whose name is held by the cvar
+// `saveposname` (set it first: `set saveposname mypos`); option 1 zeroes the velocity, option 2 also the pitch.  Replay it with `vstr mypos`.
+void CG_DF_SavePos_f( void ) {
+	char	arg[64], name[1024], line[512];
+	vec3_t	pos, vel, ang;
+	int		opt;
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	opt = atoi( arg );
+	if ( !strcmp( arg, "?" ) ) {
+		CG_Printf( "\n^1savepos: ^3Allows saving and restoring player position, angles, and velocity.\n^5Usage:   ^2savepos [ <option> ]\n^5Example: ^2see savepos documentation for details.\n\n" );
+		return;
+	}
+	trap_Cvar_VariableStringBuffer( "saveposname", name, sizeof( name ) );
+	if ( !name[0] ) {
+		CG_Printf( "%s is empty. use: set %s <myposname> <options>\n", "saveposname", "saveposname" );
+		return;
+	}
+	if ( !cg.snap ) {
+		return;
+	}
+	VectorCopy( cg.snap->ps.origin, pos );
+	VectorCopy( cg.snap->ps.velocity, vel );
+	VectorCopy( cg.snap->ps.viewangles, ang );
+	if ( opt == 1 ) {
+		VectorClear( vel );
+	} else if ( opt == 2 ) {
+		VectorClear( vel );
+		ang[0] = 0;
+	}
+	Com_sprintf( line, sizeof( line ), "placeplayer %f %f %f %f %f %f %f %f %f", pos[0], pos[1], pos[2], ang[0], ang[1], ang[2], vel[0], vel[1], vel[2] );
+	trap_SendConsoleCommand( va( "set %s %s\n", name, line ) );
+	CG_Printf( "^2\"%s\" Saved:^7 ( %.3f %.3f %.3f ) %.3f %.3f ( %i %i %i )\n", name, pos[0], pos[1], pos[2], ang[0], ang[1], (int)vel[0], (int)vel[1], (int)vel[2] );
+}
+
+// displaymessage <vertical_position> <char_size> <message...> : centerprint (the vanilla CG_CenterPrint)
+void CG_DF_DisplayMessage_f( void ) {
+	char	a1[64], a2[64], msg[1024], tmp[1024];
+	int		i, n = 0, argc = trap_Argc();
+
+	trap_Argv( 1, a1, sizeof( a1 ) );
+	trap_Argv( 2, a2, sizeof( a2 ) );
+	if ( !strcmp( a1, "?" ) || !a1[0] ) {
+		CG_Printf( "\n^1displaymessage: ^3Centerprints a message on screen.\n^5Usage:          ^2displaymessage vertical_position char_size message\n^5Example:        ^2displaymessage 100 20 Hello There\n\n" );
+		return;
+	}
+	msg[0] = 0;
+	for ( i = 3; i < argc; i++ ) {
+		int len;
+
+		trap_Argv( i, tmp, sizeof( tmp ) );
+		len = strlen( tmp );
+		if ( n + len >= 1023 ) {
+			break;
+		}
+		memcpy( msg + n, tmp, len );
+		n += len;
+		if ( i != argc - 1 ) {
+			msg[n++] = ' ';
+		}
+	}
+	msg[n] = 0;
+	CG_CenterPrint( msg, atoi( a1 ), atoi( a2 ) );
+}
+
+// resetjumpmeter: clears the jump maxima (DeFRaG also clears its jump history logger, not ported)
+void CG_DF_ResetJumpMeter_f( void ) {
+	char	arg[64];
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	if ( !strcmp( arg, "?" ) || arg[0] ) {
+		CG_Printf( "\n^2resetjumpmeter: ^3Resets jump histories and maximums.\n^5Usage:          ^2resetjumpmeter\n\n" );
+		return;
+	}
+	jumpDist = jumpMaxRise = jumpLongest = jumpHighest = 0;
+	CG_Printf( "Jumpmeter histories and maximums stats reset.\n" );
+}
+
+// ---- demo seek (cgame 0x7a4e): during demo playback  set df_demos_Seek M.SS  fast-forwards (timescale 100, sound muted) to the
+// given level time (minutes.seconds, e.g. 1.30 = 1:30; the sign selects the comparison direction) and then restores timescale 1 and
+// the volumes (saved in df_user_s_volume / df_user_s_musicvolume).  With M.00 the speed is 1000.
+vmCvar_t	df_demos_Seek;
+static int	seekActive;			// 0x161c
+
+void CG_DF_DemoSeek( void ) {
+	char	buf[64];
+	float	a, seek = df_demos_Seek.value;
+	int		cur, minutes, secs, target, speed, needMove;
+
+	if ( !cg.demoPlayback ) {
+		seekActive = 0;
+		return;
+	}
+	if ( seek == 0 ) {
+		if ( seekActive ) {
+			trap_Cvar_Set( "timescale", "1" );
+		}
+		seekActive = 0;
+		return;
+	}
+	cur = cg.time - cgs.levelStartTime;
+	a = fabs( seek );
+	minutes = (int)a;
+	secs = (int)( 100.0f * ( a - (float)(int)a ) );
+	target = 1000 * ( 60 * minutes + secs );
+	needMove = ( seek < 0 ) ? ( target < cur ) : ( target > cur );
+	speed = secs == 0 ? 1000 : 100;
+	if ( needMove ) {
+		if ( !seekActive ) {
+			trap_Cvar_VariableStringBuffer( "s_volume", buf, sizeof( buf ) );
+			trap_Cvar_Set( "df_user_s_volume", buf );
+			trap_Cvar_VariableStringBuffer( "s_musicvolume", buf, sizeof( buf ) );
+			trap_Cvar_Set( "df_user_s_musicvolume", buf );
+			trap_Cvar_Set( "s_volume", "0.0" );
+			trap_Cvar_Set( "s_musicvolume", "0.0" );
+			trap_Cvar_Set( "timescale", va( "%i", speed ) );
+			CG_Printf( "^1DEMOSEEK:^7 ^3Seeking To Target:^7 ^1%i^7 ^3Current:^7 ^1%i^7 ^3Speed:^7 ^1%i^7\n", target, cur, speed );
+			seekActive = 1;
+		}
+		return;
+	}
+	if ( seekActive ) {
+		trap_Cvar_Set( "timescale", "1" );
+		trap_Cvar_VariableStringBuffer( "df_user_s_volume", buf, sizeof( buf ) );
+		trap_Cvar_Set( "s_volume", buf );
+		trap_Cvar_VariableStringBuffer( "df_user_s_musicvolume", buf, sizeof( buf ) );
+		trap_Cvar_Set( "s_musicvolume", buf );
+		CG_Printf( "^1DEMOSEEK:^7 ^3Target Reached:^7 ^1%i^7\n", cur );
+	} else {
+		CG_Printf( "^1DEMOSEEK:^7 ^3Target:^7 ^1%i^7 ^3Already Past:^7 ^1%i^7\n", target, cur );
+	}
+	trap_Cvar_Set( "df_demos_Seek", "0.00" );
+	seekActive = 0;
+}
+
+// accessors for the CHS panels (items 210-217)
+void CG_DF_GetStats( dfStats_t *o ) {
+	o->jumpHeight = jumpMaxRise;
+	o->jumpDist = jumpDist;
+	o->tallest = jumpHighest;
+	o->longest = jumpLongest;
+	o->maxSpeed = statMaxSpeed;
+	o->distance = statDistance;
+	o->healthSpent = statHealthSpent;
+	o->armorSpent = statArmorSpent;
+	o->shotsFired = statShots;
+}
 
 // ---- svinfo_report (cgame 0x4795): writes a server/run information report to system/reports/<name>.txt ----
 static const char *dfGametypeNames[8] = {
@@ -332,7 +726,7 @@ static void CG_DF_ReportInfo( fileHandle_t f, const char *info ) {
 // pairs up the checksum list and the name list of sv_paks / sv_referencedPaks
 static void CG_DF_ReportPaks( fileHandle_t f, const char *sums, const char *names ) {
 	const char	*s = sums, *n = names;
-	char	*cs, *nm;
+	const char	*cs, *nm;
 
 	for ( ;; ) {
 		cs = COM_Parse( &s );
@@ -341,6 +735,20 @@ static void CG_DF_ReportPaks( fileHandle_t f, const char *sums, const char *name
 			break;
 		}
 		CG_DF_ReportPrintf( f, "%-24s %s\r\n", cs, nm );
+	}
+}
+
+// 0x153d + 0x31e65: report file name = argument with ^x colour codes removed (path characters are replaced by '_': oDFs keeps the files
+// inside system/reports/, DeFRaG does not filter them)
+static void CG_DF_ReportFileName( const char *arg, char *out, int size ) {
+	int i;
+
+	Q_strncpyz( out, arg, size );
+	Q_CleanStr( out );
+	for ( i = 0; out[i]; i++ ) {
+		if ( out[i] == '/' || out[i] == '\\' || out[i] == ':' || out[i] == '.' ) {
+			out[i] = '_';
+		}
 	}
 }
 
@@ -357,11 +765,7 @@ void CG_DF_SvinfoReport_f( void ) {
 		CG_Printf( "usage: svinfo_report [file]\n" );
 		return;
 	}
-	// file name: keep it inside system/reports/ (the original's name filter 0x153d is not decoded)
-	for ( i = 0; arg[i] && i < (int)sizeof( name ) - 5; i++ ) {
-		name[i] = ( arg[i] == '/' || arg[i] == '\\' || arg[i] == ':' || arg[i] == '.' ) ? '_' : arg[i];
-	}
-	name[i] = 0;
+	CG_DF_ReportFileName( arg, name, sizeof( name ) );
 	Com_sprintf( path, sizeof( path ), "system/reports/%s.txt", name );
 	trap_FS_FOpenFile( path, &f, FS_WRITE );
 	if ( !f ) {
@@ -428,6 +832,86 @@ void CG_DF_SvinfoReport_f( void ) {
 }
 
 
+
+// svinfo_summary [file] (cgame 0x4b67): brace-structured short report  system/reports/<file>.txt
+//   <servername> {  / time map gametype physics mode overbounces player comp version  / validation { warnNN "text" } / }
+static void CG_DF_SummaryLine( fileHandle_t f, int indent, const char *key, const char *value ) {
+	CG_DF_ReportPrintf( f, "%s%-12s \"%s\"\r\n", indent ? "  " : "", key, value );
+}
+
+void CG_DF_SvinfoSummary_f( void ) {
+	char		arg[MAX_QPATH], name[MAX_QPATH], path[MAX_QPATH + 16], si[BIG_INFO_STRING], sys[BIG_INFO_STRING], tmp[64];
+	fileHandle_t f;
+	int			i, v, gt, mode, obs, promode;
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	if ( !arg[0] ) {
+		CG_Printf( "usage: svinfo_summary [file]\n" );
+		return;
+	}
+	CG_DF_ReportFileName( arg, name, sizeof( name ) );
+	Com_sprintf( path, sizeof( path ), "system/reports/%s.txt", name );
+	trap_FS_FOpenFile( path, &f, FS_WRITE );
+	if ( !f ) {
+		CG_Printf( "SVI_WriteSummary(): failed to open \"%s\" for writing.\n", name );
+		return;
+	}
+	Q_strncpyz( si, CG_ConfigString( CS_SERVERINFO ), sizeof( si ) );
+	Q_strncpyz( sys, CG_ConfigString( CS_SYSTEMINFO ), sizeof( sys ) );
+	v = atoi( Info_ValueForKey( si, "defrag_vers" ) );
+	if ( v > 0 && v < 1000 ) {
+		v *= 100;
+	}
+	gt = atoi( Info_ValueForKey( si, "defrag_gametype" ) );
+	mode = Info_ValueForKey( si, "defrag_mode" )[0] ? atoi( Info_ValueForKey( si, "defrag_mode" ) ) : -1;
+	obs = Info_ValueForKey( si, "defrag_obs" )[0] ? atoi( Info_ValueForKey( si, "defrag_obs" ) ) : -1;
+	promode = atoi( Info_ValueForKey( si, "df_promode" ) ) != 0;
+
+	CG_DF_ReportPrintf( f, "%s {\r\n", Info_ValueForKey( si, "defrag_servername" ) );
+	if ( v ) {
+		CG_DF_SummaryLine( f, 1, "map", Info_ValueForKey( si, "mapname" ) );
+		CG_DF_SummaryLine( f, 1, "gametype", dfGametypeNames[gt >= 0 && gt < 8 ? gt : 0] );
+		CG_DF_SummaryLine( f, 1, "physics", promode ? "cpm" : "vq3" );
+		if ( mode != -1 ) {
+			Com_sprintf( tmp, sizeof( tmp ), "%i", mode );
+			CG_DF_SummaryLine( f, 1, "mode", tmp );
+		}
+		if ( obs != -1 ) {
+			Com_sprintf( tmp, sizeof( tmp ), "%i", obs );
+			CG_DF_SummaryLine( f, 1, "overbounces", tmp );
+		}
+		if ( cg.snap ) {
+			char clean[MAX_QPATH];
+
+			Q_strncpyz( clean, cgs.clientinfo[cg.snap->ps.clientNum].name, sizeof( clean ) );
+			Q_CleanStr( clean );
+			CG_DF_SummaryLine( f, 1, "player", clean );
+		}
+		if ( Info_ValueForKey( si, "df_competition" )[0] ) {
+			CG_DF_SummaryLine( f, 1, "comp", Info_ValueForKey( si, "df_competition" ) );
+		}
+		Com_sprintf( tmp, sizeof( tmp ), "%i.%02i.%02i", v / 10000, ( v / 100 ) % 100, v % 100 );
+		CG_DF_SummaryLine( f, 1, "version", tmp );
+	} else {
+		Com_sprintf( tmp, sizeof( tmp ), "%i", gt );
+		CG_DF_SummaryLine( f, 1, "gametype", tmp );
+		CG_DF_SummaryLine( f, 1, "map", Info_ValueForKey( si, "mapname" ) );
+		CG_DF_SummaryLine( f, 1, "player", cg.snap ? cgs.clientinfo[cg.snap->ps.clientNum].name : "" );
+		CG_DF_SummaryLine( f, 1, "gamename", Info_ValueForKey( sys, "gamename" ) );
+		CG_DF_SummaryLine( f, 1, "fs_game", Info_ValueForKey( sys, "fs_game" ) );
+	}
+	if ( dfViolationCount ) {
+		CG_DF_ReportPrintf( f, "\r\n  validation {\r\n" );
+		for ( i = 0; i < dfViolationCount; i++ ) {
+			CG_DF_ReportPrintf( f, "    warn%02i \"%s\"\r\n", i + 1, dfViolationLog[i] );
+		}
+	}
+	CG_DF_ReportPrintf( f, "  }\r\n" );		// DeFRaG writes this closing line unconditionally (0x4d56)
+	CG_DF_ReportPrintf( f, "}\r\n\r\n" );
+	trap_FS_FCloseFile( f );
+	CG_Printf( "report written to %s%s\n", "system/reports/", name );
+}
+
 // ---- authentication reply (cgame 0x4337 / hash 0x11f9), see disasm/G_CLIENT/auth_handshake.md ----
 // The server (df_auth 1, non-dedicated DeFRaG-style servers) sends "auth_request <token> <mapChecksum>"; the client
 // answers "auth_reply <hash><random decoy digit>" or is dropped. The bsp-checksum comparison of the second argument
@@ -461,9 +945,8 @@ void CG_DF_AuthRequest( int token ) {
 }
 
 void CG_DF_Reset( void ) {
-	cpLast = -1;
-	memset( cpTimes, 0, sizeof( cpTimes ) );
 	dfReported = 0;
+	CG_DF_RecInit();
 }
 
 // called for every snapshot transition with the previous and the new player state
@@ -472,48 +955,40 @@ void CG_DF_SnapshotTransition( const playerState_t *ops, const playerState_t *ps
 	int	ms;
 
 	if ( ops->clientNum != ps->clientNum ) {
+		dfFollowStamp = 0;
 		CG_DF_Reset();
+		CG_DF_RecLoad();
 		return;
 	}
 	CG_DF_Validate( ops, ps );
-	CG_DF_TrackStats( ops, ps, ops->stats[STAT_DEFRAG_FLAGS] ^ ps->stats[STAT_DEFRAG_FLAGS] );
+	CG_DF_TrackStats( ops, ps, changed );
 	// bit 0x4: run (re)started
 	if ( ( changed & 4 ) && ( ps->stats[STAT_DEFRAG_FLAGS] & 4 ) ) {
-		CG_DF_Reset();
 		CG_DF_ResetStats();
 		runActive = qtrue;
+		CG_DF_RecStart();
+	}
+	// bit 0x10 toggles once per checkpoint (event 0x80)
+	if ( ( changed & 0x10 ) && CG_DF_RaceTime( ps, &ms ) ) {
+		CG_DF_RecCheckpoint( ms );
 	}
 	// bit 0x8 toggles at the finish: DeFRaG's own 0x1b10 prints the stats there on defrag_gametype >= 5 servers
 	// (other servers get the "stats" command instead)
-	if ( ( changed & 8 ) && runActive && CG_DF_RaceTime( ps, &ms ) ) {
-		CG_DF_PrintStats( ms );
-		runActive = qfalse;
-	}
-	// bit 0x10 toggles once per checkpoint (event 0x80)
-	if ( ( changed & 0x10 ) && cpLast < DF_MAX_CHECKPOINTS - 1 && CG_DF_RaceTime( ps, &ms ) ) {
-		cpTimes[++cpLast] = ms;
-		if ( df_drawCheckpointEvents.integer ) {
-			CG_CenterPrint( CG_DF_CheckpointText( cpLast ), 200, 10 );
+	if ( ( changed & 8 ) && CG_DF_RaceTime( ps, &ms ) ) {
+		CG_DF_RecFinish( ms );
+		if ( runActive ) {
+			CG_DF_PrintStats( ms );
+			runActive = qfalse;
 		}
 	}
 }
 
-// HUD list of the last 8 checkpoints, newest at the bottom, right aligned (cgame 0x5153).
-// Placement is ours: the DeFRaG caller's x/y (0x2a12) are not decoded.
-void CG_DF_DrawCheckpointList( void ) {
-	int		i, first, w;
-	float	y;
-	const char *text;
+// DeFRaG vote timing: on variant servers (defrag_gametype >= 5) with df_vote_system on, CS_VOTE_TIME holds the vote deadline
+qboolean CG_DF_VoteIsDeadline( void ) {
+	return ( atoi( CG_DF_Serverinfo( "defrag_gametype" ) ) >= 5 && atoi( CG_DF_Serverinfo( "df_vote_system" ) ) ) ? qtrue : qfalse;
+}
 
-	if ( !df_drawCheckpointStats.integer || cpLast < 0 || cpTimes[0] == 0 ) {
-		return;
-	}
-	first = ( cpLast > 7 ) ? cpLast - 7 : 0;
-	y = SCREEN_HEIGHT * 0.5f;		// the loop below walks oldest->newest and moves up (as 0x5153 does)
-	for ( i = first; i <= cpLast; i++ ) {
-		text = CG_DF_CheckpointText( i );
-		w = (int)strlen( text );
-		CG_DrawStringExt( SCREEN_WIDTH - 8 - 16 * w, (int)y, text, colorWhite, qfalse, qtrue, 16, 16, 0 );
-		y -= 16.0f;
-	}
+// defrag_flags (0x11d2b8): serverinfo value, replaced by the "df_options" server command
+int CG_DF_DefragFlags( void ) {
+	return cg_dfOptionsSet ? cg_dfOptions : atoi( CG_DF_Serverinfo( "defrag_flags" ) );
 }

@@ -729,7 +729,7 @@ CG_DrawFPS
 ==================
 */
 #define	FPS_FRAMES	4
-static float CG_DrawFPS( float y ) {
+float CG_DrawFPS( float y ) {
 	const char		*s;
 	int			w;
 	static int	previousTimes[FPS_FRAMES];
@@ -810,7 +810,7 @@ float CG_ConvertSpeed( float unitsPerSecond ) {
 CG_DrawTimer
 =================
 */
-static float CG_DrawTimer( float y ) {
+float CG_DrawTimer( float y ) {
 	const char		*s;
 	int			w;
 	int			mins, seconds, tens;
@@ -1025,11 +1025,14 @@ static void CG_DrawUpperRight(stereoFrame_t stereoFrame)
 	if ( cg_drawSnapshot.integer ) {
 		y = CG_DrawSnapshot( y );
 	}
-	if (cg_drawFPS.integer && (stereoFrame == STEREO_CENTER || stereoFrame == STEREO_RIGHT)) {
-		y = CG_DrawFPS( y );
-	}
-	if ( cg_drawTimer.integer ) {
-		y = CG_DrawTimer( y );
+	// with the DeFRaG HUD the timer and FPS are drawn by CG_DF_DrawHUD (0x216a / 0x20dd), restacked above the jump meters
+	if ( !CG_DF_HudDrawsUpperRight() ) {
+		if (cg_drawFPS.integer && (stereoFrame == STEREO_CENTER || stereoFrame == STEREO_RIGHT)) {
+			y = CG_DrawFPS( y );
+		}
+		if ( cg_drawTimer.integer ) {
+			y = CG_DrawTimer( y );
+		}
 	}
 	if ( cg_drawAttacker.integer ) {
 		CG_DrawAttacker( y );
@@ -2148,7 +2151,12 @@ static void CG_DrawVote(void) {
 		trap_S_StartLocalSound( cgs.media.talkSound, CHAN_LOCAL_SOUND );
 	}
 
-	sec = ( VOTE_TIME - ( cg.time - cgs.voteTime ) ) / 1000;
+	if ( CG_DF_VoteIsDeadline() ) {
+		// DeFRaG 0x1c9f7: the configstring carries the vote DEADLINE
+		sec = ( cgs.voteTime - cg.time ) / 1000;
+	} else {
+		sec = ( VOTE_TIME - ( cg.time - cgs.voteTime ) ) / 1000;
+	}
 	if ( sec < 0 ) {
 		sec = 0;
 	}
@@ -2158,7 +2166,7 @@ static void CG_DrawVote(void) {
 	s = "or press ESC then click Vote";
 	CG_DrawSmallString( 0, 58 + SMALLCHAR_HEIGHT + 2, s, 1.0F );
 #else
-	s = va("VOTE(%i):%s yes:%i no:%i", sec, cgs.voteString, cgs.voteYes, cgs.voteNo );
+	s = va("VOTE(%i):^3%s^7 yes:%i no:%i", sec, cgs.voteString, cgs.voteYes, cgs.voteNo );
 	CG_DrawSmallString( 0, 58, s, 1.0F );
 #endif
 }
@@ -2600,10 +2608,14 @@ static void CG_Draw2D(stereoFrame_t stereoFrame)
 				CG_DrawTimedMenus();
 			}
 #else
-			CG_DrawStatusBar();
+			if ( !df_hud.integer ) {
+				CG_DrawStatusBar();
+			}
 #endif
       
-			CG_DrawAmmoWarning();
+			if ( !df_hud.integer ) {
+				CG_DrawAmmoWarning();
+			}
 
 #ifdef MISSIONPACK
 			CG_DrawProxWarning();
@@ -2650,7 +2662,23 @@ static void CG_Draw2D(stereoFrame_t stereoFrame)
 		CG_DrawWarmup();
 	}
 
-	CG_DF_DrawCheckpointList();
+	CG_DF_Keymaps();
+	CG_DF_Transitions();
+	CG_DF_DemoSeek();
+	CG_DF_ObFrame();
+	CG_DF_AccelFrame();
+	CG_DF_DrawAccel();
+	CG_DF_DrawChs( 0 );
+	CG_DF_DrawChs( 1 );
+	CG_DF_DrawChs( 2 );
+
+	if ( df_hud.integer ) {
+		if ( !cg.showScores ) {
+			CG_DF_DrawHUD();
+		}
+	} else {
+		CG_DF_DrawCheckpointList();
+	}
 
 	// don't draw center string if scoreboard is up
 	cg.scoreBoardShowing = CG_DrawScoreboard();

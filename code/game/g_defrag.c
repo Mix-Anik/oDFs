@@ -129,6 +129,19 @@ static void G_RaceFinished( gentity_t *ent ) {
 	if ( g_dfVariant ) {
 		trap_SendServerCommand( -1, va( "print \"%s^7 reached the finish line in ^2%s^7 (est. %s)\n\"",
 		                                ent->client->pers.netname, timeBuf, estBuf ) );
+		// DeFRaG 0x3662: "ClientTimerStop" log line (server log parsed by external tools)
+		{
+			char		mapname[MAX_QPATH];
+			qtime_t		qt;
+
+			trap_Cvar_VariableStringBuffer( "mapname", mapname, sizeof( mapname ) );
+			trap_RealTime( &qt );
+			G_LogPrintf( "ClientTimerStop: %i %i \"%s\" \"%s\" %i %i %i %i %i %i %s\n", clientNum,
+			             level.time - t->startTime, mapname, ent->client->pers.netname,
+			             g_dfMode, df_promode.integer, g_dfSubMode, df_mp_InterferenceOff.integer,
+			             df_ob_killobs.integer == 0, 19131,
+			             va( "%04i-%02d-%02d", qt.tm_year + 1900, qt.tm_mon + 1, qt.tm_mday ) );
+		}
 	} else {
 		trap_SendServerCommand( clientNum, "stats" );	// DeFRaG: triggers the cgame end-of-run stats dump
 		trap_Cvar_VariableStringBuffer( "defrag_route", route, sizeof( route ) );
@@ -412,11 +425,35 @@ static int G_EncodeRaceTime( int ms, gclient_t *cl ) {
 extern vmCvar_t df_enforceSvFps, df_sv_script_idleCfg, df_sv_script_idleDelay;
 static int g_idleDeadline;		// 0x130854
 
+extern vmCvar_t df_lockPromode;
+static int g_promodeCache, g_promodeCacheStart = -1;	// 0x1317c4
+static int g_mirrorSvFps = -1, g_mirrorClFps = -1;
+
 void G_FrameRules( void ) {
 	char buf[MAX_CVAR_VALUE_STRING];
 	int  v;
 
 	if ( !g_dfVariant ) {
+		// defrag_svfps / defrag_clfps mirrors of sv_fps / com_maxfps, written only on change
+		v = trap_Cvar_VariableIntegerValue( "sv_fps" );
+		if ( v != g_mirrorSvFps ) {
+			g_mirrorSvFps = v;
+			trap_Cvar_Set( "defrag_svfps", va( "%i", v ) );
+		}
+		v = trap_Cvar_VariableIntegerValue( "com_maxfps" );
+		if ( v != g_mirrorClFps ) {
+			g_mirrorClFps = v;
+			trap_Cvar_Set( "defrag_clfps", va( "%i", v ) );
+		}
+		// runtime df_promode lock (opt-in: it makes live changes by the operator impossible)
+		if ( df_lockPromode.integer ) {
+			if ( g_promodeCacheStart != level.startTime ) {
+				g_promodeCacheStart = level.startTime;
+				g_promodeCache = df_promode.integer;
+			} else if ( df_promode.integer != g_promodeCache ) {
+				trap_Cvar_Set( "df_promode", va( "%i", g_promodeCache ) );
+			}
+		}
 		// non-dedicated path: sv_fps clamp 60..140 unless cheats (opt-in here, it overrides operator config)
 		if ( df_enforceSvFps.integer && !trap_Cvar_VariableIntegerValue( "sv_cheats" ) ) {
 			v = trap_Cvar_VariableIntegerValue( "sv_fps" );

@@ -1,0 +1,356 @@
+0 0xc494 |  | 
+1 0xc4ae | speed | %i, l68
+2 0xc4ed | health | %i, l68
+3 0xc509 | armor | %i, l68
+4 0xc525 | ammo | %i, l68
+5 0xc549 | h%sa , l980 | %i%s%i, l68, l980, ld4
+6 0xc575 | h%sa%sa , l130, l130 | %i%s%i%s%i, l68, l134, ld4, l134, le4
+7 0xc494 |  | 
+8 0xc494 |  | 
+9 0xc494 |  | 
+10 0xc5c1 | dist XY | %i %i, *(1221240), *(1221248)
+11 0xc5ff | dist Z | %i %i, *(1221240), *(1221248)
+12 0xc637 | dist XYZ | %i %i, *(1221240), *(1221248)
+13 0xc675 | dist VIEWXYZ | %i %i, *(1221240), *(1221248)
+14 0xc6c1 | dist XY%sZ%sXYZ , l130, l130 | %i %i, *(1221240), *(1221248)
+15 0xc738 | dist XY%sZ%sVIEWXYZ , l13c, l13c | %i %i, *(1221240), *(1221248)
+16 0xc7db | look pos | %i %i, *(1221240), *(1221248)
+17 0xc494 |  | 
+18 0xc494 |  | 
+19 0xc494 |  | 
+20 0xc81d | speed X | %i %i, *(1221240), *(1221248)
+21 0xc837 | speed Y | %i %i, *(1221240), *(1221248)
+22 0xc851 | speed Z | %i %i, *(1221240), *(1221248)
+23 0xc86b | speed XY | %i %i, *(1221240), *(1221248)
+24 0xc899 | speed XYZ | %i %i, *(1221240), *(1221248)
+25 0xc8cd | speed F | %i %i, *(1221240), *(1221248)
+26 0xc908 | speed S | %i %i, *(1221240), *(1221248)
+27 0xc989 | speed F%sS , l980 | %i %i, *(1221240), *(1221248)
+28 0xca26 | speed XY%sF%sS , l130, l130 | %i %i, *(1221240), *(1221248)
+29 0xc494 |  | 
+30 0xcaf3 | pitch | %i %i, *(1221240), *(1221248)
+31 0xcb0d | yaw | %i %i, *(1221240), *(1221248)
+32 0xcb27 | roll | %i %i, *(1221240), *(1221248)
+33 0xcb41 | X pos | %i %i, *(1221240), *(1221248)
+34 0xcb5b | Y pos | %i %i, *(1221240), *(1221248)
+35 0xcb75 | Z pos | %i %i, *(1221240), *(1221248)
+36 0xcb8f | view X pos | %i %i, *(1221240), *(1221248)
+37 0xcba9 | view Y pos | %i %i, *(1221240), *(1221248)
+38 0xcbc3 | view Z pos | %i %i, *(1221240), *(1221248)
+39 0xc494 |  | 
+40 0xcbe1 | p%sy , l980 | %i %i, *(1221240), *(1221248)
+41 0xcc16 | pos | %i %i, *(1221240), *(1221248)
+42 0xcc4f | pos p%sy , l980 | %i %i, *(1221240), *(1221248)
+43 0xcca2 | view pos p%sy , l980 | %i %i, *(1221240), *(1221248)
+44 0xccf9 | position x y z | %i %i, *(1221240), *(1221248)
+45 0xcd32 | view position x y z | %i %i, *(1221240), *(1221248)
+46 0xcd6f | angles x y z | %i %i, *(1221240), *(1221248)
+47 0xcda8 | velocity x y z | %i %i, *(1221240), *(1221248)
+48 0xc494 |  | 
+49 0xc494 |  | 
+50 0xcde1 | OB( | %i %i, *(1221240), *(1221248)
+51 0xce40 | OB( | %i %i, *(1221240), *(1221248)
+52 0xce81 | OB( | %i %i, *(1221240), *(1221248)
+53 0xceea | OB( | %i %i, *(1221240), *(1221248)
+54 0xcf53 | OB( | %i %i, *(1221240), *(1221248)
+55 0xcfbc | OB( | %i %i, *(1221240), *(1221248)
+56 0xd0e3 | OB( | %i %i, *(1221240), *(1221248)
+57 0xd25a | OB( | %i %i, *(1221240), *(1221248)
+58 0xd309 | OB( | %i %i, *(1221240), *(1221248)
+59 0xd408 | OB( | %i %i, *(1221240), *(1221248)
+60 0xd48f | OB( | %i %i, *(1221240), *(1221248)
+61 0xd4da | OB(%s) , *(6512) | %i %i, *(1221240), *(1221248)
+62 0xd4f1 | OB(%s) , *(6516) | %i %i, *(1221240), *(1221248)
+63 0xd50d | OB(%s) , *(6520) | %i %i, *(1221240), *(1221248)
+64 0xd524 | OB(%s) , *(6556) | %i %i, *(1221240), *(1221248)
+65 0xd53b | OB(%s) , *(6560) | %i %i, *(1221240), *(1221248)
+66 0xd552 | OB(%s) , *(6524) | %i %i, *(1221240), *(1221248)
+67 0xd569 | OB(%s) , *(6528) | %i %i, *(1221240), *(1221248)
+68 0xd580 | OB(%s) , *(6532) | %i %i, *(1221240), *(1221248)
+69 0xd597 | OB(%s) , *(6536) | %i %i, *(1221240), *(1221248)
+70 0xd5ae | OB(%s) , *(6564) | %i %i, *(1221240), *(1221248)
+71 0xd5c5 | OB(%s) , *(6568) | %i %i, *(1221240), *(1221248)
+72 0xd5dc | OB(%s) , *(6572) | %i %i, *(1221240), *(1221248)
+73 0xd5f3 | OB(%s) , *(6576) | %i %i, *(1221240), *(1221248)
+74 0xd60a | OB(%s) , *(6540) | %i %i, *(1221240), *(1221248)
+75 0xd621 | OB(%s) , *(6544) | %i %i, *(1221240), *(1221248)
+76 0xd638 | OB(%s) , *(6548) | %i %i, *(1221240), *(1221248)
+77 0xd64f | OB(%s) , *(6552) | %i %i, *(1221240), *(1221248)
+78 0xc494 |  | 
+79 0xd666 | OB VPosOffsets | %i %i, *(1221240), *(1221248)
+80 0xd695 | None | None
+81 0xd6b4 | None | None
+82 0xd746 | None | None
+83 0xd775 | None | None
+84 0xd7b0 | None | None
+85 0xd842 | None | None
+86 0xd871 | None | None
+87 0xc494 |  | 
+88 0xc494 |  | 
+89 0xc494 |  | 
+90 0xd8ac | ghost speed | %i, l68
+91 0xd8f7 | ghost dist XY | %i, l68
+92 0xd924 | ghost dist Z | %i, l68
+93 0xd951 | ghost dist XYZ | %i, l68
+94 0xd97e | ghost dist XY%sZ%sXYZ , l13c, l13c | %i, l68
+95 0xd9f0 | ghost pos | %i, l68
+96 0xda2f | nearest ghost | %i, l68
+97 0xc494 |  | 
+98 0xda6e | ghost memory size (snap snapbuf ghosts) | %i %i %i, l68, ld4, le4
+99 0xda92 | version ghost / server | %i / %i, l68, ld4
+100 0xdaca | real time (am/pm) | %2i:%02i:%02i PM, l15c, l13c, l138
+101 0xdb14 | real time | %2i:%02i:%02i, l140, l13c, l138
+102 0xdb34 | real date (us) | %i/%02i/%i, (l148 + 1), l144, (l14c + 1900)
+103 0xdb58 | real date (us) - time (am/pm) | %i/%02i/%i - %2i:%02i:%02i PM, (l148 + 1), l144, (l14c + 1900), l15c, l13c, l138
+104 0xdbbc | real date (us) - time | %i/%02i/%i - %2i:%02i:%02i, (l148 + 1), l144, (l14c + 1900), l140, l13c, l138
+105 0xdbe9 | real date (eu) | %i/%02i/%i, l144, (l148 + 1), (l14c + 1900)
+106 0xdc0d | real date (eu) - time (am/pm) | %i/%02i/%i - %2i:%02i:%02i PM, l144, (l148 + 1), (l14c + 1900), l15c, l13c, l138
+107 0xdc71 | real date (eu) - time | %i/%02i/%i - %2i:%02i:%02i, l144, (l148 + 1), (l14c + 1900), l140, l13c, l138
+108 0xdc9e | real date (YYYYMMDD) | %04i%02i%02i, (l14c + 1900), (l148 + 1), l144
+109 0xdcc2 | real time (HHMMSS) | %02i%02i%02i, l140, l13c, l138
+110 0xdce2 | fps | %i, l68
+111 0xdd00 | ping | %i, l68
+112 0xdd21 | cfps%ssfps%ssynch%spm%sts , l138, l138, l138, l138 | %i%s%i%s%i%s%i%s%1.1f, l68, l148, ld4, l148, le4, l148, lf8, l148, l3c
+113 0xdda7 | fps%sfps%ssfps%ssynch%spm%sts , l138, l138, l138, l138, l138 | %3i%s%i%s%i%s%i%s%i%s%1.1f, i(l3c), l14c, l68, l14c, ld4, l14c, le4, l14c, lf8, l14c, l58
+114 0xde3f | mapname | server | %s | %s, l13c, l140
+115 0xde7b | mapname | %s, l13c
+116 0xdea7 | server | %s, l13c
+117 0xded3 | player name | %s, ((1728 * *(958920)) + 1017708)
+118 0xdeec | player name (no color) | %s, ((1728 * *(958920)) + 1017708)
+119 0xc494 |  | 
+120 0xdf17 | AM Start Speed |         
+121 0xdf37 | AM Speed |         
+122 0xdf51 | AM MaxSpeed |         
+123 0xdf6b | AM TrueMaxSpeed |         
+124 0xdf85 | AM Accel Percent |         
+125 0xdf9f | AM Speed Percent |         
+126 0xdfb9 | AM Accel Percent H |         
+127 0xdfd3 | AM Speed Percent H |         
+128 0xdfed | AM Speed H |         
+129 0xe007 | AM MaxSpeed H |         
+130 0xe021 | AM Angles (CC%sC) , l980 |         
+131 0xe056 | AM Percent (A%sS%sstartS , l138, l138 |         
+132 0xe0a9 | AM Speeds (startS%sS%smaxS) , l138, l138 |         
+133 0xe0fc | AM Percent H (A%sS%sstartS , l138, l138 |         
+134 0xe14f | AM Speeds H (startS%sS%smaxS) , l138, l138 |         
+135 0xe1a2 | AM Percent All (hA%sstartS%sA) , l138, l138 |         
+136 0xe1f5 | AM Percent All (hA%shS%sstartS%sA%sS) , l138, l138, l138, l138 |         
+137 0xe268 | AM Speeds All (hS%shmaxS%sstartS%sS%smaxS) , l138, l138, l138, l138 |         
+138 0xe2db | AM Angle CC |         
+139 0xe2f5 | AM Angle C |         
+140 0xe30f | jumps speed |         
+141 0xe321 | jumps accel |         
+142 0xe333 | jumps dstnc |         
+143 0xe345 | jumps hght. |         
+144 0xc494 |  | 
+145 0xe357 | max speed |         
+146 0xe36d | max accel |         
+147 0xe383 | max dstnc |         
+148 0xe399 | max hght. |         
+149 0xc494 |  | 
+150 0xe3af | input |         
+151 0xe4ff | input (FLBR) |        
+152 0xe4ff | input (FLBR) |        
+153 0xe4ff | input (FLBR) |        
+154 0xc494 |  | 
+155 0xc494 |  | 
+156 0xc494 |  | 
+157 0xc494 |  | 
+158 0xc494 |  | 
+159 0xc494 |  | 
+160 0xe6f3 | savepos dist XY | %i:%i%i:%03i, ld4, le4, l68, lf8
+161 0xe6f3 | savepos dist XY | %i:%i%i:%03i, ld4, le4, l68, lf8
+162 0xe6f3 | savepos dist XY | %i:%i%i:%03i, ld4, le4, l68, lf8
+163 0xe6f3 | savepos dist XY | %i:%i%i:%03i, ld4, le4, l68, lf8
+164 0xc494 |  | 
+165 0xc494 |  | 
+166 0xc494 |  | 
+167 0xc494 |  | 
+168 0xc494 |  | 
+169 0xc494 |  | 
+170 0xe894 | server time | %i:%i%i:%03i, ld4, le4, l68, lf8
+171 0xe8d6 | client game time | %i, *(958748)
+172 0xe8eb | level start time | %i, *(1011528)
+173 0xe900 | cg.time - lvlstart (min:sec:msec) | %s, l90
+174 0xe953 | cg.time - lvlstart (min.sec) | %s, l90
+175 0xc494 |  | 
+176 0xc494 |  | 
+177 0xc494 |  | 
+178 0xc494 |  | 
+179 0xc494 |  | 
+180 0xe9a3 | Forward X | %s, ((1728 * l68) + 1017708)
+181 0xe9ce | Forward Y | %s, ((1728 * l68) + 1017708)
+182 0xe9f9 | Forward Z | %s, ((1728 * l68) + 1017708)
+183 0xea24 | Forward X Y Z | %s, ((1728 * l68) + 1017708)
+184 0xea66 | Forward X (NoZ) | %s, ((1728 * l68) + 1017708)
+185 0xea94 | Forward Y (NoZ) | %s, ((1728 * l68) + 1017708)
+186 0xc494 |  | 
+187 0xc494 |  | 
+188 0xc494 |  | 
+189 0xc494 |  | 
+190 0xeac2 | demoname | %s, ((1728 * l68) + 1017708)
+191 0xeaea | fulldemoname | %s, ((1728 * l68) + 1017708)
+192 0xeb02 | tracking player name | %s, ((1728 * l68) + 1017708)
+193 0xeb36 | tracking player name (no color) | %s, ((1728 * l68) + 1017708)
+194 0xc494 |  | 
+195 0xc494 |  | 
+196 0xc494 |  | 
+197 0xc494 |  | 
+198 0xc494 |  | 
+199 0xc494 |  | 
+200 0xeb7c | time | unknown
+201 0xeba6 | best time | unknown
+202 0xebe6 | time difference | %i%s%i, *(1167928), l980, *(1167932)
+203 0xc494 |  | 
+204 0xc494 |  | 
+205 0xc494 |  | 
+206 0xc494 |  | 
+207 0xc494 |  | 
+208 0xc494 |  | 
+209 0xc494 |  | 
+210 0xec41 | jump height | %i%s%i, *(1167928), l980, *(1167932)
+211 0xec75 | jump dist | %i%s%i, *(1167928), l980, *(1167932)
+212 0xeca9 | tallest jump | %i%s%i, *(1167928), l980, *(1167932)
+213 0xecdd | longest jump | %i%s%i, *(1167928), l980, *(1167932)
+214 0xed11 | distance | %i%s%i, *(1167928), l980, *(1167932)
+215 0xed2e | h%sa spent , l980 | %i%s%i, *(1167928), l980, *(1167932)
+216 0xed4c | shots fired | %i, *(1167936)
+217 0xed61 | highest speed | %i, i(*(1167920))
+218 0xc494 |  | 
+219 0xed77 | country | %s, 1164612
+220 0xed8b | defrag | on
+221 0xedab | version | %i, l13c
+222 0xeddd | gametype | %i, *(1168032)
+223 0xedf2 | gametype real | %i, *(1168036)
+224 0xee07 | gamemode | %i, *(1168040)
+225 0xee1c | multiplayer | on
+226 0xee3c | physics | vq3
+227 0xee5c | overbounces | on
+228 0xee7c | mapname | %s, 1168060
+229 0xee90 | route | %s, 1168124
+230 0xeea4 | competition | %s, 1168140
+231 0xeeb8 | server name | %s, 1168400
+232 0xeecc | gamename | %s, 1168656
+233 0xeee0 | gamepath | %s, 1168720
+234 0xeef4 | cheats | on
+235 0xef14 | sv_pure | on
+236 0xef34 | sv_fps | %i, *(1168784)
+237 0xef49 | pmove_msec | %i, *(1168792)
+238 0xef5e | g_sync | %i, *(1168788)
+239 0xef73 | com_maxfps | %i, *(1168800)
+240 0xc494 |  | 
+241 0xc494 |  | 
+242 0xc494 |  | 
+243 0xc494 |  | 
+244 0xc494 |  | 
+245 0xc494 |  | 
+246 0xc494 |  | 
+247 0xc494 |  | 
+248 0xc494 |  | 
+249 0xc494 |  | 
+250 0xc494 |  | 
+251 0xc494 |  | 
+252 0xc494 |  | 
+253 0xc494 |  | 
+254 0xc494 |  | 
+255 0xc494 |  | 
+256 0xc494 |  | 
+257 0xc494 |  | 
+258 0xc494 |  | 
+259 0xc494 |  | 
+260 0xc494 |  | 
+261 0xc494 |  | 
+262 0xc494 |  | 
+263 0xc494 |  | 
+264 0xc494 |  | 
+265 0xc494 |  | 
+266 0xc494 |  | 
+267 0xc494 |  | 
+268 0xc494 |  | 
+269 0xc494 |  | 
+270 0xc494 |  | 
+271 0xc494 |  | 
+272 0xc494 |  | 
+273 0xc494 |  | 
+274 0xc494 |  | 
+275 0xc494 |  | 
+276 0xc494 |  | 
+277 0xc494 |  | 
+278 0xc494 |  | 
+279 0xc494 |  | 
+280 0xc494 |  | 
+281 0xc494 |  | 
+282 0xc494 |  | 
+283 0xc494 |  | 
+284 0xc494 |  | 
+285 0xc494 |  | 
+286 0xc494 |  | 
+287 0xc494 |  | 
+288 0xc494 |  | 
+289 0xc494 |  | 
+290 0xc494 |  | 
+291 0xc494 |  | 
+292 0xc494 |  | 
+293 0xc494 |  | 
+294 0xc494 |  | 
+295 0xc494 |  | 
+296 0xc494 |  | 
+297 0xc494 |  | 
+298 0xc494 |  | 
+299 0xc494 |  | 
+300 0xef88 | OB(%s) offsets , *(6512) | %.3f | %.3f, *(1219600), *(1219532)
+301 0xefa3 | OB(%s) offsets , *(6516) | %.3f | %.3f, *(1219604), *(1219536)
+302 0xefbe | OB(%s) offsets , *(6520) | %.3f | %.3f, *(1219608), *(1219540)
+303 0xefd9 | OB(%s) offsets , *(6556) | %.3f | %.3f, *(1219644), *(1219576)
+304 0xeff4 | OB(%s) offsets , *(6560) | %.3f | %.3f, *(1219648), *(1219580)
+305 0xf00f | OB(%s) offsets , *(6524) | %.3f | %.3f, *(1219612), *(1219544)
+306 0xf02a | OB(%s) offsets , *(6528) | %.3f | %.3f, *(1219616), *(1219548)
+307 0xf045 | OB(%s) offsets , *(6532) | %.3f | %.3f, *(1219620), *(1219552)
+308 0xf060 | OB(%s) offsets , *(6536) | %.3f | %.3f, *(1219624), *(1219556)
+309 0xc494 |  | 
+310 0xf07b | OB(%s) offsets , *(6564) | %.3f | %.3f, *(1219652), *(1219584)
+311 0xf096 | None | None
+312 0xf0b1 | None | None
+313 0xf0cc | None | None
+314 0xf0e7 | None | None
+315 0xf102 | None | None
+316 0xf11d | None | None
+317 0xf138 | None | None
+318 0xc494 |  | 
+319 0xc494 |  | 
+320 0xf153 | None | None
+321 0xf18c | None | None
+322 0xf1c5 | None | None
+323 0xf21c | None | None
+324 0xf273 | None | None
+325 0xc494 |  | 
+326 0xc494 |  | 
+327 0xc494 |  | 
+328 0xc494 |  | 
+329 0xc494 |  | 
+330 0xf2d4 | None | None
+331 0xf355 | None | None
+332 0xf36a | None | None
+333 0xf37f | None | None
+334 0xf394 | None | None
+335 0xf3a9 | None | None
+336 0xf3be | None | None
+337 0xf3d3 | None | None
+338 0xf3e8 | None | None
+339 0xf411 | None | None
+340 0xf426 | None | None
+341 0xf43b | None | None
+342 0xf450 | None | None
+343 0xf465 | None | None
+344 0xf47a | None | None
+345 0xf48f | None | None
+346 0xf4a4 | None | None
+347 0xf4ed | None | None
+348 0xf4f3 | None | None
+349 0xf4fe | None | None
+350 0xf51c | None | None
+351 0xf853 | None | None
+352 0xf8a1 | None | None
+353 0xfa5d | None | None
+354 0xfc1d | None | None
+355 0xf97f | None | None

@@ -487,10 +487,13 @@ other modes: defrag_mode = df_mode_tricksmode (mode 2) / df_mode_fastcaps (mode 
   7: damage 1, weapons 6, flags 0x7e, 0,0
 (nomover is set by presets 1 and 4; the preset values for the "hook" setting are not applied here.)
 */
+int g_dfSubMode = -1;	// 0x1317c8: raw df_mode_tricksmode / df_mode_fastcaps value, -1 in run mode (logged by ClientTimerStop)
+
 void G_ResolveNdm( void ) {
 	int v;
 
 	memset( &g_ndm, 0, sizeof( g_ndm ) );
+	g_dfSubMode = -1;
 	if ( g_dfMode == 1 ) {
 		g_ndm.damage = 1;
 		g_ndm.weaponsSet = 6;
@@ -500,6 +503,7 @@ void G_ResolveNdm( void ) {
 	}
 
 	v = trap_Cvar_VariableIntegerValue( g_dfMode == 3 ? "df_mode_fastcaps" : "df_mode_tricksmode" );
+	g_dfSubMode = v;
 	if ( v < 1 || v > 7 ) {
 		v = 0;
 	}

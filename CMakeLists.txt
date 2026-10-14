@@ -123,6 +123,12 @@ if(BUILD_QVM)
         code/cgame/cg_main.c
         code/cgame/cg_consolecmds.c
         code/cgame/cg_defrag.c
+        code/cgame/cg_dfrecords.c
+        code/cgame/cg_dfhud.c
+        code/cgame/cg_dfaccel.c
+        code/cgame/cg_dfchs.c
+        code/cgame/cg_dfob.c
+        code/cgame/cg_dfreplay.c
         code/cgame/cg_draw.c
         code/cgame/cg_drawtools.c
         code/cgame/cg_effects.c

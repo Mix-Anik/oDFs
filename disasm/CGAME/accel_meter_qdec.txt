@@ -1,0 +1,897 @@
+# qdec.py pseudo-C of the DeFRaG accel-meter functions (cgame.dis). Constants are DECIMAL; lXX are frame locals (args are the l.. above the frame size); see accel_meter.md for the interpretation.
+
+=== 0x15ff4
+enter None
+15ffa  t1 = fn_8f3a(*(1205060))
+15ffb  lc = t1
+15fff  if (lc != 0) goto L16002
+16001  goto L1601a
+L16002:
+16004  t2 = fn_15f83()
+16005  l10 = t2
+16009  if (l10 != 0) goto L1600c
+1600b  goto L1601a
+L1600c:
+1600f  if (*(1204516) != 0) goto L16013
+16011  t3 = fn_15e45()
+L16013:
+16016  if (*(1204516) == 0) goto L1601a
+16018  t4 = fn_15d20()
+L1601a:
+1601b  return 0
+
+=== 0x15f83
+enter None
+15f86  l38 = 0
+15f8b  if (*(2791196) !=f l38) goto L15f95
+15f90  if (*(2791200) !=f l38) goto L15f95
+15f92  return 0
+15f94  goto L15ff2
+L15f95:
+15f98  if (*(851152) == 0) goto L15fa7
+15f9d  t1 = fn_85c0(0)
+15f9e  l3c = t1
+15fa2  if (l3c == 0) goto L15ff0
+15fa4  return 0
+15fa6  goto L15ff2
+L15fa7:
+15fac  memcpy(&l10, (*(851180) + 196), 0xc)
+15fb1  t2 = fn_13e70(&l34)
+15fb2  l3c = t2
+15fb6  l2c = l3c
+15fbe  l30 = ((313712 * l34) + 1221300)
+15fc2  if (l2c == 0) goto L15fd7
+15fc6  l40 = l30
+15fd6  memcpy(&l10, (((624 * *((l40 + 168))) + (l40 + 180)) + 16), 0xc)
+L15fd7:
+15fdc  t3 = fn_156f7(&l1c, &l10)
+15fe2  t4 = fn_3086a(&l1c)
+15fe3  l44 = t4
+15fe7  l28 = l44
+15feb  if (l28 !=f 0) goto L15ff0
+15fed  return 0
+15fef  goto L15ff2
+L15ff0:
+15ff1  return 1
+L15ff2:
+15ff3  return 0
+
+=== 0x15c24
+enter None
+15c28  if (*(1218660) != 0) goto L15c3d
+15c2e  memcpy(&l20, (*(851180) + 64), 0xc)
+15c34  memcpy(&l2c, (*(851180) + 76), 0xc)
+15c3a  memcpy(&l4c, (*(851180) + 196), 0xc)
+15c3c  goto L15c46
+L15c3d:
+15c3f  memcpy(&l20, 958800, 0xc)
+15c42  memcpy(&l2c, 958812, 0xc)
+15c45  memcpy(&l4c, 958932, 0xc)
+L15c46:
+15c4a  t1 = fn_13e70(&l60)
+15c4b  l70 = t1
+15c4f  l5c = l70
+15c57  l38 = ((313712 * l60) + 1221300)
+15c5b  if (l5c == 0) goto L15c84
+15c62  t2 = fn_13eb1(l38, &l2c)
+15c73  memcpy(&l20, (((624 * *((l38 + 168))) + (l38 + 180)) + 4), 0xc)
+15c83  memcpy(&l4c, (((624 * *((l38 + 168))) + (l38 + 180)) + 16), 0xc)
+L15c84:
+15c8a  t3 = fn_1558d(&l20, &l64)
+15c8b  l74 = t3
+15c8f  *(2791188) = l74
+15c96  t4 = fn_156f7(&l3c, &l4c)
+15c97  l78 = t4
+15c9b  l58 = l78
+15ca0  t5 = fn_31819(&l3c)
+15ca1  l7c = t5
+15ca5  l48 = l7c
+15cac  l48 = (l48 *f l58)
+15cbc  t6 = fn_15a60(&l20, &l2c, &l3c, l48, 1065353216[1.0], *(2791188))
+15cc2  if (l28 >=f *(2791216)) goto L15cd8
+15cc5  l80 = 0
+15cca  if (*(2791192) != l80) goto L15cd8
+15ccf  if (*(2791188) != l80) goto L15cd8
+15cd3  t7 = fn_1584c(0)
+15cd7  *(2791192) = 1
+L15cd8:
+15cdb  if (*(2791188) == 0) goto L15cdf
+15cde  *(2791192) = 0
+L15cdf:
+15ce7  t8 = fn_16513(&l20, &l2c, *(958748))
+15cea  return 0
+
+=== 0x15a60
+enter None
+15a64  if (la8 == 0) goto L15a89
+15a67  *(2791196) = 0
+15a6a  *(2791200) = 0
+15a6e  if (*(9212) == 0) goto L15a77
+15a72  t1 = fn_1584c(1)
+15a76  *(9212) = 0
+L15a77:
+15a78  goto L15a83
+15a7b  t2 = trap2()
+15a7c  l54 = t2
+15a80  *(2790856) = l54
+15a82  goto L15bd5
+L15a83:
+15a86  *(2790856) = *(958748)
+15a88  goto L15bd5
+L15a89:
+15a8c  if (*(9212) != 0) goto L15ab6
+15a90  *(2791204) = *(958748)
+15a94  memcpy(2791208, l94, 0xc)
+15a98  memcpy(2791220, l98, 0xc)
+15a9b  *(2791228) = 0
+15aa0  t3 = fn_3086a(2791220)
+15aa1  l54 = t3
+15aa5  l2c = l54
+15aa9  *(2791244) = l2c
+15aac  *(2791248) = 0
+15aaf  *(2791252) = 0
+15ab2  *(2790788) = 0
+15ab5  *(9212) = 1
+L15ab6:
+15ab9  memcpy(2791232, l98, 0xc)
+15abc  *(2791240) = 0
+15abf  memcpy(&l30, 2791244, 0xc)
+15ac3  t4 = fn_31819(&l30)
+15aca  t5 = trap111(l30)
+15acb  l54 = t5
+15ace  l58 = 2790788
+15adb  *(l58) = (*(l58) +f ((1127481344[180.0] *f l54) /f 1078530011[3.14159274]))
+15ade  t6 = fn_15774()
+15adf  l5c = t6
+15ae3  l24 = l5c
+15ae7  if (l24 !=f 0) goto L15afe
+15aeb  if (*(851152) != 0) goto L15af6
+15af0  t7 = fn_13e70(&l50)
+15af1  l60 = t7
+15af5  if (l60 == 0) goto L15afe
+L15af6:
+15afd  l24 = f(*((*(851180) + 96)))
+L15afe:
+15aff  goto L15b0e
+15b06  t8 = fn_8e4a(2790856, 0)
+15b07  l60 = t8
+15b0b  *(2790896) = l60
+15b0d  goto L15b1a
+L15b0e:
+15b14  t9 = fn_8e4a(2790856, 1)
+15b15  l64 = t9
+15b19  *(2790896) = l64
+L15b1a:
+15b23  l28 = ((la4 *f *(2790896)) *f l24)
+15b28  t10 = fn_3086a(2791244)
+15b29  l68 = t10
+15b2d  l44 = l68
+15b34  l48 = (l24 -f l28)
+15b38  l40 = l44
+15b3b  l3c = 0
+15b3f  if (l40 ==f 0) goto L15b47
+15b46  l3c = (l48 /f l40)
+L15b47:
+15b49  l20 = 0
+15b4f  t11 = fn_2f6c7(l3c)
+15b50  l6c = t11
+15b54  if (l6c >f 1065353216[1.0]) goto L15b60
+15b5a  t12 = trap111(l3c)
+15b5b  l70 = t12
+15b5f  l20 = l70
+L15b60:
+15b67  l4c = ((1127481344[180.0] *f l20) /f 1078530011[3.14159274])
+15b6d  t13 = trap104(l20)
+15b6e  l74 = t13
+15b72  l14 = l74
+15b78  t14 = trap103(l20)
+15b79  l78 = t14
+15b7d  l18 = l78
+15b80  l1c = 0
+15b85  t15 = fn_3086a(2791244)
+15b86  l7c = t15
+15b8a  l2c = l7c
+15b8e  if (*(1203156) == 0) goto L15b9f
+15b9e  l2c = (l2c +f (((l2c -f *(9176)) /f *(9180)) *f *(2790896)))
+L15b9f:
+15ba2  *(2791244) = l2c
+15ba5  *(2791248) = 0
+15ba8  *(2791252) = 0
+15bab  l84 = 2791244
+15bb7  *(l84) = (*(l84) +f (l28 *f l14))
+15bba  l88 = 2791248
+15bc6  *(l88) = (*(l88) +f (l28 *f l18))
+15bc9  *(2791252) = 0
+15bd3  t16 = fn_15961(&l14, l9c, *(2790788))
+L15bd5:
+15bd6  return 0
+
+=== 0x1584c
+enter None
+15851  t1 = fn_3086a(2791220)
+15852  l58 = t1
+15856  l3c = l58
+1585b  t2 = fn_3086a(2791232)
+1585c  l5c = t2
+15860  l38 = l5c
+15865  t3 = fn_3086a(2791244)
+15866  l60 = t3
+1586a  l30 = l60
+15877  t4 = fn_157f8(l3c, f((*(958748) - *(2791204))))
+15878  l64 = t4
+1587c  l54 = l64
+15880  if (*(1203156) != 0) goto L15885
+15884  l30 = l54
+L15885:
+15887  l40 = 0
+1588a  l44 = 0
+15891  l50 = (l38 -f l3c)
+15898  l34 = (l30 -f l3c)
+1589c  if (l34 ==f 0) goto L158a6
+158a5  l40 = (1120403456[100.0] *f (l50 /f l34))
+L158a6:
+158a9  l50 = l38
+158ad  l34 = l30
+158b1  if (l34 ==f 0) goto L158bb
+158ba  l44 = (1120403456[100.0] *f (l50 /f l34))
+L158bb:
+158be  if (l84 == 0) goto L158ec
+158c2  *(2791256) = l38
+158c6  *(2791260) = l30
+158ca  *(2791264) = l54
+158ce  *(2791268) = l40
+158d2  *(2791272) = l44
+158d6  if (*(2791192) != 0) goto L158fc
+158da  *(2791276) = l38
+158de  *(2791280) = l30
+158e2  *(2791284) = l40
+158e6  *(2791288) = l44
+158e9  *(2791192) = 1
+158eb  goto L158fc
+L158ec:
+158ef  *(2791276) = l38
+158f3  *(2791280) = l30
+158f7  *(2791284) = l40
+158fb  *(2791288) = l44
+L158fc:
+158fe  l68 = 0
+15903  if (*(1204244) == l68) goto L1595f
+15908  if (l84 == l68) goto L1595f
+1590c  l48 = *(1209140)
+15910  l4c = *(1209684)
+15914  t5 = fn_28f(50234)
+1591d  t6 = fn_324a6(2790532, 50160, 128)
+15926  t7 = fn_324a6(2790660, 50106, 128)
+15946  t8 = fn_23c(2790532, l48, l4c, l3c, l48, l4c, l38, l48, l4c, l30)
+1595d  t9 = fn_23c(2790660, l48, l4c, l40, l48, l4c, l44)
+L1595f:
+15960  return 0
+
+=== 0x157f8
+enter None
+157fb  lc = 1134559232[320.0]
+15800  l10 = f(*(76692))
+15806  l14 = (981668463[0.00100000] *f l10)
+1580a  if (l10 !=f 0) goto L15810
+1580d  return l38
+1580f  goto L1584a
+L15810:
+15813  if (l3c !=f 0) goto L15819
+15816  return l38
+15818  goto L1584a
+L15819:
+1581f  l24 = (lc *f l14)
+1582b  l18 = (l24 *f ((1073741824[2.0] *f lc) -f l24))
+1582f  l28 = l38
+15841  t1 = trap106(((l28 *f l28) +f (l18 *f (l3c /f l10))))
+15842  l2c = t1
+15846  l1c = l2c
+15849  return l1c
+L1584a:
+1584b  return 0
+
+=== 0x15961
+enter None
+15964  memcpy(&l20, 2791220, 0xc)
+15968  memcpy(&l2c, l78, 0xc)
+1596c  memcpy(&l38, l7c, 0xc)
+15970  t1 = fn_31819(&l20)
+15975  t2 = fn_31819(&l2c)
+1597a  t3 = fn_31819(&l38)
+15981  t4 = trap111(l20)
+15982  l50 = t4
+1598a  l18 = ((1127481344[180.0] *f l50) /f 1078530011[3.14159274])
+15990  t5 = trap111(l2c)
+15991  l54 = t5
+15999  l1c = ((1127481344[180.0] *f l54) /f 1078530011[3.14159274])
+1599f  t6 = trap111(l38)
+159a0  l58 = t6
+159a8  l10 = ((1127481344[180.0] *f l58) /f 1078530011[3.14159274])
+159b0  t7 = fn_15579(&l20, l18)
+159b1  l5c = t7
+159b5  l18 = l5c
+159bd  t8 = fn_15579(&l2c, l1c)
+159be  l60 = t8
+159c2  l1c = l60
+159ca  t9 = fn_15579(&l38, l10)
+159cb  l64 = t9
+159cf  l10 = l64
+159d3  l44 = l10
+159d7  l10 = l44
+159e1  l14 = ((l18 +f l1c) +f l80)
+159e5  if (l14 <f 1135869952[360.0]) goto L159ec
+159eb  l14 = (l14 -f 1135869952[360.0])
+L159ec:
+159f4  t10 = fn_2f6c7((l10 -f l14))
+159f5  l68 = t10
+159f9  if (l68 <=f 1127481344[180.0]) goto L15a0e
+159fd  if (l10 <f 1127481344[180.0]) goto L15a04
+15a03  l10 = (l10 -f 1135869952[360.0])
+L15a04:
+15a07  if (l14 <f 1127481344[180.0]) goto L15a0e
+15a0d  l14 = (l14 -f 1135869952[360.0])
+L15a0e:
+15a14  l4c = (l10 -f l14)
+15a18  l10 = l44
+15a22  l14 = ((l18 -f l1c) -f l80)
+15a26  if (l14 <f 1135869952[360.0]) goto L15a2d
+15a2c  l14 = (l14 -f 1135869952[360.0])
+L15a2d:
+15a35  t11 = fn_2f6c7((l14 -f l10))
+15a36  l6c = t11
+15a3a  if (l6c <=f 1127481344[180.0]) goto L15a4f
+15a3e  if (l10 <f 1127481344[180.0]) goto L15a45
+15a44  l10 = (l10 -f 1135869952[360.0])
+L15a45:
+15a48  if (l14 <f 1127481344[180.0]) goto L15a4f
+15a4e  l14 = (l14 -f 1135869952[360.0])
+L15a4f:
+15a55  l48 = (l14 -f l10)
+15a59  *(2791196) = l48
+15a5d  *(2791200) = l4c
+15a5f  return 0
+
+=== 0x15774
+enter None
+1577c  t1 = trap100(&l2c, 0, 24)
+15781  t2 = fn_155d2(&l2c)
+15788  l24 = f(*(byte*)(&l41))
+1578e  l28 = f(*(byte*)(&l42))
+15791  *(byte*)(&l43) = 0
+1579d  t3 = fn_15658(&l2c, f(*((*(851180) + 96))))
+1579e  l58 = t3
+157a2  l48 = l58
+157a5  *(2790868) = 0
+157a8  *(2790880) = 0
+157ac  t4 = fn_31819(2790860)
+157b1  t5 = fn_31819(2790872)
+157b5  l14 = 0
+L157b6:
+157bb  l5c = (l14 << 2)
+157d1  *((l5c + &l18)) = ((*((l5c + 2790860)) *f l24) +f (*((l5c + 2790872)) *f l28))
+157d7  l14 = (l14 + 1)
+157db  if (l14 < 2) goto L157b6
+157de  l20 = 0
+157e1  memcpy(&l4c, &l18, 0xc)
+157e6  t6 = fn_31819(&l4c)
+157e7  l60 = t6
+157eb  l44 = l60
+157f2  l44 = (l44 *f l48)
+157f5  return l44
+157f7  return 0
+
+=== 0x156f7
+enter None
+156ff  t1 = trap100(&l30, 0, 24)
+15704  t2 = fn_155d2(&l30)
+1570b  l28 = f(*(byte*)(&l45))
+15711  l2c = f(*(byte*)(&l46))
+1571d  t3 = fn_15658(&l30, f(*((*(851180) + 96))))
+1571e  l4c = t3
+15722  l48 = l4c
+1572d  t4 = fn_31c8d(l60, 2790860, 2790872, 2790884)
+15731  *(2790868) = 0
+15734  *(2790880) = 0
+15738  t5 = fn_31819(2790860)
+1573d  t6 = fn_31819(2790872)
+15741  l18 = 0
+L15742:
+15747  l50 = (l18 << 2)
+1575d  *((l50 + &l1c)) = ((*((l50 + 2790860)) *f l28) +f (*((l50 + 2790872)) *f l2c))
+15763  l18 = (l18 + 1)
+15767  if (l18 < 2) goto L15742
+1576a  l24 = 0
+1576e  memcpy(l5c, &l1c, 0xc)
+15771  return l48
+15773  return 0
+
+=== 0x15bd7
+enter None
+15bdb  lc = *(1203424)
+15be1  t1 = fn_2f6c7(lc)
+15be2  l18 = t1
+15be6  l10 = l18
+15beb  t2 = fn_3086a(2791232)
+15bec  l1c = t2
+15bf0  l14 = l1c
+15bf3  l20 = 0
+15bf8  if (l14 ==f l20) goto L15c08
+15bfd  if (lc >=f l20) goto L15c08
+15c07  l10 = (l10 *f (l14 /f *(9184)))
+L15c08:
+15c0d  t3 = fn_2f6c7(lc)
+15c0e  l24 = t3
+15c13  if (l10 >=f l24) goto L15c1f
+15c19  t4 = fn_2f6c7(lc)
+15c1a  l28 = t4
+15c1e  l10 = l28
+L15c1f:
+15c21  return l10
+15c23  return 0
+
+=== 0x15ceb
+enter None
+15cef  l24 = l24
+15cf6  t1 = fn_2f6b2(i(*(2791196)))
+15cf7  l14 = t1
+15cfe  t2 = fn_2f6b2(i(*(2791200)))
+15cff  l18 = t2
+15d04  if (l14 >= l18) goto L15d0c
+15d09  l10 = (-*(2791196))
+15d0b  goto L15d10
+L15d0c:
+15d0f  l10 = *(2791200)
+L15d10:
+15d1a  lc = (l24 + i((l10 *f l28)))
+15d1d  return lc
+15d1f  return 0
+
+=== 0x15e45
+enter None
+15e49  l44 = *(93012)
+15e4d  if (l44 >= 0) goto L15e51
+15e50  l44 = 0
+L15e51:
+15e5b  l48 = *((((l44 % 10) << 2) + 1130576))
+15e5f  l3c = *(1203972)
+15e63  l40 = *(1203700)
+15e67  l50 = *(91104)
+15e6b  l38 = l50
+15e6f  l34 = l50
+15e74  l2c = f(*(91652))
+15e79  l30 = f(*(91380))
+15e81  l2c = (l2c +f f(l3c))
+15e89  l30 = (l30 +f f(l40))
+15e93  t1 = fn_1d12a(&l2c, &l30, &l34, &l38)
+15e97  l54 = 0
+15e9c  if (l3c != l54) goto L15ea2
+15ea1  if (l40 == l54) goto L15eed
+L15ea2:
+15ea4  l58 = 1056964608[0.5]
+15ea8  l5c = l34
+15ebd  l60 = l38
+15ed7  l64 = 0
+15ee0  l68 = 1065353216[1.0]
+15eeb  t2 = trap46(((l2c +f f(*(960188))) +f (l58 *f (f(*(960196)) -f l5c))), ((l30 +f f(*(960192))) +f (l58 *f (f(*(960200)) -f l60))), l5c, l60, l64, l64, l68, l68, l48)
+L15eed:
+15ef0  l58 = *(91104)
+15ef4  l38 = l58
+15ef8  l34 = l58
+15efd  l2c = f(*(91652))
+15f02  l30 = f(*(91380))
+15f0a  l2c = (l2c +f f(l3c))
+15f12  l30 = (l30 +f f(l40))
+15f15  t3 = fn_15bd7()
+15f16  l5c = t3
+15f1a  l4c = l5c
+15f24  t4 = fn_15ceb(i(l2c), l4c)
+15f25  l60 = t4
+15f2a  l2c = f(l60)
+15f34  t5 = fn_1d12a(&l2c, &l30, &l34, &l38)
+15f38  l64 = 1056964608[0.5]
+15f3c  l68 = l34
+15f51  l6c = l38
+15f6b  l70 = 0
+15f74  l74 = 1065353216[1.0]
+15f7f  t6 = trap46(((l2c +f f(*(960188))) +f (l64 *f (f(*(960196)) -f l68))), ((l30 +f f(*(960192))) +f (l64 *f (f(*(960200)) -f l6c))), l68, l6c, l70, l70, l74, l74, l48)
+15f82  return 0
+
+=== 0x15d20
+enter None
+15d24  l58 = *(1203972)
+15d28  l5c = *(1203700)
+15d2c  l40 = *(1204788)
+15d30  l50 = *(1209408)
+15d34  l4c = *(1209956)
+15d39  l44 = f(*(91652))
+15d3e  l48 = f(*(91380))
+15d4b  l44 = (l44 +f f((l58 - (l40 / 2))))
+15d58  l48 = (l48 +f f((l5c - (l40 / 2))))
+15d5b  t1 = fn_15bd7()
+15d5c  l64 = t1
+15d60  l60 = l64
+15d6a  t2 = fn_15ceb(i(l44), l60)
+15d6b  l68 = t2
+15d70  l54 = f(l68)
+15d73  l6c = 48
+15d81  l3c = ((((*(1209140) + l6c) - l6c) & 15) % 10)
+15d8a  l2c = *(((l3c << 4) + 16708))
+15d93  l30 = *(((l3c << 4) + 16712))
+15d9c  l34 = *(((l3c << 4) + 16716))
+15da0  l38 = l50
+15da4  t3 = trap45(&l2c)
+15da9  if (*(1204516) != 1) goto L15dca
+15dc8  t4 = fn_1d330(i((l54 +f 1134559232[320.0])), i((l48 +f 1131413504[240.0])), 49954, &l2c, 0, l4c, l40, l40, 1)
+L15dca:
+15dcd  if (*(1204516) != 2) goto L15dee
+15dec  t5 = fn_1d330(i((l54 +f 1134559232[320.0])), i((l48 +f 1131413504[240.0])), 49952, &l2c, 0, l4c, l40, l40, 1)
+L15dee:
+15df0  l78 = 48
+15dfe  l3c = ((((*(1209684) + l78) - l78) & 15) % 10)
+15e07  l2c = *(((l3c << 4) + 16708))
+15e10  l30 = *(((l3c << 4) + 16712))
+15e19  l34 = *(((l3c << 4) + 16716))
+15e1d  l38 = l50
+15e21  t6 = trap45(&l2c)
+15e41  t7 = fn_1d330(i((l44 +f 1134559232[320.0])), i((l48 +f 1131413504[240.0])), 49952, &l2c, 0, l4c, l40, l40, 1)
+15e44  return 0
+
+=== 0x155d2
+enter None
+155d5  l14 = 0
+155da  if (*(851152) != l14) goto L155e5
+155e4  if ((*((*(851180) + 56)) & 4096) == l14) goto L15645
+L155e5:
+155ea  *(byte*)((l34 + 21)) = 0
+155f0  *(byte*)((l34 + 22)) = 0
+155f6  *(byte*)((l34 + 23)) = 0
+155fb  t1 = fn_85c0(0)
+155fc  l18 = t1
+15600  if (l18 == 0) goto L15603
+15602  goto L15656
+L15603:
+15607  t2 = fn_85c0(1)
+15608  l1c = t2
+1560c  if (l1c == 0) goto L15613
+15612  *(byte*)((l34 + 21)) = 127
+L15613:
+15617  t3 = fn_85c0(2)
+15618  l20 = t3
+1561c  if (l20 == 0) goto L15623
+15622  *(byte*)((l34 + 21)) = -127
+L15623:
+15627  t4 = fn_85c0(8)
+15628  l24 = t4
+1562c  if (l24 == 0) goto L15633
+15632  *(byte*)((l34 + 22)) = -127
+L15633:
+15637  t5 = fn_85c0(16)
+15638  l28 = t5
+1563c  if (l28 == 0) goto L15656
+15642  *(byte*)((l34 + 22)) = 127
+15644  goto L15656
+L15645:
+15647  t6 = trap54()
+15648  l18 = t6
+1564c  l10 = l18
+15654  t7 = trap55(l10, l34)
+L15656:
+15657  return 0
+
+=== 0x15658
+enter None
+15662  t1 = fn_2f6b2(*(byte*)((l48 + 21)))
+15663  l18 = t1
+15667  lc = l18
+15671  t2 = fn_2f6b2(*(byte*)((l48 + 22)))
+15672  l1c = t2
+15677  if (l1c <= lc) goto L15687
+15681  t3 = fn_2f6b2(*(byte*)((l48 + 22)))
+15682  l20 = t3
+15686  lc = l20
+L15687:
+15690  t4 = fn_2f6b2(*(byte*)((l48 + 23)))
+15691  l24 = t4
+15696  if (l24 <= lc) goto L156a6
+156a0  t5 = fn_2f6b2(*(byte*)((l48 + 23)))
+156a1  l28 = t5
+156a5  lc = l28
+L156a6:
+156a9  if (lc != 0) goto L156ae
+156ab  return 0
+156ad  goto L156f5
+L156ae:
+156b1  l2c = l48
+156b9  l30 = *(byte*)((l2c + 21))
+156c1  l34 = *(byte*)((l2c + 22))
+156c9  l38 = *(byte*)((l2c + 23))
+156df  t6 = trap106(f((((l30 * l30) + (l34 * l34)) + (l38 * l38))))
+156e0  l3c = t6
+156e4  l10 = l3c
+156f1  l14 = ((l4c *f f(lc)) /f (1123942400[127.0] *f l10))
+156f4  return l14
+L156f5:
+156f6  return 0
+
+=== 0x15579
+enter None
+15580  if (*((l10 + 4)) >=f 0) goto L15588
+15585  return (1135869952[360.0] -f l14)
+15587  goto L1558b
+L15588:
+1558a  return l14
+L1558b:
+1558c  return 0
+
+=== 0x1558d
+enter None
+15590  memcpy(&l68, 9188, 0xc)
+15593  memcpy(&l74, 9200, 0xc)
+15597  memcpy(&l80, l94, 0xc)
+1559b  memcpy(&l5c, l94, 0xc)
+155a1  l64 = (l64 -f 1084227584[5.0])
+155b1  t1 = trap25(&l24, &l80, &l5c, &l68, &l74, 0, 33619969[9.47742432])
+155b6  if (l2c >=f 1065353216[1.0]) goto L155ce
+155bb  *(l98) = l30
+155c2  *((l98 + 4)) = l34
+155c9  *((l98 + 8)) = l38
+155cb  return 1
+155cd  goto L155d0
+L155ce:
+155cf  return 0
+L155d0:
+155d1  return 0
+
+=== 0x13eb1
+enter None
+13eb5  *(lc0) = 0
+13ebb  *((lc0 + 4)) = 0
+13ec1  *((lc0 + 8)) = 0
+13ecc  t1 = fn_123bd(*((lbc + 168)), 500)
+13ecd  l50 = t1
+13ed1  l10 = l50
+13ede  memcpy(&l24, (((624 * l10) + (lbc + 180)) + 4), 0xc)
+13ee2  l54 = lbc
+13ef2  memcpy(&l30, (((624 * *((l54 + 168))) + (l54 + 180)) + 4), 0xc)
+13ef5  l58 = 624
+13ef9  l5c = lbc
+13eff  l60 = (l5c + 180)
+13f15  if (*(((l58 * l10) + l60)) >= *(((l58 * *((l5c + 168))) + l60))) goto L14027
+13f18  l64 = 624
+13f1c  l68 = lbc
+13f22  l6c = (l68 + 180)
+13f3a  l20 = (*(((l64 * *((l68 + 168))) + l6c)) - *(((l64 * l10) + l6c)))
+13f3e  if (l20 == 0) goto L14027
+13f41  l70 = 624
+13f45  l74 = lbc
+13f4b  l78 = (l74 + 180)
+13f4e  l7c = 4
+13f6c  l3c = (*((((l70 * *((l74 + 168))) + l78) + l7c)) -f *((((l70 * l10) + l78) + l7c)))
+13f6f  l80 = 624
+13f73  l84 = lbc
+13f79  l88 = (l84 + 180)
+13f7c  l8c = 8
+13f9a  l40 = (*((((l80 * *((l84 + 168))) + l88) + l8c)) -f *((((l80 * l10) + l88) + l8c)))
+13f9d  l90 = 624
+13fa1  l94 = lbc
+13fa7  l98 = (l94 + 180)
+13faa  l9c = 12
+13fc8  l44 = (*((((l90 * *((l94 + 168))) + l98) + l9c)) -f *((((l90 * l10) + l98) + l9c)))
+13fcc  la0 = l3c
+13fd0  la4 = l40
+13fd4  la8 = l44
+13fe9  t2 = trap106((((la0 *f la0) +f (la4 *f la4)) +f (la8 *f la8)))
+13fea  lac = t2
+13fee  l4c = lac
+13ff8  l48 = (1148846080[1000.0] *f (l4c /f f(l20)))
+13ffc  l14 = l3c
+14000  l18 = l40
+14004  l1c = l44
+14008  t3 = fn_31819(&l14)
+1400d  lb0 = l48
+14014  l14 = (l14 *f lb0)
+1401b  l18 = (l18 *f lb0)
+14022  l1c = (l1c *f l48)
+14026  memcpy(lc0, &l14, 0xc)
+L14027:
+14028  return 0
+
+=== 0x13e70
+enter None
+13e73  l10 = 0
+13e76  l8 = 0
+L13e77:
+13e7e  lc = ((313712 * l8) + 1221300)
+13e85  if (*((lc + 164)) == 2) goto L13e88
+13e87  goto L13e96
+L13e88:
+13e8e  if (*((lc + 312216)) != 0) goto L13e91
+13e90  goto L13e96
+L13e91:
+13e93  l10 = 1
+13e95  goto L13ea0
+L13e96:
+13e9b  l8 = (l8 + 1)
+13e9f  if (l8 < 5) goto L13e77
+L13ea0:
+13ea3  if (l10 != 0) goto L13ea7
+13ea6  l8 = 0
+L13ea7:
+13eab  *(l1c) = l8
+13eae  return l10
+13eb0  return 0
+
+=== 0x16513
+enter None
+16517  l48 = l48
+1651a  l18 = 2790904
+16523  t1 = fn_1607e(l40, *(9216))
+16524  l24 = t1
+16528  l1c = l24
+1652c  l20 = *(958740)
+1652f  l28 = 0
+16537  if (*((l18 + 28)) == l28) goto L1654c
+1653c  if (l1c != l28) goto L1654c
+1654a  t2 = fn_1648f(l18, l40, l44, l48)
+L1654c:
+1654e  l2c = 0
+16556  if (*((l18 + 28)) != l2c) goto L1656b
+1655b  if (l1c == l2c) goto L1656b
+16569  t3 = fn_164a9(l18, l40, l44, l48)
+L1656b:
+1656d  l30 = 0
+16575  if (*((l18 + 28)) != l30) goto L165a9
+1657a  if (l1c != l30) goto L165a9
+16588  t4 = fn_164bc(l18, l40, l44, l48)
+1658c  l34 = 8
+16599  if (*((l40 + l34)) >=f *((l18 + l34))) goto L165a9
+165a7  t5 = fn_164cf(l18, l40, l44, l48)
+L165a9:
+165ac  if (l1c == 0) goto L165b3
+165b1  t6 = fn_1648c(l18)
+L165b3:
+165b5  l34 = 0
+165ba  if (l1c != l34) goto L165c8
+165bf  if (l20 != l34) goto L165d7
+165c7  if (*((l18 + 36)) == l34) goto L165d7
+L165c8:
+165d5  t7 = fn_164d6(l18, l40, l44, l48)
+L165d7:
+165dd  *((l18 + 28)) = l1c
+165e4  *((l18 + 36)) = *(958740)
+165e6  return 0
+
+=== 0x164d6
+enter None
+164da  l28 = l28
+164df  memcpy(l1c, l20, 0xc)
+164e6  memcpy((l1c + 12), l24, 0xc)
+164ed  *((l1c + 24)) = *(958748)
+164f4  if (*((l1c + 32)) != 0) goto L16511
+164fa  t1 = fn_825f(l24)
+164fb  l10 = t1
+16501  if (l10 >=f f(*(1202884))) goto L16507
+16504  lc = 1
+16506  goto L1650a
+L16507:
+16509  lc = 0
+L1650a:
+16510  *((l1c + 32)) = lc
+L16511:
+16512  return 0
+
+=== 0x85c0
+enter None
+85c4  if (*(1218660) != 0) goto L85d0
+85cd  return (*((*(851180) + 280)) & l10)
+85cf  goto L85d6
+L85d0:
+85d5  return (*(959016) & l10)
+L85d6:
+85d7  return 0
+
+=== 0x8e4a
+enter None
+8e4e  if (l48 == 0) goto L8e65
+8e56  l18 = (*(958748) - *(l44))
+8e5b  *(l44) = *(958748)
+8e62  l14 = (981668463[0.00100000] *f f(l18))
+8e64  goto L8e97
+L8e65:
+8e6c  t1 = trap6(36605, &l1c, 15)
+8e72  t2 = fn_2f428(&l1c)
+8e73  l34 = t2
+8e77  l30 = l34
+8e7a  t3 = trap2()
+8e7b  l38 = t3
+8e7f  l2c = l38
+8e87  l18 = (l2c - *(l44))
+8e8c  *(l44) = l2c
+8e96  l14 = ((981668463[0.00100000] *f f(l18)) *f l30)
+L8e97:
+8e99  return l14
+8e9b  return 0
+
+=== 0x8e9c
+enter None
+8ea0  if (*(851156) == 0) goto L8ea5
+8ea2  return 0
+8ea4  goto L8ee1
+L8ea5:
+8ea8  if (*(90292) != 0) goto L8ead
+8eaa  return 0
+8eac  goto L8ee1
+L8ead:
+8eb3  if (*((*(851180) + 48)) != 5) goto L8eb8
+8eb5  return 0
+8eb7  goto L8ee1
+L8eb8:
+8eba  l8 = 0
+8ebf  if (*(965976) != l8) goto L8ec8
+8ec7  if (*((*(851180) + 228)) > l8) goto L8ecc
+L8ec8:
+8ec9  return 0
+8ecb  goto L8ee1
+L8ecc:
+8ed2  if (*((*(851180) + 304)) != 3) goto L8ed7
+8ed4  return 0
+8ed6  goto L8ee1
+L8ed7:
+8eda  if (*(958772) == 0) goto L8edf
+8edc  return 0
+8ede  goto L8ee1
+L8edf:
+8ee0  return 1
+L8ee1:
+8ee2  return 0
+
+=== 0x8ee3
+enter None
+8ee7  l8 = l20
+8eeb  if (l8 < 0) goto L8f36
+8eef  if (l8 > 4) goto L8f36
+8ef7  goto *(((l8 << 2) + 5692))
+8ef9  return 0
+8efb  goto L8f38
+8efd  return 1
+8eff  goto L8f38
+8f03  if (*(851152) != 0) goto L8f0c
+8f0b  if (*(851148) == *((*(851180) + 184))) goto L8f11
+L8f0c:
+8f0e  l10 = 1
+8f10  goto L8f14
+L8f11:
+8f13  l10 = 0
+L8f14:
+8f16  return l10
+8f18  goto L8f38
+8f1c  if (*(851152) != 0) goto L8f2a
+8f24  if (*(851148) != *((*(851180) + 184))) goto L8f2a
+8f27  l14 = 1
+8f29  goto L8f2d
+L8f2a:
+8f2c  l14 = 0
+L8f2d:
+8f2f  return l14
+8f31  goto L8f38
+8f33  return 1
+8f35  goto L8f38
+L8f36:
+8f37  return 0
+L8f38:
+8f39  return 0
+
+=== 0x8f3a
+enter None
+8f3e  if (l18 == 4) goto L8f4b
+8f41  t1 = fn_8e9c()
+8f42  lc = t1
+8f46  if (lc != 0) goto L8f4b
+8f48  return 0
+8f4a  goto L8f55
+L8f4b:
+8f50  t2 = fn_8ee3(l18)
+8f51  lc = t2
+8f54  return lc
+L8f55:
+8f56  return 0

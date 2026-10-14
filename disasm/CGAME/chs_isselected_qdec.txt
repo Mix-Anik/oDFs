@@ -1,0 +1,44 @@
+enter 0x440
+bc6d  t1 = fn_782f(&l24, 45496)
+bc71  l424 = 0
+Lbc72:
+bc7d  t2 = fn_f332(&l24, l448, (l424 + 1))
+bc83  t3 = fn_2f24d(&l24)
+bc84  l42c = t3
+bc88  if (l42c != 0) goto Lbc8d
+bc8a  return 0
+bc8c  goto Lbcf4
+Lbc8d:
+bc8f  l428 = &l24
+bc92  l20 = &l428
+bc9a  t4 = fn_32168(l20, 1)
+bc9b  l430 = t4
+bc9f  l14 = l430
+bca2  l18 = 0
+bca4  goto Lbcdd
+Lbca5:
+bcaa  t5 = fn_2f5b8(l14)
+bcab  l434 = t5
+bcaf  l1c = l434
+bcb5  t6 = fn_2f6b2(l1c)
+bcb6  l438 = t6
+bcbe  if ((l438 % *(6500)) != l44c) goto Lbcc3
+bcc0  return 1
+bcc2  goto Lbcf4
+Lbcc3:
+bcca  t7 = fn_32168(l20, 1)
+bccb  l43c = t7
+bccf  l14 = l43c
+bcd5  l18 = (l18 + 1)
+bcda  if (l18 < *(6508)) goto Lbcdd
+bcdc  goto Lbce8
+Lbcdd:
+bce2  t8 = fn_2f24d(l14)
+bce3  l434 = t8
+bce7  if (l434 != 0) goto Lbca5
+Lbce8:
+bced  l424 = (l424 + 1)
+bcf1  if (l424 < 8) goto Lbc72
+bcf3  return 0
+Lbcf4:
+bcf5  return 0

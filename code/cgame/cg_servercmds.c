@@ -1030,6 +1030,7 @@ static void CG_ServerCommand( void ) {
 	}
 	if ( !strcmp( cmd, "df_options" ) ) {
 		cg_dfOptions = atoi( CG_Argv(1) );
+		cg_dfOptionsSet = 1;
 		return;
 	}
 	// the legacy rec/newTime/exec/bestTime/ckpt commands are swallowed
