@@ -362,3 +362,6 @@ Total 288 cvars; **199 are not registered by oDFs's cgame** (the whole DeFRaG cl
 | `df_ob_AllSlopes` | `0` | `0x1` ARCHIVE |  |
 | `df_ob_OffsetStartPosZ` | `0.00` | `0x100` TEMP |  |
 | `df_ob_OffsetStopPosZ` | `0.00` | `0x100` TEMP |  |
+
+## Iter 112 audit: cvars from this table that are still NOT registered by code/cgame (script check `"name"` substring)
+cg_stereoSeparation, cg_lagometer_x/y (`0x1c4eb`), cg_noDamageKick (`0x26adf`, PORTED iter 112), cg_noFallKick (`0x1f7e0`, PORTED iter 112), cg_crosshairColor (`0x8fe1`), cg_drawDamage (`0x29a4a`), cg_nochatbeep (`0x28d70`), cg_drawBBox (`0x1cecd`), cg_muzzleFlash (`0x2b523`), ch_recordMessage (`0x19e`), s_ambient (`0x1e8a9`/`0x1f222`/`0x1f7e0`), df_cl_alwaysDrawItems, df_accel_Output / df_accel_HistoryResetSpeed, df_ghosts_LiveAmmo / CheckPVS / Miniview* (9, miniview `0x12a10`), df_ghost1/2_PlayCameraMode. NOTE: the earlier "all DeFRaG cgame cvars are registered" claim (iter 109) was wrong — it only held for the df_* names the consumers-first sweeps looked at. Also: `0x10a61` clamps the global ghost cvars each frame (DrawOutput 0..4, AutoMode 0..8, AutoModeMP 0..1, LiveAmmo/…): silently re-set with `0x819c` when out of range; `0x10b81` is the matching per-cvar table (strings at 49133..49463).

@@ -2012,7 +2012,7 @@ Returns the Z component of the surface being shadowed
 ===============
 */
 #define	SHADOW_DISTANCE		128
-static qboolean CG_PlayerShadow( centity_t *cent, float *shadowPlane ) {
+qboolean CG_PlayerShadow( centity_t *cent, float *shadowPlane ) {
 	vec3_t		end, mins = {-15, -15, 0}, maxs = {15, 15, 2};
 	trace_t		trace;
 	float		alpha;
@@ -2241,6 +2241,86 @@ int CG_LightVerts( vec3_t normal, int numVerts, polyVert_t *verts )
 		verts[i].modulate[3] = 255;
 	}
 	return qtrue;
+}
+
+/*
+===============
+CG_DF_DrawBBox
+
+DeFRaG cgame 0x1cecd (cg_drawBBox): a translucent bounding box around every other living player, drawn with the shaders "bbox" (top and
+bottom face) and "bbox_nocull" (the four sides) from the DeFRaG pk3. Box: mins (-15,-15,-24), maxs (15,15,32); other clients use the
+packed currentState.solid (x/y half widths, z max = byte - 32), the local client the predicted viewheight + 6. Colour by team: red
+(160,0,0), blue (0,0,192), else green (0,128,0). The own box is only drawn when prediction is not in use (cg_nopredict or dead).
+===============
+*/
+static void CG_DF_DrawBBox( const centity_t *cent ) {
+	qhandle_t	shTop, shSide;
+	vec3_t		mins = { -15, -15, -24 }, maxs = { 15, 15, 32 };
+	vec3_t		top[4], bot[4];
+	polyVert_t	v[4];
+	byte		col[4];
+	int			team, i, f;
+	qboolean	own = ( cent->currentState.number == cg.predictedPlayerState.clientNum );
+	static const int face[6][4] = {		// indices 0..3 = top corners, 4..7 = bottom corners
+		{ 0, 1, 2, 3 }, { 7, 6, 5, 4 }, { 3, 2, 6, 7 }, { 2, 1, 5, 6 }, { 0, 3, 7, 4 }, { 1, 0, 4, 5 }
+	};
+	static const float st[4][2] = { { 0, 0 }, { 0, 1 }, { 1, 1 }, { 1, 0 } };
+
+	if ( !cg_drawBBox.integer ) {
+		return;
+	}
+	if ( own && !( cg_nopredict.integer || ( cg.snap && cg.snap->ps.stats[STAT_HEALTH] <= 0 ) ) ) {
+		return;
+	}
+	if ( cent->currentState.eFlags & EF_DEAD ) {
+		return;
+	}
+	shTop = trap_R_RegisterShader( "bbox" );
+	shSide = trap_R_RegisterShader( "bbox_nocull" );
+	if ( !shTop || !shSide ) {
+		return;
+	}
+	if ( own ) {
+		maxs[2] = cg.predictedPlayerState.viewheight + 6;
+	} else {
+		int solid = cent->currentState.solid;
+
+		mins[0] = -( solid & 255 );
+		maxs[0] = solid & 255;
+		mins[1] = -( ( solid >> 8 ) & 255 );
+		maxs[1] = ( solid >> 8 ) & 255;
+		maxs[2] = ( ( solid >> 16 ) & 255 ) - 32;
+	}
+	team = cgs.clientinfo[cent->currentState.clientNum].team;
+	col[0] = col[1] = col[2] = 0;
+	col[3] = 255;
+	if ( team == TEAM_RED ) {
+		col[0] = 160;
+	} else if ( team == TEAM_BLUE ) {
+		col[2] = 192;
+	} else {
+		col[1] = 128;
+	}
+	// top corners: (+x,-y) (-x,-y) (-x,+y) (+x,+y); bottom corners are the same lowered by the box height
+	for ( i = 0; i < 4; i++ ) {
+		top[i][0] = cent->lerpOrigin[0] + ( ( i == 0 || i == 3 ) ? maxs[0] : mins[0] );
+		top[i][1] = cent->lerpOrigin[1] + ( ( i >= 2 ) ? maxs[1] : mins[1] );
+		top[i][2] = cent->lerpOrigin[2] + maxs[2];
+		VectorCopy( top[i], bot[i] );
+		bot[i][2] -= maxs[2] - mins[2];
+	}
+	for ( f = 0; f < 6; f++ ) {
+		for ( i = 0; i < 4; i++ ) {
+			int k = face[f][i];
+			const float *p = ( k < 4 ) ? top[k] : bot[k - 4];
+
+			VectorCopy( p, v[i].xyz );
+			v[i].st[0] = st[i][0];
+			v[i].st[1] = st[i][1];
+			memcpy( v[i].modulate, col, 4 );
+		}
+		trap_R_AddPolyToScene( f < 2 ? shTop : shSide, 4, v );
+	}
 }
 
 /*
@@ -2601,6 +2681,8 @@ void CG_Player( centity_t *cent ) {
 
 	// add powerups floating behind the player
 	CG_PlayerPowerups( cent, &torso );
+
+	CG_DF_DrawBBox( cent );		// DeFRaG 0x26a4c
 }
 
 

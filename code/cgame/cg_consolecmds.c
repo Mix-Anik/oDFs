@@ -598,6 +598,12 @@ void CG_InitConsoleCommands( void ) {
 	trap_AddCommand ("callteamvote");
 	trap_AddCommand ("teamvote");
 	trap_AddCommand ("stats");
+	// DeFRaG (cgame 0x1adc7) also registers these server-handled commands for tab completion
+	trap_AddCommand ("cv");
+	trap_AddCommand ("placeplayer");
+	trap_AddCommand ("respawnpoint");
+	trap_AddCommand ("firemissile");
+	trap_AddCommand ("arena");
 	trap_AddCommand ("varMath");
 	trap_AddCommand ("svinfo_summary");
 	trap_AddCommand ("replay");

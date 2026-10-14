@@ -54,3 +54,6 @@ original pass, not ported.
 - `df_name`: storage only — added `gclient_t.demoName[21]`, parsed and
   cleaned in `ClientUserinfoChanged`. **No broadcast** — the unconfirmed
   `\dfn\` claim above was not ported.
+
+## Iter 111: configstring keys `dfn` / `dfscore` (found via the cgame hash-DIFF worklist, `CG_NewClientInfo` = cgame `0x2537b`)
+The DeFRaG qagame format for non-bots (`0x1cffe`, literal `0x7ec3`) is `n\%s\dfn\%s\t\%i\model\%s\hmodel\%s\g_redteam\%s\g_blueteam\%s\c1\%s\c2\%s\hc\%i\w\%i\l\%i\tt\%d\tl\%d\dfscore\%d` with `dfn` = `client+0x268` (demo name from `df_name`) and `dfscore` = `client+0x2b0` (best finish time). The DeFRaG cgame reads `dfn` (20 chars, stored right after the name in its clientinfo_t; no `dfscore` key string exists in cgame). The finish handler `0x35ce` calls `ClientUserinfoChanged` (`0x1ccdf`) after `CalculateRanks` so the new best time is republished. Ported: both keys in the non-bot configstring (g_client.c) + the refresh in g_defrag.c. Bots keep the vanilla format (as in DeFRaG). Behaviour: configstring gains two keys (cosmetic for oDFs' own cgame). Revert: remove the keys / the ClientUserinfoChanged call.

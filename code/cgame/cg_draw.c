@@ -1687,13 +1687,10 @@ static void CG_DrawLagometer( void ) {
 	//
 	// draw the graph
 	//
-#ifdef MISSIONPACK
-	x = 640 - 48;
-	y = 480 - 144;
-#else
-	x = 640 - 48;
-	y = 480 - 48;
-#endif
+	// DeFRaG (cgame 0x1c4eb): position from cg_lagometer_x / cg_lagometer_y
+	// (vanilla: x = 640 - 48, y = 480 - 48)
+	x = cg_lagometer_x.integer;
+	y = cg_lagometer_y.integer;
 
 	trap_R_SetColor( NULL );
 	CG_DrawPic( x, y, 48, 48, cgs.media.lagometerShader );
@@ -1929,7 +1926,12 @@ static void CG_DrawCrosshair(void)
 		CG_ColorForHealth( hcolor );
 		trap_R_SetColor( hcolor );
 	} else {
-		trap_R_SetColor( NULL );
+		// DeFRaG (cgame 0x8fe1): fixed palette colour from cg_crosshairColor
+		static const vec4_t crosshairPalette[10] = {
+			{ 0, 0, 0, 1 }, { 1, 0, 0, 1 }, { 0, 1, 0, 1 }, { 1, 1, 0, 1 }, { 0, 0, 1, 1 },
+			{ 0, 1, 1, 1 }, { 1, 0, 1, 1 }, { 1, 1, 1, 1 }, { 1, 0.5f, 0, 1 }, { 0.5f, 0.5f, 0.5f, 1 }
+		};
+		trap_R_SetColor( crosshairPalette[ ( cg_crosshairColor.integer & 15 ) % 10 ] );
 	}
 
 	w = h = cg_crosshairSize.value;

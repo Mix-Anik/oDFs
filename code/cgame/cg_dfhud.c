@@ -59,7 +59,8 @@ typedef struct {
 	int				px, py;		// +0x44 / +0x48 position resolved by the last draw
 } dfWidget_t;
 
-static dfWidget_t	wBest, wLast, wSpeed, wPower[3], wHealth, wArmor, wAmmo, wFrags, wCkpt;
+static dfWidget_t	wBest, wLast, wSpeed, wPower[3], wFlag, wHealth, wArmor, wAmmo, wFrags, wCkpt;
+vmCvar_t			df_hud_3DIcons;					// 0x11aef0: flag carrier icon as 3D model (1) or 16x16 sprite (0)
 static int			powerList[3] = { -1, -1, -1 };	// 0x11cca8
 static int			powerCount;						// 0x11cca4
 int				dfLastRunMs;					// 0x11d284
@@ -137,6 +138,7 @@ void CG_DF_HudInit( void ) {
 	for ( i = 0; i < 3; i++ ) {
 		CG_DF_InitWidget( &wPower[i], 5, 438, 2, 6, SH_78_B, SH_78_I );
 	}
+	CG_DF_InitWidget( &wFlag, 5, 438, 0, 0, SH_36_B, SH_36_I );		// W4 0x11cdec
 	CG_DF_InitWidget( &wHealth, 93, 438, 3, 25, SH_94_B, SH_94_I );
 	wHealth.icon = &dfSh[SH_ICON_NULL];
 	wHealth.visible = 1;
@@ -704,6 +706,21 @@ void CG_DF_DrawHUD( void ) {
 		w->value = &secs[i];
 		w->visible = 1;
 		CG_DF_DrawWidget( w );
+	}
+
+	// flag carrier box W4 (0x2c16): below the power-up list, red flag (powerups[7]) -> TEAM_RED else TEAM_BLUE. DeFRaG's holdable box W5
+	// (0x2c91, x = 46 beside the flag box) takes its icon from an unresolved table quirk (see hud_widget_system.md) and is not ported.
+	if ( ps->powerups[PW_REDFLAG] || ps->powerups[PW_BLUEFLAG] ) {
+		int team = ps->powerups[PW_REDFLAG] ? TEAM_RED : TEAM_BLUE;
+
+		wFlag.y = 438 - 42 * powerCount;
+		wFlag.visible = 1;
+		CG_DF_DrawWidget( &wFlag );
+		if ( df_hud_3DIcons.integer ) {
+			CG_DrawFlagModel( wFlag.x, wFlag.y, 32, 32, team, qfalse );
+		} else {
+			CG_DrawFlagModel( wFlag.x + 10, wFlag.y + 8, 16, 16, team, qtrue );
+		}
 	}
 
 	// health, armor, ammo, frags

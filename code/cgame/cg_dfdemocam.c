@@ -11,6 +11,16 @@
 #include "cg_local.h"
 
 vmCvar_t	df_demos_CameraMode, df_mp_TrackPlayerNum, df_demos_CameraTransitionSpeed;
+vmCvar_t	df_ghosts_CheckPVS;
+qboolean	cg_dfClearAreamask;		// set by a camera that left the player's PVS; applied after cg.refdef.areamask is copied
+
+// 0x8f57: DeFRaG's PVS test - when `p` is not visible from the player's predicted origin the area mask is cleared
+// (all areas drawn).  The original clears cg.refdef.areamask right away; oDFs copies the snapshot mask later, so it is deferred.
+void CG_DF_CheckPVS( const vec3_t p ) {
+	if ( !trap_R_inPVS( cg.predictedPlayerState.origin, p ) ) {
+		cg_dfClearAreamask = qtrue;
+	}
+}
 vmCvar_t	df_demos_HidePacketEntities, df_demos_HideLocalEntities, df_demos_UnlockThirdPersonPitch;
 
 typedef struct {
@@ -48,12 +58,30 @@ static void DC_Track( dcTrack_t *t ) {
 	if ( c == cg.clientNum || c < 0 || c >= MAX_CLIENTS || !cgs.clientinfo[c].infoValid || cgs.clientinfo[c].team >= TEAM_SPECTATOR ) {
 		return;
 	}
+	if ( !trap_R_inPVS( cg_entities[c].lerpOrigin, cg.refdef.vieworg ) ) {		// 0x7ce2
+		if ( df_ghosts_CheckPVS.integer ) {
+			return;
+		}
+		cg_dfClearAreamask = qtrue;
+	}
 	t->client = c;
 	t->weapon = cg_entities[c].currentState.weapon;
 	VectorCopy( cg_entities[c].lerpOrigin, t->pos );
 	VectorCopy( cg_entities[c].lerpAngles, t->ang );
 	VectorCopy( cg_entities[c].lerpOrigin, t->pos2 );
 	t->pos[2] += 26;		// DeFRaG's *(5200)
+}
+
+// 0x7c81 for other modules (the ghost miniview, mode 7/8): the tracked client's record; returns the client number
+qboolean CG_DF_TrackRecord( int *client, int *weapon, vec3_t pos, vec3_t ang ) {
+	dcTrack_t t;
+
+	DC_Track( &t );
+	*client = t.client;
+	*weapon = t.weapon;
+	VectorCopy( t.pos, pos );
+	VectorCopy( t.ang, ang );
+	return qtrue;
 }
 
 // 0x14741: third-person chase position behind `pos`/`ang` (range back, yawOffset degrees), traced against the world
@@ -125,10 +153,45 @@ static qboolean DC_SavedPos( vec3_t pos, vec3_t ang ) {
 	return qtrue;
 }
 
+// 0x14d30: camera "sequences". df_demos_CamSeqPosition / Speed / Mode hold space separated lists; whenever the camera is idle
+// (cam+4 == 0, called at the top of 0x15040) the first token of each list is moved into saveposname / df_demos_CameraTransitionSpeed /
+// df_demos_CameraMode and the rest of the list stays behind in the cvar's LOCAL string only (DeFRaG's write-back flag 0x420 is never set,
+// so the real cvar keeps the full list until it is changed). An empty Position list ends the update early (returns 0), as in DeFRaG.
+vmCvar_t	df_demos_CamSeqPosition, df_demos_CamSeqSpeed, df_demos_CamSeqMode;
+
+static qboolean DC_SeqPop( vmCvar_t *list, const char *target ) {
+	char		buf[MAX_CVAR_VALUE_STRING];
+	const char	*p = list->string, *tok;
+
+	if ( !list->string[0] ) {
+		return qfalse;
+	}
+	Q_strncpyz( buf, list->string, sizeof( buf ) );
+	p = buf;
+	tok = COM_Parse( &p );
+	if ( !tok[0] ) {
+		return qfalse;
+	}
+	trap_Cvar_Set( target, tok );
+	Q_strncpyz( list->string, p, sizeof( list->string ) );
+	return qtrue;
+}
+
+static void DC_CamSeq( void ) {
+	if ( !DC_SeqPop( &df_demos_CamSeqPosition, "saveposname" ) ) {
+		return;
+	}
+	DC_SeqPop( &df_demos_CamSeqSpeed, "df_demos_CameraTransitionSpeed" );
+	DC_SeqPop( &df_demos_CamSeqMode, "df_demos_CameraMode" );
+}
+
 // 0x15040: where the camera should be for this mode; returns qfalse when the camera was set immediately (no transition)
 static qboolean DC_Target( const dcTrack_t *t, vec3_t pos, vec3_t ang ) {
 	float range = cg_thirdPersonRange.value;
 
+	if ( !dc.init ) {
+		DC_CamSeq();
+	}
 	switch ( dc.mode ) {
 	case 4: case 5: case 6: case 7:
 		if ( !DC_SavedPos( pos, ang ) ) {
@@ -217,6 +280,9 @@ static void DC_Apply( const vec3_t pos, const vec3_t ang ) {
 	VectorCopy( pos, cg.refdef.vieworg );
 	VectorCopy( ang, cg.refdefViewAngles );
 	AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+	if ( df_ghosts_CheckPVS.integer ) {		// 0x14fe4
+		CG_DF_CheckPVS( cg.refdef.vieworg );
+	}
 }
 
 // the df_demos_CamOffset* position / angle / radius offsets (same cvars as the replay camera)

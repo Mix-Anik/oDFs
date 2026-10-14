@@ -1070,11 +1070,13 @@ static void CG_ServerCommand( void ) {
 	}
 
 	if ( !strcmp( cmd, "chat" ) ) {
-		if ( cgs.gametype >= GT_TEAM && cg_teamChatsOnly.integer ) {
+		if ( cg_teamChatsOnly.integer ) {		// DeFRaG 0x28de1: no gametype test (vanilla: cgs.gametype >= GT_TEAM &&)
 			return;
 		}
 
-		trap_S_StartLocalSound( cgs.media.talkSound, CHAN_LOCAL_SOUND );
+		if ( !cg_nochatbeep.integer ) {		// DeFRaG 0x28de5 / 0x28e1c
+			trap_S_StartLocalSound( cgs.media.talkSound, CHAN_LOCAL_SOUND );
+		}
 		Q_strncpyz( text, CG_Argv(1), MAX_SAY_TEXT );
 		CG_RemoveChatEscapeChar( text );
 		CG_Printf( "%s\n", text );
@@ -1082,7 +1084,9 @@ static void CG_ServerCommand( void ) {
 	}
 
 	if ( !strcmp( cmd, "tchat" ) ) {
-		trap_S_StartLocalSound( cgs.media.talkSound, CHAN_LOCAL_SOUND );
+		if ( !cg_nochatbeep.integer ) {		// DeFRaG 0x28de5 / 0x28e1c
+			trap_S_StartLocalSound( cgs.media.talkSound, CHAN_LOCAL_SOUND );
+		}
 		Q_strncpyz( text, CG_Argv(1), MAX_SAY_TEXT );
 		CG_RemoveChatEscapeChar( text );
 		CG_AddToTeamChat( text );
@@ -1153,7 +1157,9 @@ static void CG_ServerCommand( void ) {
 		return;
 	}
 
-	CG_Printf( "Unknown client game command: %s\n", cmd );
+	if ( !CG_DF_ModSupport() ) {
+		CG_Printf( "Unknown client game command: %s\n", cmd );
+	}
 }
 
 

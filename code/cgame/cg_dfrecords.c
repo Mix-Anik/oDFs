@@ -186,6 +186,11 @@ static void CG_DF_ExpandName( char *dst, int size, const char *tmpl, const char 
 	}
 }
 
+// 0x1185f: the ghost/record base name (template without directory and extension)
+void CG_DF_RecordBaseName( char *dst, int size ) {
+	CG_DF_ExpandName( dst, size, "$map_$-route_$gt_$phys_$-mode", NULL, NULL );
+}
+
 static void CG_DF_RecordPath( char *dst, int size, const char *dir ) {
 	CG_DF_ExpandName( dst, size, "$map_$-route_$gt_$phys_$-mode", dir, "rec" );
 }

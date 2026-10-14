@@ -176,6 +176,10 @@ void CG_DamageFeedback( int yawByte, int pitchByte, int damage ) {
 	if ( kick > 10 ) {
 		kick = 10;
 	}
+	if ( cg_noDamageKick.integer ) {		// DeFRaG 0x26c10: cg_noDamageKick
+		cg.v_dmg_roll = 0;
+		cg.v_dmg_pitch = 0;
+	}
 	cg.damageValue = kick;
 	cg.v_dmg_time = cg.time + DAMAGE_TIME;
 	cg.damageTime = cg.snap->serverTime;

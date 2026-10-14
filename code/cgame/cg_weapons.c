@@ -610,6 +610,9 @@ void CG_RegisterWeapon( int weaponNum ) {
 	vec3_t			mins, maxs;
 	int				i;
 
+	if ( CG_DF_ModSupport() && weaponNum > 10 ) {		// DeFRaG 0x2ab25: unknown foreign-mod weapons are drawn as the machinegun
+		weaponNum = 1;
+	}
 	weaponInfo = &cg_weapons[weaponNum];
 
 	if ( weaponNum == 0 ) {
@@ -912,6 +915,11 @@ static void CG_CalculateWeaponPosition( vec3_t origin, vec3_t angles ) {
 
 	VectorCopy( cg.refdef.vieworg, origin );
 	VectorCopy( cg.refdefViewAngles, angles );
+
+	// DeFRaG (cgame 0x2b181): cg_drawGun 2 = no weapon bobbing / landing drop / idle drift
+	if ( cg_drawGun.integer == 2 ) {
+		return;
+	}
 
 	// on odd legs, invert some angles
 	if ( cg.bobcycle & 1 ) {
@@ -1254,11 +1262,8 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 
 	VectorMA(gun.origin, lerped.origin[0], parent->axis[0], gun.origin);
 
-	// Make weapon appear left-handed for 2 and centered for 3
-	if(ps && cg_drawGun.integer == 2)
-		VectorMA(gun.origin, -lerped.origin[1], parent->axis[1], gun.origin);
-	else if(!ps || cg_drawGun.integer != 3)
-	       	VectorMA(gun.origin, lerped.origin[1], parent->axis[1], gun.origin);
+	// (ioq3 made the weapon left-handed for cg_drawGun 2 and centered for 3; DeFRaG's cg_drawGun 2 is the no-bobbing mode instead)
+	VectorMA(gun.origin, lerped.origin[1], parent->axis[1], gun.origin);
 
 	VectorMA(gun.origin, lerped.origin[2], parent->axis[2], gun.origin);
 
@@ -1296,6 +1301,9 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	}
 
 	// add the flash
+	if ( cg_muzzleFlash.integer && weaponNum == WP_PLASMAGUN ) {		// DeFRaG 0x2b6ac: cg_muzzleFlash hides the plasma gun flash
+		return;
+	}
 	if ( ( weaponNum == WP_LIGHTNING || weaponNum == WP_GAUNTLET || weaponNum == WP_GRAPPLING_HOOK )
 		&& ( nonPredictedCent->currentState.eFlags & EF_FIRING ) ) 
 	{

@@ -30,6 +30,7 @@ displayContextDef_t cgDC;
 #endif
 
 int forceModelModificationCount = -1;
+static int recordMessageModificationCount = -1;
 
 void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum );
 void CG_Shutdown( void );
@@ -113,6 +114,10 @@ vmCvar_t	cg_crosshairSize;
 vmCvar_t	cg_crosshairX;
 vmCvar_t	cg_crosshairY;
 vmCvar_t	cg_crosshairHealth;
+vmCvar_t	cg_crosshairColor;
+vmCvar_t	ch_recordMessage;
+vmCvar_t	df_cl_alwaysDrawItems;
+vmCvar_t	s_ambient;
 vmCvar_t	cg_draw2D;
 vmCvar_t	cg_drawStatus;
 vmCvar_t	cg_animSpeed;
@@ -121,6 +126,12 @@ vmCvar_t	cg_debugPosition;
 vmCvar_t	cg_debugEvents;
 vmCvar_t	cg_errorDecay;
 vmCvar_t	cg_nopredict;
+vmCvar_t	cg_noDamageKick;		// DeFRaG: no view kick when damaged
+vmCvar_t	cg_noFallKick;
+vmCvar_t	cg_muzzleFlash;			// DeFRaG: != 0 hides the plasma gun muzzle flash
+vmCvar_t	cg_drawDamage;			// DeFRaG: damage screen blob (default 1)
+vmCvar_t	cg_drawBBox;			// DeFRaG: bounding boxes of other players
+vmCvar_t	cg_nochatbeep;			// DeFRaG: silence the chat sound			// DeFRaG: no view dip when landing
 vmCvar_t	cg_noPlayerAnims;
 vmCvar_t	cg_showmiss;
 vmCvar_t	cg_footsteps;
@@ -144,6 +155,8 @@ vmCvar_t	cg_thirdPerson;
 vmCvar_t	cg_thirdPersonRange;
 vmCvar_t	cg_thirdPersonAngle;
 vmCvar_t	cg_lagometer;
+vmCvar_t	cg_lagometer_x;
+vmCvar_t	cg_lagometer_y;
 vmCvar_t	cg_drawAttacker;
 vmCvar_t	cg_synchronousClients;
 vmCvar_t 	cg_teamChatTime;
@@ -238,6 +251,8 @@ static cvarTable_t cvarTable[] = {
 	{ &df_accel_FontSize, "df_accel_FontSize", "7", CVAR_ARCHIVE },
 	{ &df_accel_Scale, "df_accel_Scale", "-1.2", CVAR_ARCHIVE },
 	{ &df_accel_AdjustMaxSpeed, "df_accel_AdjustMaxSpeed", "1", CVAR_ARCHIVE },
+	{ &df_accel_Output, "df_accel_Output", "0", CVAR_ARCHIVE },
+	{ &df_accel_HistoryResetSpeed, "df_accel_HistoryResetSpeed", "100", CVAR_ARCHIVE },
 	{ &df_chs_UsePredicted, "df_chs_UsePredicted", "1", CVAR_ARCHIVE },
 	{ &dfChs[0].draw, "df_chs0_Draw", "0", CVAR_ARCHIVE },
 	{ &dfChs[0].fontSize, "df_chs0_FontSize", "8", CVAR_ARCHIVE },
@@ -290,6 +305,19 @@ static cvarTable_t cvarTable[] = {
 	{ &dfChs[2].info[7], "df_chs2_Info8", "0", CVAR_ARCHIVE },
 	{ &df_demos_Seek, "df_demos_Seek", "0.00", CVAR_TEMP },
 	{ &df_demos_ReplayVerbose, "df_demos_ReplayVerbose", "1", CVAR_ARCHIVE },
+	{ &df_demos_validation, "df_demos_validation", "0", CVAR_ARCHIVE },
+	{ &df_varHelpers_DrawOutput, "df_varHelpers_DrawOutput", "0", CVAR_ARCHIVE },
+	{ &df_demos_ModSupport, "df_demos_ModSupport", "0", CVAR_TEMP },
+	{ &df_hud_3DIcons, "df_hud_3DIcons", "1", CVAR_ARCHIVE },
+	{ &cg_noDamageKick, "cg_noDamageKick", "0", CVAR_ARCHIVE },
+	{ &cg_noFallKick, "cg_noFallKick", "0", CVAR_ARCHIVE },
+	{ &cg_nochatbeep, "cg_nochatbeep", "0", CVAR_ARCHIVE },
+	{ &cg_muzzleFlash, "cg_muzzleFlash", "0", CVAR_ARCHIVE },
+	{ &cg_drawDamage, "cg_drawDamage", "1", CVAR_ARCHIVE },
+	{ &cg_drawBBox, "cg_drawBBox", "0", CVAR_ARCHIVE },
+	{ &df_demos_CamSeqPosition, "df_demos_CamSeqPosition", "", CVAR_TEMP },
+	{ &df_demos_CamSeqSpeed, "df_demos_CamSeqSpeed", "", CVAR_TEMP },
+	{ &df_demos_CamSeqMode, "df_demos_CamSeqMode", "", CVAR_TEMP },
 	{ &df_demos_ReplayMode, "df_demos_ReplayMode", "0", CVAR_ARCHIVE },
 	{ &df_demos_ReplayFilename, "df_demos_ReplayFilename", "$demoname", CVAR_ARCHIVE },
 	{ &df_demos_ReplayDrawMask, "df_demos_ReplayDrawMask", "32767", CVAR_ARCHIVE },
@@ -365,12 +393,19 @@ static cvarTable_t cvarTable[] = {
 	{ &cg_drawRewards, "cg_drawRewards", "1", CVAR_ARCHIVE },
 	{ &cg_crosshairSize, "cg_crosshairSize", "24", CVAR_ARCHIVE },
 	{ &cg_crosshairHealth, "cg_crosshairHealth", "1", CVAR_ARCHIVE },
+	{ &cg_crosshairColor, "cg_crosshairColor", "7", CVAR_ARCHIVE },
+	{ &ch_recordMessage, "ch_recordMessage", "1", CVAR_ARCHIVE },
+	{ &df_cl_alwaysDrawItems, "df_cl_alwaysDrawItems", "1", CVAR_ARCHIVE },
+	{ &df_ghosts_CheckPVS, "df_ghosts_CheckPVS", "1", CVAR_ARCHIVE },
+	{ &s_ambient, "s_ambient", "1", CVAR_ARCHIVE | CVAR_LATCH },
 	{ &cg_crosshairX, "cg_crosshairX", "0", CVAR_ARCHIVE },
 	{ &cg_crosshairY, "cg_crosshairY", "0", CVAR_ARCHIVE },
 	{ &cg_brassTime, "cg_brassTime", "2500", CVAR_ARCHIVE },
 	{ &cg_simpleItems, "cg_simpleItems", "0", CVAR_ARCHIVE },
 	{ &cg_addMarks, "cg_marks", "1", CVAR_ARCHIVE },
 	{ &cg_lagometer, "cg_lagometer", "1", CVAR_ARCHIVE },
+	{ &cg_lagometer_x, "cg_lagometer_x", "1", CVAR_ARCHIVE },
+	{ &cg_lagometer_y, "cg_lagometer_y", "1", CVAR_ARCHIVE },
 	{ &cg_railTrailTime, "cg_railTrailTime", "400", CVAR_ARCHIVE  },
 	{ &cg_gun_x, "cg_gunX", "0", CVAR_CHEAT },
 	{ &cg_gun_y, "cg_gunY", "0", CVAR_CHEAT },
@@ -487,6 +522,8 @@ void CG_RegisterCvars( void ) {
 	forceModelModificationCount = cg_forceModel.modificationCount;
 
 	CG_DF_GhostRegisterCvars();
+	trap_Cvar_Register(NULL, "df_name", "", CVAR_USERINFO | CVAR_ARCHIVE );		// DeFRaG cgame cvar table: server copies it to demoName
+	trap_Cvar_Register(NULL, "df_cl_respawnMsec", "250", CVAR_USERINFO | CVAR_ARCHIVE );	// server: respawn delay 50..1700 ms
 	trap_Cvar_Register(NULL, "model", DEFAULT_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
 	trap_Cvar_Register(NULL, "headmodel", DEFAULT_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
 	trap_Cvar_Register(NULL, "team_model", DEFAULT_TEAM_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
@@ -543,6 +580,13 @@ void CG_UpdateCvars( void ) {
 	if ( forceModelModificationCount != cg_forceModel.modificationCount ) {
 		forceModelModificationCount = cg_forceModel.modificationCount;
 		CG_ForceModelChange();
+	}
+
+	// DeFRaG (cgame 0x19e): ch_recordMessage drives ui_recordSPDemo (inverted).
+	// The original sends the command without a trailing newline; one is added here.
+	if ( recordMessageModificationCount != ch_recordMessage.modificationCount ) {
+		recordMessageModificationCount = ch_recordMessage.modificationCount;
+		trap_SendConsoleCommand( va( "set ui_recordSPDemo %i\n", ch_recordMessage.integer ? 0 : 1 ) );
 	}
 }
 
@@ -987,6 +1031,8 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.plasmaBallShader = trap_R_RegisterShader( "sprites/plasma1" );
 	cgs.media.bloodTrailShader = trap_R_RegisterShader( "bloodTrail" );
 	cgs.media.lagometerShader = trap_R_RegisterShader("lagometer" );
+	cgs.media.dfNotAvailableShader = trap_R_RegisterShaderNoMip( "sprites/notAvailable" );
+	cgs.media.dfUnavailableItemShader = trap_R_RegisterShader( "gfx/unavailableItem" );
 	cgs.media.connectionShader = trap_R_RegisterShader( "disconnected" );
 
 	cgs.media.waterBubbleShader = trap_R_RegisterShader( "waterBubble" );
@@ -2023,6 +2069,7 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	cgs.levelStartTime = atoi( s );
 
 	CG_ParseServerinfo();
+	CG_DF_InitCvars();
 
 	// load the new map
 	CG_LoadingString( "collision map" );

@@ -590,7 +590,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 	case EV_FALL_SHORT:
 		DEBUGNAME("EV_FALL_SHORT");
 		trap_S_StartSound (NULL, es->number, CHAN_AUTO, cgs.media.landSound );
-		if ( clientNum == cg.predictedPlayerState.clientNum ) {
+		if ( clientNum == cg.predictedPlayerState.clientNum && !cg_noFallKick.integer ) {		// DeFRaG 0x1f926: cg_noFallKick
 			// smooth landing z changes
 			cg.landChange = -8;
 			cg.landTime = cg.time;
@@ -600,7 +600,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 		DEBUGNAME("EV_FALL_MEDIUM");
 		// use normal pain sound
 		trap_S_StartSound( NULL, es->number, CHAN_VOICE, CG_CustomSound( es->number, "*pain100_1.wav" ) );
-		if ( clientNum == cg.predictedPlayerState.clientNum ) {
+		if ( clientNum == cg.predictedPlayerState.clientNum && !cg_noFallKick.integer ) {		// DeFRaG 0x1f926: cg_noFallKick
 			// smooth landing z changes
 			cg.landChange = -16;
 			cg.landTime = cg.time;
@@ -610,7 +610,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 		DEBUGNAME("EV_FALL_FAR");
 		trap_S_StartSound (NULL, es->number, CHAN_AUTO, CG_CustomSound( es->number, "*fall1.wav" ) );
 		cent->pe.painTime = cg.time;	// don't play a pain sound right after this
-		if ( clientNum == cg.predictedPlayerState.clientNum ) {
+		if ( clientNum == cg.predictedPlayerState.clientNum && !cg_noFallKick.integer ) {		// DeFRaG 0x1f926: cg_noFallKick
 			// smooth landing z changes
 			cg.landChange = -24;
 			cg.landTime = cg.time;
@@ -1236,7 +1236,9 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 
 	default:
 		DEBUGNAME("UNKNOWN");
-		CG_Error( "Unknown event: %i", event );
+		if ( !CG_DF_ModSupport() ) {
+			CG_Error( "Unknown event: %i", event );
+		}
 		break;
 	}
 

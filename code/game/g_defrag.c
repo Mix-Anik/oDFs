@@ -121,6 +121,7 @@ static void G_RaceFinished( gentity_t *ent ) {
 	if ( t->bestTime > 0 && ( !ent->client->pers.bestFinishTime || ent->client->pers.bestFinishTime > t->bestTime ) ) {
 		ent->client->pers.bestFinishTime = t->bestTime;
 		CalculateRanks();
+		ClientUserinfoChanged( clientNum );		// 0x36d3: republishes the configstring (dfscore)
 	}
 
 	G_FormatTime( level.time - t->startTime, timeBuf, sizeof(timeBuf) );

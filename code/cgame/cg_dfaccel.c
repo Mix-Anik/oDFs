@@ -13,6 +13,7 @@ vmCvar_t	df_accel_OffsetY;
 vmCvar_t	df_accel_FontSize;
 vmCvar_t	df_accel_Scale;
 vmCvar_t	df_accel_AdjustMaxSpeed;
+vmCvar_t	df_accel_Output;
 vmCvar_t	df_chs_UsePredicted;
 
 // state at 0x2a9584..0x2a9730
@@ -197,6 +198,17 @@ static void CG_DF_AccelPercent( qboolean latch ) {
 	} else {
 		dfAm.hCur = cur; dfAm.hMax = hist; dfAm.hAccel = pa; dfAm.hSpeed = ps;
 	}
+
+	// df_accel_Output (0x15903): print the latched measurement to the console
+	if ( df_accel_Output.integer && latch ) {
+		int lc = dfChs[2].labelColor.integer, fc = dfChs[2].fontColor.integer;
+
+		CG_Printf( "\n" );
+		CG_Printf( "SPEED:   ^%istart ^7= ^%i%8.3f ^%ispeed ^7= ^%i%8.3f ^%imax ^7= ^%i%8.3f\n",
+			lc, fc, start, lc, fc, cur, lc, fc, hist );
+		CG_Printf( "PERCENT: ^%iaccel ^7= ^%i%8.3f ^%ispeed ^7= ^%i%8.3f\n",
+			lc, fc, pa, lc, fc, ps );
+	}
 }
 
 // 0x15a60: one simulation step
@@ -261,6 +273,134 @@ static void CG_DF_AccelStep( const vec3_t pos, const vec3_t vel, const vec3_t wi
 }
 
 // 0x15c24: frame driver
+// ---- jump history logger (0x16513 and 0x1648f/0x164a9/0x164bc/0x16382/0x162c2/0x164d6/0x1621a, record at 0x2a95f8) ----
+// Feeds CHS items 140-143 (last 12 jumps: speed / accel% / distance / height) and 145-148 (maxima).
+typedef struct {
+	vec3_t	pos;			// +0   last on-ground position
+	vec3_t	vel;			// +12  last on-ground velocity
+	int		time;			// +24  time of that record (0 = none)
+	int		onGround;		// +28  previous frame: ground within 5 units
+	int		resetFlag;		// +32  history is cleared at the next take-off
+	int		teleport;		// +36  previous cg.nextFrameTeleport
+	int		idx;			// +40  ring cursor
+	float	maxDist;		// +44
+	float	maxHeight;		// +48
+	float	maxSpeed;		// +52
+	float	maxAccel;		// +56
+	float	ring[4][12];	// +60 distance, +108 height, +156 speed, +204 accel%
+} dfJumpLog_t;
+
+static dfJumpLog_t	jlog;
+
+vmCvar_t	df_accel_HistoryResetSpeed;
+
+static float CG_DF_HLen( float x, float y ) {
+	return sqrt( x * x + y * y );
+}
+
+static float CG_DF_FMax( float a, float b ) {
+	return a > b ? a : b;
+}
+
+static qboolean CG_DF_JumpSpectating( void ) {
+	return cgs.clientinfo[cg.clientNum].team == TEAM_SPECTATOR;
+}
+
+// 0x16513
+static void CG_DF_JumpHistory( const vec3_t pos, const vec3_t vel ) {
+	qboolean	ground = CG_DF_GroundBelow( pos );
+	int			teleport = cg.nextFrameTeleport;
+	int			idx, i;
+	float		dx, dy, dz, d;
+
+	if ( jlog.onGround && !ground ) {
+		// 0x1648f: take-off; drop the history if the last ground contact was slow
+		if ( jlog.resetFlag ) {
+			memset( jlog.ring, 0, sizeof( jlog.ring ) );
+			jlog.idx = 0;
+			jlog.resetFlag = 0;
+		}
+	}
+	if ( !jlog.onGround && ground ) {
+		// 0x16382: landing; log distance, speed, accel%
+		if ( jlog.time ) {
+			jlog.idx = ( jlog.idx + 1 ) % 12;
+			idx = jlog.idx;
+			d = CG_DF_HLen( pos[0] - jlog.pos[0], pos[1] - jlog.pos[1] );
+			jlog.ring[0][idx] = d;
+			if ( !CG_DF_JumpSpectating() ) {
+				jlog.maxDist = CG_DF_FMax( jlog.maxDist, d );
+			}
+			d = CG_DF_HLen( vel[0], vel[1] );
+			jlog.ring[2][idx] = d;
+			if ( !CG_DF_JumpSpectating() ) {
+				jlog.maxSpeed = CG_DF_FMax( jlog.maxSpeed, d );
+			}
+			jlog.ring[3][idx] = dfAm.accelPct;
+			if ( !CG_DF_JumpSpectating() ) {
+				jlog.maxAccel = CG_DF_FMax( jlog.maxAccel, jlog.ring[3][idx] );
+			}
+		}
+	}
+	if ( !jlog.onGround && !ground ) {
+		// 0x162c2: airborne; track the height of the current jump and the maxima
+		if ( jlog.time && !jlog.teleport ) {
+			idx = jlog.idx;
+			dx = pos[0] - jlog.pos[0];
+			dy = pos[1] - jlog.pos[1];
+			dz = pos[2] - jlog.pos[2];
+			jlog.ring[1][idx] = CG_DF_FMax( dz, jlog.ring[1][idx] );
+			if ( !CG_DF_JumpSpectating() ) {
+				jlog.maxHeight = CG_DF_FMax( dz, jlog.maxHeight );
+				jlog.maxDist = CG_DF_FMax( CG_DF_HLen( dx, dy ), jlog.maxDist );
+				jlog.maxSpeed = CG_DF_FMax( CG_DF_HLen( vel[0], vel[1] ), jlog.maxSpeed );
+			}
+		}
+	}
+	if ( ground || ( !teleport && jlog.teleport ) ) {
+		// 0x164d6: remember the last ground state
+		VectorCopy( pos, jlog.pos );
+		VectorCopy( vel, jlog.vel );
+		jlog.time = cg.time;
+		if ( !jlog.resetFlag ) {
+			jlog.resetFlag = CG_DF_HLen( vel[0], vel[1] ) < (float)df_accel_HistoryResetSpeed.integer;
+		}
+	}
+	jlog.onGround = ground;
+	jlog.teleport = teleport;
+	(void)i;
+}
+
+// 0x1601c: CHS items 140-143; type 0 distance, 1 height, 2 speed, 3 accel%; oldest first, zero entries skipped
+void CG_DF_JumpHistoryText( int type, char *out, int size ) {
+	int		i, idx;
+	float	v;
+	char	tmp[256];
+
+	out[0] = 0;
+	if ( type < 0 || type > 3 ) {
+		return;
+	}
+	for ( i = 0; i < 12; i++ ) {
+		idx = ( i + jlog.idx + 1 ) % 12;
+		v = jlog.ring[type][idx];
+		if ( v != 0.0f ) {
+			Com_sprintf( tmp, sizeof( tmp ), "%s %4i", out, (int)v );
+			Q_strncpyz( out, tmp, size );
+		}
+	}
+}
+
+// CHS items 145-148: 0 = max speed, 1 = max accel, 2 = max distance, 3 = max height
+float CG_DF_JumpHistoryMax( int which ) {
+	switch ( which ) {
+	case 0: return jlog.maxSpeed;
+	case 1: return jlog.maxAccel;
+	case 2: return jlog.maxDist;
+	default: return jlog.maxHeight;
+	}
+}
+
 void CG_DF_AccelFrame( void ) {
 	vec3_t		pos, vel, ang, wish, ground;
 	float		scale, len;
@@ -293,6 +433,7 @@ void CG_DF_AccelFrame( void ) {
 	dfAm.startSpeed = VectorLength( acStartVel );
 	dfAm.angleR = acAngleR;
 	dfAm.angleL = acAngleL;
+	CG_DF_JumpHistory( pos, vel );		// 0x15ce7
 }
 
 // 0x8e9c: HUD elements allowed right now?

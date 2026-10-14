@@ -1423,6 +1423,9 @@ static void DR_CameraView( void ) {
 		DR_AddCvars3( cg.refdefViewAngles, "df_demos_CamOffsetAngleX", "df_demos_CamOffsetAngleY", "df_demos_CamOffsetAngleZ" );
 	}
 	AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+	if ( df_ghosts_CheckPVS.integer ) {		// 0x1a22a (tests the camera position before the offsets)
+		CG_DF_CheckPVS( drCamOrigin );
+	}
 }
 
 // 0x15246: the df_demos_CamOffset* position / angle / radius offsets applied to a camera (used by the demo camera)

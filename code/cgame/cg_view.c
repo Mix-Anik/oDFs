@@ -223,7 +223,7 @@ CG_OffsetThirdPersonView
 ===============
 */
 #define	FOCUS_DISTANCE	512
-static void CG_OffsetThirdPersonView( void ) {
+void CG_OffsetThirdPersonView( void ) {
 	vec3_t		forward, right, up;
 	vec3_t		view;
 	vec3_t		focusAngles;
@@ -315,7 +315,7 @@ CG_OffsetFirstPersonView
 
 ===============
 */
-static void CG_OffsetFirstPersonView( void ) {
+void CG_OffsetFirstPersonView( void ) {
 	float			*origin;
 	float			*angles;
 	float			bob;
@@ -365,6 +365,12 @@ static void CG_OffsetFirstPersonView( void ) {
 		ratio = 0;
 	angles[PITCH] += ratio * cg.fall_value;
 #endif
+
+	// DeFRaG (cgame 0x297a0): cg_drawGun 2 turns the view bobbing off, only the eye height is added
+	if ( cg_drawGun.integer == 2 ) {
+		origin[2] += cg.predictedPlayerState.viewheight;
+		return;
+	}
 
 	// add angles based on velocity
 	VectorCopy( cg.predictedPlayerState.velocity, predictedVelocity );
@@ -469,7 +475,7 @@ Fixed fov at intermissions, otherwise account for fov variable and zooms.
 #define	WAVE_AMPLITUDE	1
 #define	WAVE_FREQUENCY	0.4
 
-static int CG_CalcFov( void ) {
+int CG_CalcFov( void ) {
 	float	x;
 	float	phase;
 	float	v;
@@ -563,7 +569,7 @@ static void CG_DamageBlendBlob( void ) {
 	int			maxTime;
 	refEntity_t		ent;
 
-	if (!cg_blood.integer) {
+	if (!cg_drawDamage.integer) {		// DeFRaG 0x29a4e: cg_drawDamage replaces the cg_blood test here
 		return;
 	}
 
@@ -798,6 +804,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 
 	// this counter will be bumped for every valid scene we generate
 	cg.clientFrame++;
+	CG_DF_ModSupportSnapshot();
 
 	// update cg.predictedPlayerState
 	CG_PredictPlayerState();
@@ -808,6 +815,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 
 	// build cg.refdef
 	inwater = CG_CalcViewValues();
+	cg_dfClearAreamask = qfalse;
 	CG_DF_ReplayFrame();		// DeFRaG replay/recam runtime: may override cg.refdef view (df_demos_ReplayMode 2/3)
 	CG_DF_DemoCamera();		// DeFRaG demo camera (df_demos_CameraMode)
 
@@ -840,6 +848,9 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	}
 	cg.refdef.time = cg.time;
 	memcpy( cg.refdef.areamask, cg.snap->areamask, sizeof( cg.refdef.areamask ) );
+	if ( cg_dfClearAreamask ) {		// DeFRaG df_ghosts_CheckPVS (0x8f57)
+		memset( cg.refdef.areamask, 0, sizeof( cg.refdef.areamask ) );
+	}
 
 	// warning sounds when powerup is wearing off
 	CG_PowerupTimerSounds();
@@ -874,6 +885,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 
 	// actually issue the rendering calls
 	CG_DrawActive( stereoView );
+	CG_DF_Miniview();		// DeFRaG miniview (cgame 0x7a04): a second small scene drawn over the HUD
 
 	if ( cg_stats.integer ) {
 		CG_Printf( "cg.clientFrame:%i\n", cg.clientFrame );

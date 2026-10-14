@@ -803,17 +803,19 @@ static void CG_DF_ReportFileName( const char *arg, char *out, int size ) {
 	}
 }
 
-void CG_DF_SvinfoReport_f( void ) {
-	char		arg[MAX_QPATH], name[MAX_QPATH], path[MAX_QPATH + 16], si[BIG_INFO_STRING], sys[BIG_INFO_STRING];
+// worker of 0x4795(name, timeMs, usage): timeMs != 0 adds the "time" line (0x4846), usage prints the usage text on an empty name
+static void CG_DF_WriteReport( const char *arg, int runMs, qboolean usage ) {
+	char		name[MAX_QPATH], path[MAX_QPATH + 16], si[BIG_INFO_STRING], sys[BIG_INFO_STRING];
 	char		vers[32], servername[64];
 	fileHandle_t f;
 	qtime_t		tm;
 	int			i, v, gt, mode, obs;
 	const char	*physics;
 
-	trap_Argv( 1, arg, sizeof( arg ) );
 	if ( !arg[0] ) {
-		CG_Printf( "usage: svinfo_report [file]\n" );
+		if ( usage ) {
+			CG_Printf( "usage: svinfo_report [file]\n" );
+		}
 		return;
 	}
 	CG_DF_ReportFileName( arg, name, sizeof( name ) );
@@ -840,6 +842,9 @@ void CG_DF_SvinfoReport_f( void ) {
 	CG_DF_ReportPrintf( f, "=\r\n= Report for %s (%04i-%02i-%02i)\r\n=\r\n\r\n", servername, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday );
 	CG_DF_ReportPrintf( f, "*** Info\r\n" );
 	CG_DF_ReportPrintf( f, "%-24s %s\r\n", "validation", dfViolationCount ? "failed" : "passed" );
+	if ( runMs ) {
+		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "time", CG_DF_FormatTime( runMs ) );
+	}
 	CG_DF_ReportPrintf( f, "%-24s %s\r\n", "map", Info_ValueForKey( si, "mapname" ) );
 	if ( v ) {
 		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "gametype", dfGametypeNames[gt >= 0 && gt < 8 ? gt : 0] );
@@ -882,6 +887,13 @@ void CG_DF_SvinfoReport_f( void ) {
 	CG_Printf( "report written to %s\n", path );
 }
 
+void CG_DF_SvinfoReport_f( void ) {
+	char arg[MAX_QPATH];
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	CG_DF_WriteReport( arg, 0, qtrue );
+}
+
 
 
 // svinfo_summary [file] (cgame 0x4b67): brace-structured short report  system/reports/<file>.txt
@@ -890,14 +902,16 @@ static void CG_DF_SummaryLine( fileHandle_t f, int indent, const char *key, cons
 	CG_DF_ReportPrintf( f, "%s%-12s \"%s\"\r\n", indent ? "  " : "", key, value );
 }
 
-void CG_DF_SvinfoSummary_f( void ) {
-	char		arg[MAX_QPATH], name[MAX_QPATH], path[MAX_QPATH + 16], si[BIG_INFO_STRING], sys[BIG_INFO_STRING], tmp[64];
+// worker of 0x4b67(name, timeMs, usage)
+static void CG_DF_WriteSummary( const char *arg, int runMs, qboolean usage ) {
+	char		name[MAX_QPATH], path[MAX_QPATH + 16], si[BIG_INFO_STRING], sys[BIG_INFO_STRING], tmp[64];
 	fileHandle_t f;
 	int			i, v, gt, mode, obs, promode;
 
-	trap_Argv( 1, arg, sizeof( arg ) );
 	if ( !arg[0] ) {
-		CG_Printf( "usage: svinfo_summary [file]\n" );
+		if ( usage ) {
+			CG_Printf( "usage: svinfo_summary [file]\n" );
+		}
 		return;
 	}
 	CG_DF_ReportFileName( arg, name, sizeof( name ) );
@@ -920,6 +934,9 @@ void CG_DF_SvinfoSummary_f( void ) {
 
 	CG_DF_ReportPrintf( f, "%s {\r\n", Info_ValueForKey( si, "defrag_servername" ) );
 	if ( v ) {
+		if ( runMs ) {
+			CG_DF_SummaryLine( f, 1, "time", CG_DF_FormatTime( runMs ) );
+		}
 		CG_DF_SummaryLine( f, 1, "map", Info_ValueForKey( si, "mapname" ) );
 		CG_DF_SummaryLine( f, 1, "gametype", dfGametypeNames[gt >= 0 && gt < 8 ? gt : 0] );
 		CG_DF_SummaryLine( f, 1, "physics", promode ? "cpm" : "vq3" );
@@ -961,6 +978,115 @@ void CG_DF_SvinfoSummary_f( void ) {
 	CG_DF_ReportPrintf( f, "}\r\n\r\n" );
 	trap_FS_FCloseFile( f );
 	CG_Printf( "report written to %s%s\n", "system/reports/", name );
+}
+
+void CG_DF_SvinfoSummary_f( void ) {
+	char arg[MAX_QPATH];
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	CG_DF_WriteSummary( arg, 0, qtrue );
+}
+
+// ---- demo validation (cgame 0x4db6, called from the finish handler 0x1aec when cg.demoPlayback and defrag_vers >= 18100) ----
+// df_demos_validation >= 1: <date>_summary report; if a violation was logged (0x5b02) also <date>_failed.txt (the server name);
+// df_demos_validation >= 2: full <date>.txt report. <date> = 0x4775 = "YYYY-MM-DD" of the real-time clock.
+vmCvar_t	df_demos_validation, df_demos_ModSupport;
+
+// ---- df_demos_ModSupport (cgame 0xa191 / 0xa1a6; cvar flags TEMP) ----
+// During demo playback with df_demos_ModSupport > 0, the "Bad item index / Bad entity type / Bad leType / Unknown event / Unknown
+// client game command" failures are ignored and weapon numbers > 10 are drawn as weapon 1 (0xa191 callers: 0x1ea0c, 0x1f222, 0x1f7e0,
+// 0x20dab, 0x28d70, 0x2ab1d). Not ported: level 3 entity-trajectory fix 0xa213 (adds a per-entity delta of unidentified fields, only for
+// ModSupport 3) and the "MOD Demo detected" print of 0x7f2a.
+qboolean CG_DF_ModSupport( void ) {
+	return ( cg.demoPlayback && df_demos_ModSupport.integer > 0 ) ? qtrue : qfalse;
+}
+
+// 0xa174: the server counts as DeFRaG when o3j_version or defrag_vers (parsed or merely present) is set
+static qboolean CG_DF_IsDefragServer( void ) {
+	char si[BIG_INFO_STRING];
+
+	Q_strncpyz( si, CG_ConfigString( CS_SERVERINFO ), sizeof( si ) );
+	return ( atoi( Info_ValueForKey( si, "o3j_version" ) ) || atoi( Info_ValueForKey( si, "defrag_vers" ) ) || Info_ValueForKey( si, "defrag_vers" )[0] ) ? qtrue : qfalse;
+}
+
+// 0xa1a6, run after cg.clientFrame++ in CG_DrawActiveFrame: on a non-DeFRaG demo clear the stats the race code would misread
+void CG_DF_ModSupportSnapshot( void ) {
+	int i;
+
+	if ( !CG_DF_ModSupport() || !cg.snap || CG_DF_IsDefragServer() ) {
+		return;
+	}
+	for ( i = 7; i < 16; i++ ) {
+		cg.snap->ps.stats[i] = 0;
+	}
+	if ( df_demos_ModSupport.integer == 2 ) {
+		for ( i = 10; i < 16; i++ ) {
+			cg.snap->ps.powerups[i] = 0;
+		}
+		for ( i = 0; i < 16; i++ ) {
+			cg.snap->ps.persistant[i] = 0;
+		}
+	}
+}
+
+// ---- cgame init cvar sequence (cgame 0x3985, called from CG_Init after the glconfig) ----
+// defrag_demoPlayback = cg.demoPlayback ("1"/"0"; read by the DeFRaG ui, 0x1a92), df_name defaults to the player's name,
+// defrag_version_server = parsed server defrag_vers as "%i.%02i.%02i" (0x3c33 result), defrag_version_client = "1.91.31".
+// (cg.demoPlayback is still 0 at this point of CG_Init - DeFRaG writes the cvar only here too.) The shader registrations of 0x3985
+// (sprites/notAvailable, gfx/unavailableItem, df_gfx/scoreboard/*) belong to the features that use them.
+void CG_DF_InitCvars( void ) {
+	char	name[MAX_STRING_CHARS], si[BIG_INFO_STRING];
+	int		v;
+
+	trap_Cvar_Set( "defrag_demoPlayback", cg.demoPlayback ? "1" : "0" );
+	trap_Cvar_VariableStringBuffer( "df_name", name, sizeof( name ) );
+	if ( !name[0] ) {
+		trap_Cvar_VariableStringBuffer( "name", name, sizeof( name ) );
+		trap_Cvar_Set( "df_name", name );
+	}
+	Q_strncpyz( si, CG_ConfigString( CS_SERVERINFO ), sizeof( si ) );
+	v = atoi( Info_ValueForKey( si, "defrag_vers" ) );
+	if ( v > 0 && v < 1000 ) {
+		v *= 100;
+	}
+	trap_Cvar_Set( "defrag_version_server", va( "%i.%02i.%02i", v / 10000, ( v / 100 ) % 100, v % 100 ) );
+	trap_Cvar_Set( "defrag_version_client", va( "%i.%02i.%02i", 1, 91, 31 ) );
+}
+
+void CG_DF_DemoValidation( int ms ) {
+	char		date[32], file[MAX_QPATH + 16], si[BIG_INFO_STRING];
+	fileHandle_t f;
+	qtime_t		tm;
+	int			v;
+
+	if ( !cg.demoPlayback || df_demos_validation.integer <= 0 ) {
+		return;
+	}
+	Q_strncpyz( si, CG_ConfigString( CS_SERVERINFO ), sizeof( si ) );
+	v = atoi( Info_ValueForKey( si, "defrag_vers" ) );
+	if ( v > 0 && v < 1000 ) {
+		v *= 100;
+	}
+	if ( v < 18100 ) {
+		return;
+	}
+	trap_RealTime( &tm );
+	Com_sprintf( date, sizeof( date ), "%04i-%02i-%02i", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday );
+	Com_sprintf( file, sizeof( file ), "%s_summary", date );
+	CG_DF_WriteSummary( file, ms, qtrue );
+	if ( dfViolationCount ) {
+		Com_sprintf( file, sizeof( file ), "system/reports/%s_failed.txt", date );
+		trap_FS_FOpenFile( file, &f, FS_WRITE );
+		if ( f ) {
+			CG_DF_ReportPrintf( f, "%s\r\n", CG_DF_Serverinfo( "defrag_servername" ) );
+			trap_FS_FCloseFile( f );
+		} else {
+			CG_Printf( "SVI_ReportBadDemo(): failed to open \"%s\" for writing.\n", file );
+		}
+	}
+	if ( df_demos_validation.integer > 1 ) {
+		CG_DF_WriteReport( date, ms, qtrue );
+	}
 }
 
 // ---- authentication reply (cgame 0x4337 / hash 0x11f9), see disasm/G_CLIENT/auth_handshake.md ----
@@ -1023,6 +1149,7 @@ void CG_DF_SnapshotTransition( const playerState_t *ops, const playerState_t *ps
 	// bit 0x4: run (re)started
 	if ( ( changed & 4 ) && ( ps->stats[STAT_DEFRAG_FLAGS] & 4 ) ) {
 		CG_DF_ResetStats();
+		CG_DF_GhostRunStart();
 		CG_DF_ArStartEvent();
 		runActive = qtrue;
 		CG_DF_RecStart();
@@ -1034,8 +1161,10 @@ void CG_DF_SnapshotTransition( const playerState_t *ops, const playerState_t *ps
 	// bit 0x8 toggles at the finish: DeFRaG's own 0x1b10 prints the stats there on defrag_gametype >= 5 servers
 	// (other servers get the "stats" command instead)
 	if ( ( changed & 8 ) && CG_DF_RaceTime( ps, &ms ) ) {
+		CG_DF_GhostRunEnd( ms );
 		CG_DF_RecFinish( ms );
 		CG_DF_ArFinishEvent( ms, CG_DF_RecKeep() );
+		CG_DF_DemoValidation( ms );
 		if ( runActive ) {
 			CG_DF_PrintStats( ms );
 			runActive = qfalse;

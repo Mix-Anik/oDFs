@@ -131,7 +131,8 @@ static void CG_EntityEffects( centity_t *cent ) {
 		if (cent->currentState.eType != ET_SPEAKER) {
 			trap_S_AddLoopingSound( cent->currentState.number, cent->lerpOrigin, vec3_origin, 
 				cgs.gameSounds[ cent->currentState.loopSound ] );
-		} else {
+		} else if ( s_ambient.integer ) {
+			// DeFRaG (cgame 0x1e8a9): speaker loops only with s_ambient
 			trap_S_AddRealLoopingSound( cent->currentState.number, cent->lerpOrigin, vec3_origin, 
 				cgs.gameSounds[ cent->currentState.loopSound ] );
 		}
@@ -221,6 +222,52 @@ static void CG_Speaker( centity_t *cent ) {
 
 /*
 ==================
+DeFRaG per-client item availability (cgame 0x4e14 IsItemEntityAvailableToClient)
+
+The qagame marks an item as taken for one client by setting bit <clientNum> in
+es->time (clients 0..31) / es->time2 (32..63). A set bit = NOT available.
+==================
+*/
+static qboolean CG_DF_ItemAvailable( const entityState_t *es, int clientNum ) {
+	if ( es->eType != ET_ITEM ) {
+		return qfalse;
+	}
+	if ( clientNum < 0 || clientNum >= 64 ) {
+		return qfalse;
+	}
+	if ( clientNum < 32 ) {
+		return ( es->time & ( 1 << clientNum ) ) ? qfalse : qtrue;
+	}
+	return ( es->time2 & ( 1 << ( clientNum - 32 ) ) ) ? qfalse : qtrue;
+}
+
+/*
+==================
+DeFRaG "multiplayer" gate (cgame global 0x11d2ac): server version >= 18100
+and defrag_gametype < 5. Cached once per frame.
+==================
+*/
+static qboolean CG_DF_ItemMultiplayerServer( void ) {
+	static int		lastTime = -1;
+	static qboolean	mp;
+
+	if ( lastTime != cg.time ) {
+		char	si[MAX_INFO_STRING];
+		int		v;
+
+		lastTime = cg.time;
+		Q_strncpyz( si, CG_ConfigString( CS_SERVERINFO ), sizeof( si ) );
+		v = atoi( Info_ValueForKey( si, "defrag_vers" ) );
+		if ( v > 0 && v < 1000 ) {
+			v *= 100;
+		}
+		mp = ( v >= 18100 && atoi( Info_ValueForKey( si, "defrag_gametype" ) ) < 5 ) ? qtrue : qfalse;
+	}
+	return mp;
+}
+
+/*
+==================
 CG_Item
 ==================
 */
@@ -235,6 +282,9 @@ static void CG_Item( centity_t *cent ) {
 
 	es = &cent->currentState;
 	if ( es->modelindex >= bg_numItems ) {
+		if ( CG_DF_ModSupport() ) {		// DeFRaG 0x1ea1b (a191): foreign-mod demo, ignore the entity
+			return;
+		}
 		CG_Error( "Bad item index %i on entity", es->modelindex );
 	}
 
@@ -254,6 +304,17 @@ static void CG_Item( centity_t *cent ) {
 		ent.shaderRGBA[1] = 255;
 		ent.shaderRGBA[2] = 255;
 		ent.shaderRGBA[3] = 255;
+		// DeFRaG (cgame 0x1ea0c): items on this client's cooldown are hidden, or with
+		// df_cl_alwaysDrawItems 1/3 (multiplayer servers) drawn with an overlay sprite
+		if ( !CG_DF_ItemAvailable( es, cg.snap->ps.clientNum ) ) {
+			if ( !CG_DF_ItemMultiplayerServer() || df_cl_alwaysDrawItems.integer == 0 || df_cl_alwaysDrawItems.integer == 2 ) {
+				return;
+			}
+			trap_R_AddRefEntityToScene(&ent);
+			ent.customShader = cgs.media.dfNotAvailableShader;
+			trap_R_AddRefEntityToScene(&ent);
+			return;
+		}
 		trap_R_AddRefEntityToScene(&ent);
 		return;
 	}
@@ -345,6 +406,15 @@ static void CG_Item( centity_t *cent ) {
 		ent.nonNormalizedAxes = qtrue;
 	}
 #endif
+
+	// DeFRaG (cgame 0x1ea0c): items on this client's cooldown are hidden, or with
+	// df_cl_alwaysDrawItems 1/2 (multiplayer servers) drawn with the unavailable shader
+	if ( !CG_DF_ItemAvailable( es, cg.snap->ps.clientNum ) ) {
+		if ( !CG_DF_ItemMultiplayerServer() || df_cl_alwaysDrawItems.integer == 0 || df_cl_alwaysDrawItems.integer == 3 ) {
+			return;
+		}
+		ent.customShader = cgs.media.dfUnavailableItemShader;
+	}
 
 	// add to refresh list
 	trap_R_AddRefEntityToScene(&ent);
@@ -1027,7 +1097,9 @@ static void CG_AddCEntity( centity_t *cent ) {
 
 	switch ( cent->currentState.eType ) {
 	default:
-		CG_Error( "Bad entity type: %i", cent->currentState.eType );
+		if ( !CG_DF_ModSupport() ) {
+			CG_Error( "Bad entity type: %i", cent->currentState.eType );
+		}
 		break;
 	case ET_INVISIBLE:
 	case ET_PUSH_TRIGGER:
@@ -1061,7 +1133,10 @@ static void CG_AddCEntity( centity_t *cent ) {
 		CG_Portal( cent );
 		break;
 	case ET_SPEAKER:
-		CG_Speaker( cent );
+		// DeFRaG (cgame 0x1f222): s_ambient 0 disables target_speakers
+		if ( s_ambient.integer ) {
+			CG_Speaker( cent );
+		}
 		break;
 	case ET_GRAPPLE:
 		CG_Grapple( cent );

@@ -746,6 +746,21 @@ static void CG_DF_ChsItem( int id, char *label, char *value, const char *sep ) {
 		CG_DF_ChsFloat( value, fmt, v );
 		break;
 	}
+	case 140: case 141: case 142: case 143: {
+		static const char *jl[4] = { "jumps speed", "jumps accel", "jumps dstnc", "jumps hght." };
+		static const int jt[4] = { 2, 3, 0, 1 };
+
+		Q_strncpyz( label, jl[item - 140], CHS_BUF );
+		CG_DF_JumpHistoryText( jt[item - 140], value, CHS_BUF );
+		break;
+	}
+	case 145: case 146: case 147: case 148: {
+		static const char *ml[4] = { "max speed", "max accel", "max dstnc", "max hght." };
+
+		Q_strncpyz( label, ml[item - 145], CHS_BUF );
+		CG_DF_ChsFloat( value, fmt, CG_DF_JumpHistoryMax( item - 145 ) );
+		break;
+	}
 	case 40: case 41: case 42: case 43: case 44: case 45: case 46: case 47: case 150: case 151: case 152: case 153:
 	case 210: case 211: case 212: case 213: case 214: case 190: case 191: case 192: case 193: case 215: case 216: case 217: case 219: case 220: case 221: case 222: case 223: case 224:
 	case 225: case 226: case 227: case 228: case 229: case 230: case 231: case 232: case 233: case 234: case 235: case 236: case 237: case 238: case 239: {
@@ -1232,6 +1247,33 @@ void CG_DF_DrawChs( int p ) {
 	}
 }
 
+// DeFRaG 0xb0ad: log line of a var* change, selected by df_varHelpers_DrawOutput (0 off; 1-4 "[ name ] Old Value = x New Value = y",
+// 5-8 "name --> y"; 1/5 white, 2/6 df_chs0, 3/7 df_chs1, 4/8 df_chs2 colours: name = FontColor, values = LabelColor)
+vmCvar_t	df_varHelpers_DrawOutput;
+
+static void CG_DF_VarSetLogged( const char *name, const char *newVal ) {
+	char	oldVal[MAX_STRING_CHARS];
+	int		mode = df_varHelpers_DrawOutput.integer;
+	int		nameCol = 7, valCol = 7;
+
+	trap_Cvar_VariableStringBuffer( name, oldVal, sizeof( oldVal ) );
+	trap_Cvar_Set( name, newVal );
+	if ( mode < 1 || mode > 8 ) {
+		return;
+	}
+	if ( ( mode - 1 ) % 4 ) {
+		int c = ( mode - 1 ) % 4 - 1;	// df_chs0..2
+
+		nameCol = dfChs[c].fontColor.integer;
+		valCol = dfChs[c].labelColor.integer;
+	}
+	if ( mode <= 4 ) {
+		CG_Printf( "^7[ ^%i%s ^7] Old Value = ^%i%s ^7New Value = ^%i%s\n", nameCol, name, valCol, oldVal, valCol, newVal );
+	} else {
+		CG_Printf( "^%i%s ^4--> ^%i%s\n", nameCol, name, valCol, newVal );
+	}
+}
+
 // ---- varMath (cgame 0xa4cc): "varMath <var> <op> <value> [<op> <value> ...]" evaluated left to right, operators + - * / % = ----
 // Numbers keep integer or float flavour (a '.' in either operand selects "%.4f" output); strings concatenate with + ("<s>" = a space,
 // "<0>" = empty); "=" assigns.  Arguments may use $variables.  The result is written with trap_Cvar_Set (DeFRaG's 0x80bf also logs
@@ -1352,7 +1394,7 @@ void CG_DF_VarMath_f( void ) {
 			Com_sprintf( res, sizeof( res ), "%i", r44 );
 		}
 	}
-	trap_Cvar_Set( target, res );
+	CG_DF_VarSetLogged( target, res );
 }
 
 // ---- varCommand / varCycle / varCycleOnce / varJoin / varFormat / varSave (cgame 0xa42d / 0xa897 / 0xa9bb / 0xaaab / 0xafda) ----
@@ -1424,7 +1466,7 @@ static void CG_DF_VarCycle( qboolean wrap ) {
 		}
 	}
 	(void)found;
-	trap_Cvar_Set( name, out );
+	CG_DF_VarSetLogged( name, out );
 }
 void CG_DF_VarCycle_f( void ) { CG_DF_VarCycle( qtrue ); }
 void CG_DF_VarCycleOnce_f( void ) { CG_DF_VarCycle( qfalse ); }
@@ -1456,7 +1498,7 @@ void CG_DF_VarJoin_f( void ) {
 			Com_sprintf( acc, sizeof( acc ), "%s%s", acc, arg );
 		}
 	}
-	trap_Cvar_Set( name, acc );
+	CG_DF_VarSetLogged( name, acc );
 }
 
 // varFormat <var> <spec1: s|i|f> <value1> [<spec2> <value2>] : printf-style formatting, e.g. varFormat user_f 2.2f 987.654
@@ -1511,7 +1553,7 @@ void CG_DF_VarFormat_f( void ) {
 		if ( t1 == 2 && t2 == 3 ) Com_sprintf( out, sizeof( out ), fmt, i1, f2 );
 		if ( t1 == 3 && t2 == 2 ) Com_sprintf( out, sizeof( out ), fmt, f1, i2 );
 	}
-	trap_Cvar_Set( name, out );
+	CG_DF_VarSetLogged( name, out );
 }
 
 // varSave <var> <file> : appends  set <var> "<value>"  to the file
