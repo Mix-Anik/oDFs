@@ -992,6 +992,470 @@ static void DR_CmdActivate( void ) {		// 0x17f21: only MANUAL activators react; 
 	drActs[id].value = v;
 }
 
+// ---- playback runtime (cgame 0x1a4ed driver -> 0x1a4ac frame; see disasm/CGAME/replay_system.md "Iter 73") ----
+// Per frame (ReplayMode 2 / 3, script loaded): activators 0x197e6 -> active transitions 0x1a033 -> camera 0x1a119.
+// Not ported: ReplayMode 1 (key-driven toggle state machine 0x1a323 / 0x1a2bf), the edit overlay 0x18873 (modes 3 / 4), camera modes 9..11
+// (0x15550 free camera), ghost-follow of 0x1a265, the cvar-restore cleanup 0x1a3a6 / 0x1a3c3, the df_ghosts_CheckPVS areamask fix and the verbose debug prints.
+static vec3_t	drCamOrigin, drCamAngles;	// 2823440 / 2823452: camera output of the transitions
+static vec3_t	drTarget;					// 2823468: tracked position (the viewed player's origin)
+static int		drTime;						// 2823492
+static int		drLastTime;					// 2791292
+
+static float DR_CvarF( const char *name ) {
+	char buf[MAX_CVAR_VALUE_STRING];
+
+	trap_Cvar_VariableStringBuffer( name, buf, sizeof( buf ) );
+	return atof( buf );
+}
+
+static float DR_Clamp( float x, float lo, float hi ) {		// 0x8285 (a NaN gives lo)
+	if ( !( x >= lo ) ) {
+		return lo;
+	}
+	if ( !( x <= hi ) ) {
+		return hi;
+	}
+	return x;
+}
+
+static float DR_VarValue( int id ) {		// 0x19179
+	float v;
+
+	if ( id < 0 || id >= DR_MAX_VAR ) {
+		return 0;
+	}
+	v = drVars[id].value;
+	if ( v == -9999.0f ) {
+		v = drVars[id].original;
+	}
+	return v;
+}
+
+static void DR_FormatNum( char *buf, int size, float v ) {		// "%i" when integral, else "%.3f"
+	if ( v == (float)(int)v ) {
+		Com_sprintf( buf, size, "%i", (int)v );
+	} else {
+		Com_sprintf( buf, size, "%.3f", v );
+	}
+}
+
+static void DR_PropagateVar( int id ) {		// 0x19626: other VARs naming the same cvar take this one's Value as their current value
+	int i;
+
+	for ( i = 0; i < DR_MAX_VAR; i++ ) {
+		if ( i != id && !strcmp( drVars[id].name, drVars[i].name ) ) {
+			drVars[i].current = drVars[id].value;
+		}
+	}
+}
+
+static void DR_ApplyVar( int id ) {		// 0x19670: write the VAR's value into its cvar
+	char	buf[MAX_STRING_CHARS];
+	float	v;
+
+	trap_Cvar_VariableStringBuffer( drVars[id].name, buf, sizeof( buf ) );
+	if ( !buf[0] ) {
+		return;
+	}
+	v = DR_VarValue( id );
+	DR_FormatNum( buf, sizeof( buf ), v );
+	trap_Cvar_Set( drVars[id].name, buf );
+	drVars[id].current = v;
+	DR_PropagateVar( id );
+}
+
+// ---- transition stepping ----
+static void DR_StepTime( drTran_t *t, float dt, float speed ) {		// 0x19195 (TranType TIME)
+	float	a = DR_VarValue( t->id1 ), b = DR_VarValue( t->id2 );
+	float	scale = 0, p;
+
+	if ( speed < 0 ) {
+		if ( t->dtype == DR_VAR ) {
+			scale = fabs( b - a );
+			if ( scale != 0 ) {
+				scale = 1000.0f / scale;
+			}
+		}
+		if ( t->dtype == DR_CAM ) {
+			vec3_t d;
+
+			VectorSubtract( drCams[t->id2].origin, drCams[t->id1].origin, d );
+			scale = VectorLength( d );
+			if ( scale != 0 ) {
+				scale = 1000.0f / scale;
+			}
+		}
+		p = t->interp[0] + ( ( fabs( speed ) / 100.0f ) * dt ) * scale;
+	} else {
+		p = t->interp[0] + ( fabs( speed ) / 100.0f ) * dt;
+	}
+	if ( p >= 1.0f ) {
+		if ( t->id1 == t->id2 ) {
+			p = 1.0f;
+		}
+		if ( t->curLoop != 0 ) {
+			p = 0;
+			if ( t->curLoop > 0 ) {
+				t->curLoop -= 1.0f;
+			} else {
+				int tmp = t->id1;
+
+				t->curLoop += 1.0f;
+				t->id1 = t->id2;
+				t->id2 = tmp;
+			}
+		} else {
+			t->curLoop = t->loop;
+			t->activated = 0;
+		}
+	}
+	t->interp[0] = DR_Clamp( p, 0, 1 );
+}
+
+static void DR_StepPos( int k, drTran_t *t, float v ) {		// 0x19317 (TranType POS*: progress of the tracked position between the two cameras on axis k)
+	float lo = drCams[t->id1].origin[k], hi = drCams[t->id2].origin[k];
+	float r = DR_Clamp( ( drTarget[k] - lo ) / ( hi - lo ), 0, 1 );
+
+	t->interp[k] = DR_Clamp( r + v * 0.001f, 0, 1 );
+}
+
+// second axis of a two-letter POSxy type (the table of 0x1938d: that axis takes the record's +20 field instead of Speed)
+static const signed char drAltAxis[11] = { -1, -1, -1, -1, -1, 1, 2, 0, 2, 0, 1 };
+
+static void DR_TranStep( drTran_t *t, float dt ) {		// 0x1938d
+	float	sp = t->speed, alt = t->loop;
+	int		k;
+
+	if ( sp == 0 ) {
+		sp = DR_CvarF( "df_demos_ReplayTransitionSpeed" );
+	}
+	if ( t->type < 1 || t->type > 10 ) {
+		return;
+	}
+	if ( t->type == 1 ) {
+		DR_StepTime( t, dt, sp );
+		return;
+	}
+	for ( k = 0; k < 3; k++ ) {
+		DR_StepPos( k, t, k == drAltAxis[t->type] ? alt : sp );
+	}
+}
+
+// interpolant index used for the camera angles, and for the x / y / z origin components, per TranType
+static const signed char drAngIdx[11] = { 0, 0, 0, 1, 2, 0, 0, 1, 1, 2, 2 };
+static const signed char drPosIdx[11][3] = {
+	{ 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 1, 1, 1 }, { 2, 2, 2 },
+	{ 0, 1, 0 }, { 0, 0, 2 }, { 0, 1, 1 }, { 1, 1, 2 }, { 0, 2, 2 }, { 2, 1, 2 }
+};
+
+static void DR_TranApply( drTran_t *t, float dt ) {		// 0x199c3
+	int k;
+
+	if ( !t->activated ) {
+		return;
+	}
+	DR_TranStep( t, dt );
+	if ( !t->activated && t->interp[0] == 0 ) {
+		return;
+	}
+	if ( t->dtype == DR_VAR ) {
+		char	buf[MAX_STRING_CHARS];
+		float	a, b, v, p = t->interp[0];
+
+		trap_Cvar_VariableStringBuffer( drVars[t->id1].name, buf, sizeof( buf ) );
+		if ( !buf[0] ) {
+			return;
+		}
+		a = DR_VarValue( t->id1 );
+		b = DR_VarValue( t->id2 );
+		v = a + p * ( b - a );
+		v = ( a > b ) ? DR_Clamp( v, b, a ) : DR_Clamp( v, a, b );
+		if ( !( p > 0 ) ) {
+			v = a;
+		}
+		if ( !( p < 1.0f ) ) {
+			v = b;
+		}
+		if ( !t->activated ) {
+			v = b;
+		}
+		DR_FormatNum( buf, sizeof( buf ), v );
+		trap_Cvar_Set( drVars[t->id1].name, buf );
+		drVars[t->id1].current = v;
+		DR_PropagateVar( t->id1 );
+	} else if ( t->dtype == DR_CAM ) {
+		const drCam_t *c1 = &drCams[t->id1], *c2 = &drCams[t->id2];
+
+		if ( t->type < 1 || t->type > 10 ) {
+			return;
+		}
+		for ( k = 0; k < 3; k++ ) {
+			drCamAngles[k] = LerpAngle( c1->angles[k], c2->angles[k], t->interp[drAngIdx[t->type]] );
+			drCamOrigin[k] = c1->origin[k] + t->interp[drPosIdx[t->type][k]] * ( c2->origin[k] - c1->origin[k] );
+		}
+	}
+}
+
+static void DR_StepTrans( void ) {		// 0x1a033
+	float	dt;
+	int		i;
+
+	dt = ( cg.time - drLastTime ) * 0.001f;		// 0x8e4a(&last, 1)
+	drLastTime = cg.time;
+	for ( i = 0; i < DR_MAX_TRAN; i++ ) {
+		if ( drTrans[i].activated ) {
+			DR_TranApply( &drTrans[i], dt );
+		}
+	}
+}
+
+// ---- activators ----
+static qboolean DR_ActLatch( int id ) {		// 0x194d7: fires once until the condition drops again
+	if ( drActs[id].activated ) {
+		return qfalse;
+	}
+	drActs[id].activated = 1;
+	return qtrue;
+}
+
+static qboolean DR_PointInBox( const vec3_t p, const vec3_t c1, const vec3_t c2 ) {		// 0x82b6
+	int i;
+
+	for ( i = 0; i < 3; i++ ) {
+		float lo = c1[i] < c2[i] ? c1[i] : c2[i];
+		float hi = c1[i] < c2[i] ? c2[i] : c1[i];
+
+		if ( p[i] > hi || !( p[i] >= lo ) ) {
+			return qfalse;
+		}
+	}
+	return qtrue;
+}
+
+static qboolean DR_ActCheck( int id ) {		// 0x194f1
+	drAct_t	*a = &drActs[id];
+	vec3_t	d;
+	int		n;
+
+	switch ( a->type ) {
+	case 1:		// MANUAL
+		if ( a->value != 0 ) {
+			a->value = 0;
+			return DR_ActLatch( id );
+		}
+		break;
+	case 2:		// TIMER
+		if ( !( drTime < (int)a->value ) ) {
+			return DR_ActLatch( id );
+		}
+		break;
+	case 3:		// TRANEND: transition number Value has reached its end
+		n = (int)a->value;
+		if ( n >= 0 && n < DR_MAX_TRAN && drTrans[n].interp[0] >= 1.0f ) {
+			return DR_ActLatch( id );
+		}
+		break;
+	case 4:		// RADIUS
+		VectorSubtract( drTarget, a->pos1, d );
+		if ( VectorLength( d ) < a->value ) {
+			return DR_ActLatch( id );
+		}
+		break;
+	case 5:		// VOLUME
+		if ( DR_PointInBox( drTarget, a->pos1, a->pos2 ) ) {
+			return DR_ActLatch( id );
+		}
+		break;
+	}
+	a->activated = 0;
+	return qfalse;
+}
+
+static void DR_ActLinks( int act ) {		// 0x196f9: instant effects (VAR write / camera jump) of a fired activator
+	int i;
+
+	for ( i = 0; i < DR_MAX_LINK; i++ ) {
+		const drLink_t *l = &drLinks[i];
+
+		if ( l->dtype1 != DR_ACT || l->id1 != act || !drActs[act].activated || l->id2 == -1 ) {
+			continue;
+		}
+		if ( l->dtype2 == DR_VAR ) {
+			DR_ApplyVar( l->id2 );
+		} else if ( l->dtype2 == DR_CAM ) {
+			VectorCopy( drCams[l->id2].origin, drCamOrigin );		// 0x196e6
+			VectorCopy( drCams[l->id2].angles, drCamAngles );
+		}
+	}
+}
+
+static void DR_Activators( void ) {		// 0x197e6
+	qboolean	camFired = qfalse;
+	int			keep = -1, a, i;
+
+	for ( a = 0; a < DR_MAX_ACT; a++ ) {
+		if ( !DR_ActCheck( a ) ) {
+			continue;
+		}
+		for ( i = 0; i < DR_MAX_LINK; i++ ) {
+			const drLink_t *l = &drLinks[i];
+
+			if ( l->dtype1 != DR_ACT || l->id1 != a ) {
+				continue;
+			}
+			if ( l->dtype2 == DR_TRAN ) {
+				drTran_t *t = &drTrans[l->id2];
+
+				t->activated = 1;
+				t->interp[0] = t->interp[1] = t->interp[2] = 0;
+				if ( t->dtype == DR_CAM ) {
+					camFired = qtrue;
+					keep = l->id2;
+				}
+			}
+			if ( l->dtype2 == DR_CAM ) {
+				camFired = qtrue;
+				keep = -1;
+			}
+		}
+		DR_ActLinks( a );
+	}
+	if ( camFired ) {		// a camera move starts: every other running camera transition stops
+		for ( i = 0; i < DR_MAX_TRAN; i++ ) {
+			if ( drTrans[i].dtype == DR_CAM && i != keep ) {
+				drTrans[i].activated = 0;
+			}
+		}
+	}
+}
+
+// ---- camera (0x1a119) ----
+static qboolean DR_AddCvars3( vec3_t v, const char *n0, const char *n1, const char *n2 ) {		// 0x14b09 / 0x14b8b
+	float		d[3];
+	qboolean	changed = qfalse;
+	int			i;
+
+	d[0] = DR_CvarF( n0 );
+	d[1] = DR_CvarF( n1 );
+	d[2] = DR_CvarF( n2 );
+	for ( i = 0; i < 3; i++ ) {
+		v[i] += d[i];
+		if ( d[i] != 0 ) {
+			changed = qtrue;
+		}
+	}
+	return changed;
+}
+
+static qboolean DR_AddRadius( vec3_t origin, const vec3_t angles ) {		// 0x14c0d: offsets along forward / right / up
+	static const char *names[3] = { "df_demos_CamOffsetRadiusF", "df_demos_CamOffsetRadiusR", "df_demos_CamOffsetRadiusU" };
+	vec3_t		axis[3];
+	qboolean	changed = qfalse;
+	int			i, j;
+
+	AngleVectors( angles, axis[0], axis[1], axis[2] );
+	for ( i = 0; i < 3; i++ ) {
+		float s = DR_CvarF( names[i] );
+
+		for ( j = 0; j < 3; j++ ) {
+			origin[j] += axis[i][j] * s;
+		}
+		if ( s != 0 ) {
+			changed = qtrue;
+		}
+	}
+	return changed;
+}
+
+static void DR_CamAngles( int mode, vec3_t out, vec3_t dir ) {		// 0x1a07d
+	vec3_t a;
+
+	if ( mode < 5 || mode > 7 ) {
+		return;
+	}
+	vectoangles( dir, a );
+	if ( mode == 6 ) {
+		a[0] = out[0];
+	} else if ( mode == 7 ) {
+		a[1] = out[1];
+	}
+	VectorCopy( a, out );
+}
+
+static void DR_CameraView( void ) {
+	int		mode = (int)DR_CvarF( "df_demos_ReplayCameraMode" );		// 0x1a067
+	vec3_t	dir, tgt;
+	qboolean	posChanged, radChanged;
+
+	if ( mode == 0 ) {
+		return;
+	}
+	if ( mode == 8 ) {
+		VectorCopy( cg.refdef.vieworg, drCamOrigin );
+		VectorCopy( cg.refdefViewAngles, drCamAngles );
+	}
+	if ( mode >= 9 && mode <= 11 ) {		// 0x15550: the demo-camera engine with the replay's own camera object
+		float sp = DR_CvarF( "df_demos_ReplayTransitionSpeed" );
+
+		CG_DF_ReplayFreeCamera( mode, sp == 0 ? 200.0f : sp );
+		return;
+	}
+	if ( mode == 12 ) {
+		tgt[0] = DR_CvarF( "df_demos_TargetPositionX" );
+		tgt[1] = DR_CvarF( "df_demos_TargetPositionY" );
+		tgt[2] = DR_CvarF( "df_demos_TargetPositionZ" );
+	} else {
+		VectorCopy( drTarget, tgt );
+	}
+	VectorSubtract( tgt, drCamOrigin, dir );
+	VectorNormalize( dir );
+	DR_CamAngles( mode, drCamAngles, dir );
+	VectorCopy( drCamOrigin, cg.refdef.vieworg );
+	VectorCopy( drCamAngles, cg.refdefViewAngles );
+	posChanged = DR_AddCvars3( cg.refdef.vieworg, "df_demos_CamOffsetPositionX", "df_demos_CamOffsetPositionY", "df_demos_CamOffsetPositionZ" );
+	DR_AddCvars3( cg.refdefViewAngles, "df_demos_CamOffsetAngleX", "df_demos_CamOffsetAngleY", "df_demos_CamOffsetAngleZ" );
+	radChanged = DR_AddRadius( cg.refdef.vieworg, cg.refdefViewAngles );
+	if ( posChanged || radChanged ) {		// aim again from the displaced origin
+		VectorSubtract( tgt, cg.refdef.vieworg, dir );
+		VectorNormalize( dir );
+		DR_CamAngles( mode, drCamAngles, dir );
+		VectorCopy( drCamAngles, cg.refdefViewAngles );
+		DR_AddCvars3( cg.refdefViewAngles, "df_demos_CamOffsetAngleX", "df_demos_CamOffsetAngleY", "df_demos_CamOffsetAngleZ" );
+	}
+	AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+}
+
+// 0x15246: the df_demos_CamOffset* position / angle / radius offsets applied to a camera (used by the demo camera)
+void CG_DF_CamOffsets( vec3_t pos, vec3_t ang ) {
+	DR_AddCvars3( pos, "df_demos_CamOffsetPositionX", "df_demos_CamOffsetPositionY", "df_demos_CamOffsetPositionZ" );
+	DR_AddCvars3( ang, "df_demos_CamOffsetAngleX", "df_demos_CamOffsetAngleY", "df_demos_CamOffsetAngleZ" );
+	DR_AddRadius( pos, ang );
+}
+
+// 0x19156 clamps ReplayMode to 0..4, then 0x1a4ed runs the frame. Called after CG_CalcViewValues.
+void CG_DF_ReplayFrame( void ) {
+	int mode = df_demos_ReplayMode.integer;
+
+	if ( mode < 0 || mode > 4 ) {
+		mode = (int)DR_Clamp( (float)mode, 0, 4 );
+		trap_Cvar_Set( "df_demos_ReplayMode", va( "%i", mode ) );
+	}
+	if ( mode < 2 ) {
+		return;
+	}
+	if ( cg.demoPlayback && DR_CvarF( "df_demos_CameraMode" ) != 0 ) {
+		return;
+	}
+	if ( !DR_EnsureLoaded() || mode == 4 ) {
+		return;
+	}
+	drTime = cg.time;
+	VectorCopy( cg.predictedPlayerState.origin, drTarget );
+	DR_Activators();
+	DR_StepTrans();
+	DR_CameraView();
+}
+
 void CG_DF_Replay_f( void ) {			// 0x18006
 	char sub[MAX_STRING_CHARS];
 

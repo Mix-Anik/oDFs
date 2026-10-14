@@ -516,6 +516,27 @@ static void CG_Missile( centity_t *cent ) {
 
 /*
 ===============
+CG_DF_AddGhostMissile
+
+DeFRaG ghost missiles (cgame 0x1f3a0): the normal missile drawer with the weapon's looping missile sound
+temporarily removed (cg_weapons[w].missileSound is the field at 103496 + 136*w + 84 in DeFRaG's cgame).
+===============
+*/
+void CG_DF_AddGhostMissile( centity_t *cent ) {
+	int			w = cent->currentState.weapon;
+	sfxHandle_t	keep;
+
+	if ( w < 0 || w >= WP_NUM_WEAPONS ) {
+		w = 0;
+	}
+	keep = cg_weapons[w].missileSound;
+	cg_weapons[w].missileSound = 0;
+	CG_Missile( cent );
+	cg_weapons[w].missileSound = keep;
+}
+
+/*
+===============
 CG_Grapple
 
 This is called when the grapple is sitting up against the wall
@@ -1000,6 +1021,10 @@ static void CG_AddCEntity( centity_t *cent ) {
 	// add automatic effects
 	CG_EntityEffects( cent );
 
+	if ( cent->currentState.eType < 32 && ( df_demos_HidePacketEntities.integer & ( 1 << cent->currentState.eType ) ) ) {		// DeFRaG 0x1f24a: hidden entity types
+		return;
+	}
+
 	switch ( cent->currentState.eType ) {
 	default:
 		CG_Error( "Bad entity type: %i", cent->currentState.eType );
@@ -1012,12 +1037,18 @@ static void CG_AddCEntity( centity_t *cent ) {
 		CG_General( cent );
 		break;
 	case ET_PLAYER:
+		if ( CG_DF_HideForInterference( cent ) || CG_DF_HideTrackedBody( cent->currentState.clientNum ) ) {
+			break;
+		}
 		CG_Player( cent );
 		break;
 	case ET_ITEM:
 		CG_Item( cent );
 		break;
 	case ET_MISSILE:
+		if ( CG_DF_HideForInterference( cent ) ) {
+			break;
+		}
 		CG_Missile( cent );
 		break;
 	case ET_MOVER:

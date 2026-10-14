@@ -349,12 +349,16 @@ void CG_DF_RecCheckpoint( int t ) {
 	}
 }
 
+static qboolean dfRecKeep;
+qboolean CG_DF_RecKeep( void ) { return dfRecKeep; }
+
 void CG_DF_RecFinish( int t ) {
 	int		*N = &dfRecB[DF_REC_COUNT];
 	int		best;
 	qboolean isNew = qfalse, isTie = qfalse;
 	char	path[256];
 
+	dfRecKeep = qfalse;
 	dfRecB[*N] = t;
 	if ( cg.snap && cgs.clientinfo[cg.snap->ps.clientNum].team != TEAM_SPECTATOR ) {
 		best = dfRecR2[dfRecR2[DF_REC_COUNT]];
@@ -367,6 +371,7 @@ void CG_DF_RecFinish( int t ) {
 			CG_DF_RecordPath( path, sizeof( path ), "system/records/latest" );
 			CG_DF_WriteRecord( path, dfRecB );
 		}
+		dfRecKeep = isNew || ( isTie && df_tieOverwrites.integer );
 		if ( isNew || ( isTie && df_tieOverwrites.integer ) ) {
 			CG_DF_RecordPath( path, sizeof( path ), CG_DF_RecordDir() );
 			CG_DF_WriteRecord( path, dfRecB );

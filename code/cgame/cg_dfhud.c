@@ -759,3 +759,48 @@ void CG_DF_DrawHUD( void ) {
 	}
 	CG_DF_DrawFollowName();
 }
+
+// ---- video-capture HUD (cgame 0x3387, chosen by 0x1ce20 instead of every other 2D element) ----
+// df_hud_videocapture_enable: only the run timer is drawn, as plain text at (x, y): fontsize 4..32, fontcolor = colour index 0..7,
+// fontshadow, fontjustify 0 centre / 1 left / 2 right.
+vmCvar_t	df_hud_videocapture_enable, df_hud_videocapture_x, df_hud_videocapture_y, df_hud_videocapture_fontsize,
+			df_hud_videocapture_fontcolor, df_hud_videocapture_fontshadow, df_hud_videocapture_fontjustify;
+
+void CG_DF_DrawVideoCapture( void ) {
+	const char	*s;
+	int			ms, size, len, x, y;
+	const float	*color;
+
+	if ( !cg.snap || !( cg.snap->ps.stats[STAT_DEFRAG_FLAGS] & 2 ) ) {		// race time initialised (plain form only; encoded times on listen servers are not decoded)
+		return;
+	}
+	ms = ( cg.snap->ps.stats[STAT_RACE_TIME_HI] << 16 ) | ( cg.snap->ps.stats[STAT_RACE_TIME_LO] & 0xffff );
+	if ( !ms ) {
+		return;
+	}
+	size = df_hud_videocapture_fontsize.integer;
+	if ( size < 4 ) {
+		size = 4;
+	}
+	if ( size > 32 ) {
+		size = 32;
+	}
+	s = CG_DF_FormatTime( ms );
+	len = strlen( s );
+	switch ( df_hud_videocapture_fontjustify.integer ) {
+	case 0:
+		x = df_hud_videocapture_x.integer - ( len * size ) / 2;
+		y = df_hud_videocapture_y.integer - size / 2;
+		break;
+	case 2:
+		x = df_hud_videocapture_x.integer - len * size;
+		y = df_hud_videocapture_y.integer;
+		break;
+	default:
+		x = df_hud_videocapture_x.integer;
+		y = df_hud_videocapture_y.integer;
+		break;
+	}
+	color = ( df_hud_videocapture_fontcolor.integer >= 0 && df_hud_videocapture_fontcolor.integer < 8 ) ? g_color_table[df_hud_videocapture_fontcolor.integer] : colorWhite;
+	CG_DrawStringExt( x, y, s, color, qtrue, df_hud_videocapture_fontshadow.integer, size, size, len );
+}

@@ -772,6 +772,53 @@ static void CG_DF_ChsItem( int id, char *label, char *value, const char *sep ) {
 		CG_DF_ChsDist( item, label, value, sep, wf, fmt, pos, ang );
 		break;
 	}
+	case 90: case 91: case 92: case 93: case 94: case 95: case 96: case 98: case 99: {		// ghost items (cgame 0xc320 cases at 0xd870..0xdac9)
+		char wf[24];
+		vec3_t gv;
+		int gs, k;
+		float gd[3];
+
+		Com_sprintf( wf, sizeof( wf ), "%%%i.%if", 4 + dec + ( dec > 0 ? 1 : 0 ), dec );
+		switch ( item ) {
+		case 90:
+			Q_strncpyz( label, "ghost speed", CHS_BUF );
+			CG_DF_GhostVelocity( CG_DF_GhostNearest( 2 ), gv );
+			CG_DF_ChsFloat( value, fmt, sqrt( gv[0] * gv[0] + gv[1] * gv[1] ) );
+			break;
+		case 91: case 92: case 93:
+			Q_strncpyz( label, item == 91 ? "ghost dist XY" : ( item == 92 ? "ghost dist Z" : "ghost dist XYZ" ), CHS_BUF );
+			k = item - 91;
+			CG_DF_ChsFloat( value, fmt, CG_DF_GhostDist( CG_DF_GhostNearest( k ), k ) );
+			break;
+		case 94:
+			Com_sprintf( label, CHS_BUF, "ghost dist XY%sZ%sXYZ", sep, sep );
+			gs = CG_DF_GhostNearest( 2 );
+			for ( k = 0; k < 3; k++ ) {
+				gd[k] = CG_DF_GhostDist( gs, k );
+			}
+			Com_sprintf( value, CHS_BUF, va( "%s%s%s%s%s", wf, sep, wf, sep, wf ), gd[0], gd[1], gd[2] );
+			break;
+		case 95:
+			Q_strncpyz( label, "ghost pos", CHS_BUF );
+			CG_DF_GhostOrigin( CG_DF_GhostNearest( 2 ), gv );
+			CG_DF_ChsNums( value, wf, "(", " ", ")", gv[0], gv[1], gv[2] );
+			break;
+		case 96:
+			Q_strncpyz( label, "nearest ghost", CHS_BUF );
+			gs = CG_DF_GhostNearest( 2 );
+			Com_sprintf( value, CHS_BUF, "%i", gs + ( CG_DF_GhostPlaying( gs ) ? 1 : 0 ) );		// 0xda5a: index, +1 when that slot is playing
+			break;
+		case 98:
+			Q_strncpyz( label, "ghost memory size (snap snapbuf ghosts)", CHS_BUF );
+			Com_sprintf( value, CHS_BUF, "%i %i %i", 624, 312000, 1560000 );		// DeFRaG's own constants (frame, ring, 5 rings)
+			break;
+		case 99:
+			Q_strncpyz( label, "version ghost / server", CHS_BUF );
+			Com_sprintf( value, CHS_BUF, "%i / %i", CG_DF_GhostHeader( CG_DF_GhostNearest( 2 ), 0 ), CG_DF_GhostHeader( CG_DF_GhostNearest( 2 ), 1 ) );
+			break;
+		}
+		break;
+	}
 	case 160: case 161: case 162: case 163: {
 		char wf[24];
 

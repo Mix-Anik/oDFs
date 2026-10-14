@@ -2581,6 +2581,11 @@ static void CG_Draw2D(stereoFrame_t stereoFrame)
 		return;
 	}
 
+	if ( df_hud_videocapture_enable.integer ) {		// DeFRaG 0x1ce20: only the timer is drawn
+		CG_DF_DrawVideoCapture();
+		return;
+	}
+
 	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
 		CG_DrawIntermission();
 		return;

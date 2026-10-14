@@ -244,7 +244,7 @@ static void CG_OffsetThirdPersonView( void ) {
 		cg.refdefViewAngles[YAW] = cg.predictedPlayerState.stats[STAT_DEAD_YAW];
 	}
 
-	if ( focusAngles[PITCH] > 45 ) {
+	if ( !df_demos_UnlockThirdPersonPitch.integer && focusAngles[PITCH] > 45 ) {		// DeFRaG 0x29533
 		focusAngles[PITCH] = 45;		// don't go too far overhead
 	}
 	AngleVectors( focusAngles, forward, NULL, NULL );
@@ -255,7 +255,9 @@ static void CG_OffsetThirdPersonView( void ) {
 
 	view[2] += 8;
 
-	cg.refdefViewAngles[PITCH] *= 0.5;
+	if ( !df_demos_UnlockThirdPersonPitch.integer ) {
+		cg.refdefViewAngles[PITCH] *= 0.5;
+	}
 
 	AngleVectors( cg.refdefViewAngles, forward, right, up );
 
@@ -806,6 +808,8 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 
 	// build cg.refdef
 	inwater = CG_CalcViewValues();
+	CG_DF_ReplayFrame();		// DeFRaG replay/recam runtime: may override cg.refdef view (df_demos_ReplayMode 2/3)
+	CG_DF_DemoCamera();		// DeFRaG demo camera (df_demos_CameraMode)
 
 	// first person blend blobs, done after AnglesToAxis
 	if ( !cg.renderingThirdPerson ) {
@@ -818,6 +822,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 		CG_AddMarks();
 		CG_AddParticles ();
 		CG_AddLocalEntities();
+		CG_DF_GhostFrame();		// DeFRaG ghosts: record / play back (drawn through CG_Player)
 	}
 	CG_AddViewWeapon( &cg.predictedPlayerState );
 

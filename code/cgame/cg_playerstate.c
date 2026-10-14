@@ -418,7 +418,7 @@ void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
 	}
 
 	// check for flag pickup
-	if ( cgs.gametype > GT_TEAM ) {
+	if ( cgs.gametype > GT_TEAM && ( df_sound_flagGrabbing.integer || !CG_DF_Serverinfo( "defrag_vers" )[0] ) ) {		// DeFRaG 0x26e03: muted on DeFRaG servers unless df_sound_flagGrabbing
 		if ((ps->powerups[PW_REDFLAG] != ops->powerups[PW_REDFLAG] && ps->powerups[PW_REDFLAG]) ||
 			(ps->powerups[PW_BLUEFLAG] != ops->powerups[PW_BLUEFLAG] && ps->powerups[PW_BLUEFLAG]) ||
 			(ps->powerups[PW_NEUTRALFLAG] != ops->powerups[PW_NEUTRALFLAG] && ps->powerups[PW_NEUTRALFLAG]) )
@@ -430,7 +430,7 @@ void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
 	// lead changes
 	if (!reward) {
 		//
-		if ( !cg.warmup ) {
+		if ( !cg.warmup && df_sound_leadChanges.integer ) {		// DeFRaG 0x26e03: df_sound_leadChanges
 			// never play lead changes during warmup
 			if ( ps->persistant[PERS_RANK] != ops->persistant[PERS_RANK] ) {
 				if ( cgs.gametype < GT_TEAM) {

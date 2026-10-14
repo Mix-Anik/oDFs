@@ -11,16 +11,67 @@ vmCvar_t	df_drawCheckpointStats;		// list of the last checkpoints on the HUD
 int			cg_dfOptionsSet;				// "df_options" received
 int			cg_dfOptions;				// 0x11d2b8: set by the "df_options" server command (unused by DeFRaG's own qagame)
 
-// race time published by the server in ps.stats[7]/[8]; only the plain form (dedicated/variant servers,
-// defrag_gametype >= 5) is read here -- the obfuscated form (cgame 0x5fd7) is not decoded on this side.
+// Race time published by the server in ps.stats[7]/[8] (qagame func_0x38ba). stats[12] bit 2 = timer initialised. Plain milliseconds
+// (< 2^22) on dedicated servers or with sv_cheats; otherwise the obfuscated form of qagame 0x3f0c (G_EncodeRaceTime), undone here (cgame 0x5fd7):
+// undo the playerstate xors (origin.x, velocity.x, health, movementDir), the byte chain, the level-time/map salt and the replicated nibble, then
+// verify the 6-bit checksum. Returns qfalse (ms = 0) when the timer is not running or the value fails the check.
 static qboolean CG_DF_RaceTime( const playerState_t *ps, int *ms ) {
-	char	info[MAX_INFO_STRING];
+	unsigned int	e, x, r, a, t;
+	static byte		mapSalt;
+	static char		saltMap[MAX_QPATH];
+	char			map[MAX_QPATH];
+	int				i, v;
 
-	Q_strncpyz( info, CG_ConfigString( CS_SERVERINFO ), sizeof( info ) );
-	if ( atoi( Info_ValueForKey( info, "defrag_gametype" ) ) < 5 ) {
+	*ms = 0;
+	if ( !( ps->stats[STAT_DEFRAG_FLAGS] & 2 ) ) {
 		return qfalse;
 	}
-	*ms = ( ps->stats[STAT_RACE_TIME_HI] << 16 ) | ( ps->stats[STAT_RACE_TIME_LO] & 0xffff );
+	e = ( (unsigned int)ps->stats[STAT_RACE_TIME_HI] << 16 ) | ( (unsigned int)ps->stats[STAT_RACE_TIME_LO] & 0xffff );
+	if ( !( e >> 22 ) ) {		// plain
+		*ms = (int)e;
+		return qtrue;
+	}
+	// obfuscated
+	e ^= (unsigned int)( ps->movementDir & 0xf ) << 28;
+	v = ps->stats[STAT_HEALTH];
+	e ^= ( v > 0 ) ? (unsigned int)( v & 0xff ) : 0x96u;
+	v = (int)floor( ps->velocity[0] );
+	e ^= (unsigned int)( v < 0 ? -v : v ) << 16;
+	v = (int)floor( ps->origin[0] );
+	e ^= (unsigned int)( v < 0 ? -v : v ) & 0xffff;
+	for ( i = 2; i >= 0; i-- ) {
+		( (byte *)&e )[i + 1] ^= ( (byte *)&e )[i];
+	}
+	Q_strncpyz( map, Info_ValueForKey( CG_ConfigString( CS_SERVERINFO ), "mapname" ), sizeof( map ) );
+	Q_strlwr( map );
+	if ( strcmp( map, saltMap ) ) {
+		const char *c;
+
+		Q_strncpyz( saltMap, map, sizeof( saltMap ) );
+		mapSalt = 0;
+		for ( c = map; *c; c++ ) {
+			mapSalt += (byte)*c;
+		}
+	}
+	t = (unsigned int)cg.snap->serverTime;
+	x = t << 2;
+	x += ( (unsigned int)mapSalt + 19131u ) << 8;
+	x ^= t << 24;
+	e ^= x;
+	r = e >> 28;
+	r |= ( ~r << 4 ) & 0xff;
+	r |= r << 8;
+	r |= r << 16;
+	e = ( e & 0xf0000000u ) | ( ( e ^ r ) & 0x0fffffffu );
+	a = 0;
+	for ( i = 0; i < 3; i++ ) {
+		a += ( ( e & 0x3fffff ) >> ( 6 * i ) ) & 0x3f;
+	}
+	a += ( ( e & 0x3fffff ) >> 18 ) & 0xf;
+	if ( ( ( e >> 22 ) & 0x3f ) != ( a & 0x3f ) ) {
+		return qfalse;
+	}
+	*ms = (int)( e & 0x3fffff );
 	return qtrue;
 }
 
@@ -961,10 +1012,18 @@ void CG_DF_SnapshotTransition( const playerState_t *ops, const playerState_t *ps
 		return;
 	}
 	CG_DF_Validate( ops, ps );
+	{		// DeFRaG 0x5248 -> 0x11d284: the current race time, refreshed every snapshot (the 'last time' HUD widget shows it live)
+		int live;
+
+		if ( CG_DF_RaceTime( ps, &live ) && live > 0 ) {
+			CG_DF_SetLastRunTime( live );
+		}
+	}
 	CG_DF_TrackStats( ops, ps, changed );
 	// bit 0x4: run (re)started
 	if ( ( changed & 4 ) && ( ps->stats[STAT_DEFRAG_FLAGS] & 4 ) ) {
 		CG_DF_ResetStats();
+		CG_DF_ArStartEvent();
 		runActive = qtrue;
 		CG_DF_RecStart();
 	}
@@ -976,6 +1035,7 @@ void CG_DF_SnapshotTransition( const playerState_t *ops, const playerState_t *ps
 	// (other servers get the "stats" command instead)
 	if ( ( changed & 8 ) && CG_DF_RaceTime( ps, &ms ) ) {
 		CG_DF_RecFinish( ms );
+		CG_DF_ArFinishEvent( ms, CG_DF_RecKeep() );
 		if ( runActive ) {
 			CG_DF_PrintStats( ms );
 			runActive = qfalse;
@@ -991,4 +1051,173 @@ qboolean CG_DF_VoteIsDeadline( void ) {
 // defrag_flags (0x11d2b8): serverinfo value, replaced by the "df_options" server command
 int CG_DF_DefragFlags( void ) {
 	return cg_dfOptionsSet ? cg_dfOptions : atoi( CG_DF_Serverinfo( "defrag_flags" ) );
+}
+
+// ---- DeFRaG event scripts (cgame 0x1b2e, fed by the event word of 0x1c8b): df_script_onMapLoad / onJoinTeam / onRespawn ----
+// Event bits (0x1c8b): 0x1 = first snapshot or new server count (map load), 0x10 = respawn: set together with 0x1, and whenever
+// PERS_TEAM or PERS_SPAWN_COUNT change between two snapshots. The handler runs `exec <mapname>.cfg`, `exec team_<red|blue|spect|free>.cfg`
+// (first spawn, not following) and `exec respawn.cfg` (not following, not a spectator). Not ported from 0x1b2e: the stats-accumulator
+// reset it also performs (our trackers reset on their own events).
+vmCvar_t	df_script_onMapLoad, df_script_onJoinTeam, df_script_onRespawn;
+vmCvar_t	df_player_Sprites;	// cgame 0x26191 (CG_PlayerSprites)
+vmCvar_t	df_sound_flagGrabbing, df_sound_leadChanges;	// cgame 0x26e03 (CG_CheckLocalSounds)
+
+void CG_DF_ScriptEvents( const snapshot_t *old, const snapshot_t *cur ) {
+	int ev = 0;
+	const char *team;
+
+	if ( !old ) {
+		ev = 0x11;
+	} else if ( ( cur->snapFlags ^ old->snapFlags ) & SNAPFLAG_SERVERCOUNT ) {
+		ev = 0x13;
+	} else {
+		if ( cur->ps.persistant[PERS_TEAM] != old->ps.persistant[PERS_TEAM] ) {
+			ev |= 0x14;
+		}
+		if ( cur->ps.persistant[PERS_SPAWN_COUNT] != old->ps.persistant[PERS_SPAWN_COUNT] ) {
+			ev |= 0x10;
+		}
+	}
+	if ( !( ev & 0x10 ) || cg.demoPlayback ) {
+		return;
+	}
+	CG_DF_ArRespawnEvent();
+	if ( ( ev & 1 ) && df_script_onMapLoad.integer ) {
+		trap_SendConsoleCommand( va( "exec %s.cfg\n", Info_ValueForKey( CG_ConfigString( CS_SERVERINFO ), "mapname" ) ) );
+	}
+	if ( cur->ps.pm_flags & PMF_FOLLOW ) {
+		return;
+	}
+	if ( df_script_onJoinTeam.integer && cur->ps.persistant[PERS_SPAWN_COUNT] == 1 ) {
+		switch ( cur->ps.persistant[PERS_TEAM] ) {
+		case TEAM_RED: team = "team_red"; break;
+		case TEAM_BLUE: team = "team_blue"; break;
+		case TEAM_SPECTATOR: team = "team_spect"; break;
+		default: team = "team_free"; break;
+		}
+		trap_SendConsoleCommand( va( "exec %s.cfg\n", team ) );
+	}
+	if ( df_script_onRespawn.integer && cur->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR ) {
+		trap_SendConsoleCommand( "exec respawn.cfg\n" );
+	}
+}
+
+// ---- df_mp_NoDrawRadius (cgame 0x9c47 / 0x9bdd / 0x9c12, called from CG_AddCEntity 0x1f222 for ET_PLAYER and ET_MISSILE) ----
+// With player interaction disabled by the server (ps.stats[STAT_INTERFERENCE]: bit 0 = players, bit 1 = missiles; bit 2 = only other-team
+// clients), other clients' players / missiles closer than |df_mp_NoDrawRadius| to the viewer are not drawn; a NEGATIVE radius draws such players as
+// translucent (powerup bit 16 = invisibility effect) instead. The viewer's own entities are never affected.
+vmCvar_t	df_mp_NoDrawRadius;
+
+qboolean CG_DF_HideForInterference( centity_t *cent ) {
+	int			self = cg.predictedPlayerState.clientNum, owner = cent->currentState.clientNum;
+	int			st = cg.predictedPlayerState.stats[STAT_INTERFERENCE], radius = df_mp_NoDrawRadius.integer, hide = 0;
+	qboolean	player = cent->currentState.eType == ET_PLAYER;
+	vec3_t		d;
+
+	if ( owner == self || owner < 0 || owner >= MAX_CLIENTS ) {
+		return qfalse;
+	}
+	VectorSubtract( cg.predictedPlayerState.origin, cent->lerpOrigin, d );
+	if ( VectorLength( d ) >= ( radius < 0 ? -radius : radius ) ) {
+		return qfalse;
+	}
+	if ( st & ( player ? 1 : 2 ) ) {
+		hide = ( st & 4 ) ? ( cgs.clientinfo[self].team != cgs.clientinfo[owner].team ) : 1;
+	}
+	if ( hide && radius < 0 && player ) {
+		cent->currentState.powerups |= 16;
+		return qfalse;
+	}
+	return hide ? qtrue : qfalse;
+}
+
+// ---- df_player_SmokeTrails (cgame 0x9082 per frame, 0x9038 puff, 0x9154 fragment pre-step; LE loop 0x20dab) ----
+// value = N.MM: N (integer part) = seconds the viewer's own smoke trail lasts (puff dropped wherever the viewer moved, tag 903); MM (hundredths)
+// = seconds the trails of every player entity in the snapshot (tag 901) and every playing ghost (tag 902) last. The puffs are smoke-puff sprites
+// turned into stationary LE_FRAGMENTs (so they stay until the last second, then sink like gibs) and tagged in color[0]; 0x9154 expires tagged
+// puffs at once when their part of the value becomes 0. Limited to one update per 25 ms.
+vmCvar_t	df_player_SmokeTrails;
+
+static void CG_DF_SmokePuff( const vec3_t origin, int seconds, int tag ) {		// 0x9038
+	static const vec3_t	vel = { 0, 0, 0 };
+	localEntity_t		*le;
+
+	le = CG_SmokePuff( origin, vel, 4, 1, 1, 1, 0.66f, 1000.0f * seconds, cg.time, cg.time, LEF_PUFF_DONT_SCALE, cgs.media.smokePuffShader );
+	le->leType = LE_FRAGMENT;
+	le->color[0] = tag;
+}
+
+void CG_DF_SmokeTrails( void ) {		// 0x9082
+	static int		nextTime;
+	static vec3_t	lastPos;
+	float			x = df_player_SmokeTrails.value, ax = x < 0 ? -x : x;
+	int				own, others, i;
+	vec3_t			d, p;
+
+	if ( x == 0 || cg.time < nextTime ) {
+		return;
+	}
+	nextTime = cg.time + 25;
+	own = (int)ax;
+	others = (int)( 100.0f * ( ax - (float)own ) );
+	if ( own ) {
+		VectorSubtract( cg.predictedPlayerState.origin, lastPos, d );
+		if ( VectorLength( d ) > 0 ) {
+			VectorCopy( cg.predictedPlayerState.origin, lastPos );
+			CG_DF_SmokePuff( lastPos, own, 903 );
+		}
+	}
+	if ( !others ) {
+		return;
+	}
+	for ( i = 0; i < 5; i++ ) {
+		if ( CG_DF_GhostPos( i, p ) ) {
+			CG_DF_SmokePuff( p, others, 902 );
+		}
+	}
+	for ( i = 0; i < cg.snap->numEntities; i++ ) {
+		const centity_t *cent = &cg_entities[cg.snap->entities[i].number];
+
+		if ( cent->currentState.eType == ET_PLAYER ) {
+			CG_DF_SmokePuff( cent->lerpOrigin, others, 901 );
+		}
+	}
+}
+
+void CG_DF_SmokeFragmentPre( localEntity_t *le ) {		// 0x9154
+	int tag = (int)le->color[0], own, others;
+	float ax = df_player_SmokeTrails.value;
+
+	if ( tag <= 900 || tag >= 904 ) {
+		return;
+	}
+	if ( ax < 0 ) {
+		ax = -ax;
+	}
+	own = (int)ax;
+	others = (int)( 100.0f * ( ax - (float)own ) );
+	if ( ( tag == 903 && own == 0 ) || ( tag != 903 && others == 0 ) ) {
+		le->endTime = cg.time;
+	}
+}
+qboolean CG_DF_RunActive( void ) {		// 0x11d288
+	return runActive;
+}
+
+// 0x9cf3: explosions (LE_EXPLOSION / LE_SPRITE_EXPLOSION) tagged with their owner in color[0] follow the missile rule of df_mp_NoDrawRadius
+qboolean CG_DF_HideLocalForInterference( localEntity_t *le ) {
+	int			owner = (int)le->color[0], st = cg.predictedPlayerState.stats[STAT_INTERFERENCE], radius = df_mp_NoDrawRadius.integer;
+	vec3_t		d;
+
+	if ( owner == cg.predictedPlayerState.clientNum || owner < 0 || owner >= MAX_CLIENTS ) {
+		return qfalse;
+	}
+	VectorSubtract( cg.predictedPlayerState.origin, le->refEntity.origin, d );
+	if ( VectorLength( d ) >= ( radius < 0 ? -radius : radius ) ) {
+		return qfalse;
+	}
+	if ( !( st & 2 ) ) {
+		return qfalse;
+	}
+	return ( st & 4 ) ? ( cgs.clientinfo[cg.predictedPlayerState.clientNum].team != cgs.clientinfo[owner].team ) : qtrue;
 }

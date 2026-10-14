@@ -502,6 +502,7 @@ static consoleCommand_t	commands[] = {
 	{ "svinfo_report", CG_DF_SvinfoReport_f },
 	{ "svinfo_summary", CG_DF_SvinfoSummary_f },
 	{ "replay", CG_DF_Replay_f },
+	{ "ghost", CG_DF_Ghost_f },
 	{ "varMath", CG_DF_VarMath_f },
 	{ "info", CG_DF_Info_f },
 	{ "help", CG_DF_Help_f },
@@ -600,6 +601,7 @@ void CG_InitConsoleCommands( void ) {
 	trap_AddCommand ("varMath");
 	trap_AddCommand ("svinfo_summary");
 	trap_AddCommand ("replay");
+	trap_AddCommand ("ghost");
 	trap_AddCommand ("info");
 	trap_AddCommand ("help");
 	trap_AddCommand ("commands");

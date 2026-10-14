@@ -820,6 +820,9 @@ void CG_AddLocalEntities( void ) {
 			CG_FreeLocalEntity( le );
 			continue;
 		}
+		if ( le->leType < 32 && ( df_demos_HideLocalEntities.integer & ( 1 << le->leType ) ) ) {		// DeFRaG 0x20dd2: hidden local entity types
+			continue;
+		}
 		switch ( le->leType ) {
 		default:
 			CG_Error( "Bad leType: %i", le->leType );
@@ -829,14 +832,19 @@ void CG_AddLocalEntities( void ) {
 			break;
 
 		case LE_SPRITE_EXPLOSION:
-			CG_AddSpriteExplosion( le );
+			if ( !CG_DF_HideLocalForInterference( le ) ) {
+				CG_AddSpriteExplosion( le );
+			}
 			break;
 
 		case LE_EXPLOSION:
-			CG_AddExplosion( le );
+			if ( !CG_DF_HideLocalForInterference( le ) ) {
+				CG_AddExplosion( le );
+			}
 			break;
 
 		case LE_FRAGMENT:			// gibs and brass
+			CG_DF_SmokeFragmentPre( le );
 			CG_AddFragment( le );
 			break;
 
@@ -878,6 +886,27 @@ void CG_AddLocalEntities( void ) {
 	}
 }
 
+// ghost recorder (cgame 0x11d58): up to `max` explosions (grenade 4 / rocket 5 / plasma 8 / BFG 9) of the active local entity list
+int CG_DF_GhostExplosions( int onlyOwn, vec3_t *org, int *code, int max ) {
+	const localEntity_t	*le;
+	int					n = 0;
 
+	for ( le = cg_activeLocalEntities.prev; le != &cg_activeLocalEntities && n < max; le = le->prev ) {
+		int c = 0;
 
-
+		if ( le->leType != LE_EXPLOSION && le->leType != LE_SPRITE_EXPLOSION ) {
+			continue;
+		}
+		if ( onlyOwn && (int)le->color[0] != cg.predictedPlayerState.clientNum ) {
+			continue;
+		}
+		if ( le->refEntity.customShader == cgs.media.grenadeExplosionShader ) c = 4;
+		else if ( le->refEntity.customShader == cgs.media.rocketExplosionShader ) c = 5;
+		else if ( le->refEntity.customShader == cgs.media.plasmaExplosionShader ) c = 8;
+		else if ( le->refEntity.customShader == cgs.media.bfgExplosionShader ) c = 9;
+		VectorCopy( le->refEntity.origin, org[n] );
+		code[n] = c;
+		n++;
+	}
+	return n;
+}

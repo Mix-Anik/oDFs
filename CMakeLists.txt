@@ -126,7 +126,10 @@ if(BUILD_QVM)
         code/cgame/cg_dfrecords.c
         code/cgame/cg_dfhud.c
         code/cgame/cg_dfaccel.c
+        code/cgame/cg_dfautorec.c
         code/cgame/cg_dfchs.c
+        code/cgame/cg_dfdemocam.c
+        code/cgame/cg_dfghost.c
         code/cgame/cg_dfob.c
         code/cgame/cg_dfreplay.c
         code/cgame/cg_draw.c

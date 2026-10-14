@@ -86,6 +86,7 @@ void CG_SetInitialSnapshot( snapshot_t *snap ) {
 	entityState_t	*state;
 
 	cg.snap = snap;
+	CG_DF_ScriptEvents( NULL, snap );
 
 	BG_PlayerStateToEntityState( &snap->ps, &cg_entities[ snap->ps.clientNum ].currentState, qfalse );
 
@@ -170,6 +171,7 @@ static void CG_TransitionSnapshot( void ) {
 
 		ops = &oldFrame->ps;
 		ps = &cg.snap->ps;
+		CG_DF_ScriptEvents( oldFrame, cg.snap );
 		CG_DF_SnapshotTransition( ops, ps );
 		// teleporting checks are irrespective of prediction
 		if ( ( ps->eFlags ^ ops->eFlags ) & EF_TELEPORT_BIT ) {

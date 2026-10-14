@@ -1941,8 +1941,15 @@ Float sprites over the player's head
 static void CG_PlayerSprites( centity_t *cent ) {
 	int		team;
 
+	// DeFRaG 0x26191: df_player_Sprites, a blinking connection sprite, and no team (friend) icon on DeFRaG servers
+	if ( !df_player_Sprites.integer ) {
+		return;
+	}
+
 	if ( cent->currentState.eFlags & EF_CONNECTION ) {
-		CG_PlayerFloatSprite( cent, cgs.media.connectionShader );
+		if ( sin( cg.time / 350.0f ) > 0 ) {
+			CG_PlayerFloatSprite( cent, cgs.media.connectionShader );
+		}
 		return;
 	}
 
@@ -1981,6 +1988,9 @@ static void CG_PlayerSprites( centity_t *cent ) {
 		return;
 	}
 
+	if ( CG_DF_Serverinfo( "defrag_vers" )[0] ) {
+		return;
+	}
 	team = cgs.clientinfo[ cent->currentState.clientNum ].team;
 	if ( !(cent->currentState.eFlags & EF_DEAD) && 
 		cg.snap->ps.persistant[PERS_TEAM] == team &&

@@ -324,6 +324,36 @@ static cvarTable_t cvarTable[] = {
 	{ &df_noEndOfRunStats, "df_noEndOfRunStats", "0", CVAR_ARCHIVE },
 	{ &df_validityChecks, "df_validityChecks", "1", CVAR_ARCHIVE },
 	{ &df_drawCheckpointEvents, "df_drawCheckpointEvents", "1", CVAR_ARCHIVE },
+	{ &df_mp_NoDrawRadius, "df_mp_NoDrawRadius", "200", CVAR_ARCHIVE },
+	{ &df_player_SmokeTrails, "df_player_SmokeTrails", "0.00", CVAR_ARCHIVE },
+	{ &df_scoreboard, "df_scoreboard", "1", CVAR_ARCHIVE },
+	{ &df_demos_CameraMode, "df_demos_CameraMode", "0", CVAR_ARCHIVE },
+	{ &df_mp_TrackPlayerNum, "df_mp_TrackPlayerNum", "-1", CVAR_TEMP },
+	{ &df_demos_HidePacketEntities, "df_demos_HidePacketEntities", "0", CVAR_ARCHIVE },
+	{ &df_demos_HideLocalEntities, "df_demos_HideLocalEntities", "0", CVAR_ARCHIVE },
+	{ &df_demos_UnlockThirdPersonPitch, "df_demos_UnlockThirdPersonPitch", "0", CVAR_ARCHIVE },
+	{ &df_demos_CameraTransitionSpeed, "df_demos_CameraTransitionSpeed", "50", CVAR_ARCHIVE },
+	{ &df_autorecord, "df_autorecord", "3", CVAR_ARCHIVE },
+	{ &df_ar_stopdelay, "df_ar_stopdelay", "3000", CVAR_ARCHIVE },
+	{ &df_ar_format, "df_ar_format", "$map.$-route[$gt.$phys.$-mode]$m.$-s.$-ms($pl.$plc)", CVAR_ARCHIVE },
+	{ &df_ar_speedcapture_format, "df_ar_speedcapture_format", "0", CVAR_ARCHIVE },
+	{ &df_ar_verbose, "df_ar_verbose", "0", 0 },
+	{ &df_ar_targetfolder, "df_ar_targetfolder", "./", 0 },
+	{ &df_hud_scoreboard_size, "df_hud_scoreboard_size", "0", CVAR_ARCHIVE },
+	{ &df_hud_scoreboard_showSpectators, "df_hud_scoreboard_showSpectators", "1", CVAR_ARCHIVE },
+	{ &df_player_Sprites, "df_player_Sprites", "1", CVAR_ARCHIVE },
+	{ &df_hud_videocapture_enable, "df_hud_videocapture_enable", "0", 0 },
+	{ &df_hud_videocapture_x, "df_hud_videocapture_x", "320", CVAR_ARCHIVE },
+	{ &df_hud_videocapture_y, "df_hud_videocapture_y", "240", CVAR_ARCHIVE },
+	{ &df_hud_videocapture_fontsize, "df_hud_videocapture_fontsize", "16", CVAR_ARCHIVE },
+	{ &df_hud_videocapture_fontcolor, "df_hud_videocapture_fontcolor", "7", CVAR_ARCHIVE },
+	{ &df_hud_videocapture_fontshadow, "df_hud_videocapture_fontshadow", "1", CVAR_ARCHIVE },
+	{ &df_hud_videocapture_fontjustify, "df_hud_videocapture_fontjustify", "0", CVAR_ARCHIVE },
+	{ &df_sound_flagGrabbing, "df_sound_flagGrabbing", "0", CVAR_ARCHIVE },
+	{ &df_sound_leadChanges, "df_sound_leadChanges", "1", CVAR_ARCHIVE },
+	{ &df_script_onMapLoad, "df_script_onMapLoad", "0", CVAR_ARCHIVE },
+	{ &df_script_onJoinTeam, "df_script_onJoinTeam", "0", CVAR_ARCHIVE },
+	{ &df_script_onRespawn, "df_script_onRespawn", "0", CVAR_ARCHIVE },
 	{ &df_drawCheckpointStats, "df_drawCheckpointStats", "1", CVAR_ARCHIVE },
 	{ &cg_drawSnapshot, "cg_drawSnapshot", "0", CVAR_ARCHIVE  },
 	{ &cg_draw3dIcons, "cg_draw3dIcons", "1", CVAR_ARCHIVE  },
@@ -456,6 +486,7 @@ void CG_RegisterCvars( void ) {
 
 	forceModelModificationCount = cg_forceModel.modificationCount;
 
+	CG_DF_GhostRegisterCvars();
 	trap_Cvar_Register(NULL, "model", DEFAULT_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
 	trap_Cvar_Register(NULL, "headmodel", DEFAULT_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
 	trap_Cvar_Register(NULL, "team_model", DEFAULT_TEAM_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );

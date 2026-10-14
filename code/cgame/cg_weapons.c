@@ -1911,6 +1911,9 @@ void CG_MissileHitWall( int weapon, int clientNum, vec3_t origin, vec3_t dir, im
 							   duration, isSprite );
 		le->light = light;
 		VectorCopy( lightColor, le->lightColor );
+		if ( weapon == WP_GRENADE_LAUNCHER || weapon == WP_ROCKET_LAUNCHER || weapon == WP_PLASMAGUN || weapon == WP_BFG ) {
+			le->color[0] = clientNum;		// DeFRaG 0x2bca9: owner tag (read by CG_DF_HideLocalForInterference and the ghost recorder)
+		}
 		if ( weapon == WP_RAILGUN ) {
 			// colorize with client color
 			VectorCopy( cgs.clientinfo[clientNum].color1, le->color );

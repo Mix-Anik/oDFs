@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 // cg_scoreboard -- draw the scoreboard on top of the game screen
 #include "cg_local.h"
+qboolean CG_DF_DrawScoreboard( void );
+extern vmCvar_t df_scoreboard;
 
 
 #define	SCOREBOARD_X		(0)
@@ -289,6 +291,10 @@ qboolean CG_DrawOldScoreboard( void ) {
 		return qfalse;
 	}
 
+	if ( df_scoreboard.integer ) {		// DeFRaG race scoreboard (cgame 0x668c)
+		return CG_DF_DrawScoreboard();
+	}
+
 	if ( cg.showScores || cg.predictedPlayerState.pm_type == PM_DEAD ||
 		 cg.predictedPlayerState.pm_type == PM_INTERMISSION ) {
 		fade = 1.0;
@@ -540,3 +546,185 @@ void CG_DrawTourneyScoreboard( void ) {
 
 }
 
+// ---- DeFRaG scoreboard (cgame 0x668c; disasm/CGAME/scoreboard_draw.md) ----
+// A race table instead of the vanilla one: Player / Score (best time) / Ping, a "Spectators Info" panel (who follows whom), the speed award box and
+// a version footer. df_hud_scoreboard_size (0/1) selects 8x10 / 10x12 characters, df_hud_scoreboard_showSpectators the spectator panel.
+// Enabled by df_scoreboard (not a DeFRaG cvar; 0 = the vanilla layout).
+vmCvar_t	df_scoreboard, df_hud_scoreboard_size, df_hud_scoreboard_showSpectators;
+
+static const vec4_t	dsbBorder = { 1, 1, 1, 1 }, dsbOwn = { 0.3f, 0.3f, 0.3f, 0.9f }, dsbHead = { 0.2f, 0.3f, 0.4f, 0.9f },
+					dsbHeadText = { 0.7f, 0.9f, 1, 1 }, dsbRow = { 0.2f, 0.2f, 0.2f, 0.9f }, dsbWhite = { 1, 1, 1, 1 }, dsbGrey = { 0.75f, 0.75f, 0.75f, 1 };
+static qhandle_t	dsbEye, dsbCam, dsbAward;
+static qboolean		dsbReg;
+
+static const char *DSB_Pad( const char *s, int width ) {		// 0x663a: right-align in `width` columns
+	static char	buf[40];
+	int			len = strlen( s ), pad;
+
+	if ( width > 32 ) {
+		width = 31;
+	}
+	pad = width - len;
+	if ( pad < 0 ) {
+		pad = 0;
+	}
+	Com_Memset( buf, ' ', pad );
+	Q_strncpyz( buf + pad, s, width - pad + 1 );
+	return buf;
+}
+
+qboolean CG_DF_DrawScoreboard( void ) {
+	const int	cw = df_hud_scoreboard_size.integer ? 10 : 8, ch = df_hud_scoreboard_size.integer ? 12 : 10;
+	const int	colA = ( cw << 4 ) + 6, colB = ( cw << 3 ) + 6, colC = ( cw << 2 ) + 6, rh = ch + 6, W = colA + colB + colC;
+	const int	half = ( ( W - 6 ) / 2 ) / cw - 1;
+	qboolean	anyFollowed = qfalse, wide;
+	float		x, y = 68;
+	int			i, j, self = cg.snap ? cg.snap->ps.clientNum : 0;
+	char		buf[128];
+
+	if ( !cg.showScores && cg.predictedPlayerState.pm_type != PM_INTERMISSION ) {
+		return qfalse;
+	}
+	if ( !dsbReg ) {
+		dsbEye = trap_R_RegisterShader( "df_gfx/scoreboard/eye.tga" );
+		dsbCam = trap_R_RegisterShader( "df_gfx/scoreboard/cam.tga" );
+		dsbAward = trap_R_RegisterShader( "df_gfx/scoreboard/award_speed.tga" );
+		dsbReg = qtrue;
+	}
+	for ( i = 0; i < cg.numScores; i++ ) {
+		if ( cg.scores[i].scoreFlags != -1 ) {		// someone follows scores[j]
+			anyFollowed = qtrue;
+		}
+	}
+	wide = anyFollowed && df_hud_scoreboard_showSpectators.integer && cg.numScores >= 8;
+
+	if ( !cg.demoPlayback ) {		// date / server name line
+		qtime_t	t;
+		int		len;
+
+		trap_RealTime( &t );
+		Com_sprintf( buf, sizeof( buf ), "%s %04i-%02i-%02i %02i:%02i", Info_ValueForKey( CG_ConfigString( CS_SERVERINFO ), "sv_hostname" ),
+			t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min );
+		len = strlen( buf );
+		CG_DrawStringExt( 320 - ( len << 3 ) / 2, 57, buf, dsbGrey, qtrue, qtrue, 8, 8, 0 );
+	}
+
+	if ( wide ) {
+		x = 320 - W - ( df_hud_scoreboard_size.integer ? 10 : 18 ) / 2;
+	} else {
+		x = 320 - W / 2;
+	}
+
+	// header
+	CG_FillRect( x, y, W, rh, dsbHead );
+	CG_DrawRect( x, y, colA, rh, 1, dsbBorder );
+	CG_DrawStringExt( x + 3, y + 3, "Player", dsbHeadText, qfalse, qfalse, cw, ch, 16 );
+	CG_DrawRect( x + colA, y, colB, rh, 1, dsbBorder );
+	CG_DrawStringExt( x + colA + 3, y + 3, "   Score", dsbHeadText, qfalse, qfalse, cw, ch, 8 );
+	CG_DrawRect( x + colA + colB, y, colC, rh, 1, dsbBorder );
+	CG_DrawStringExt( x + colA + colB + 3, y + 3, "Ping", dsbHeadText, qfalse, qfalse, cw, ch, 4 );
+	y += rh;
+
+	for ( i = 0; i < cg.numScores; i++ ) {
+		const score_t		*sc = &cg.scores[i];
+		const clientInfo_t	*ci = &cgs.clientinfo[sc->client];
+		float				ix;
+		qboolean			followed = qfalse;
+
+		for ( j = 0; j < cg.numScores; j++ ) {
+			if ( cg.scores[j].scoreFlags == sc->client ) {
+				followed = qtrue;
+				break;
+			}
+		}
+		CG_FillRect( x, y, W, rh, sc->client == self ? dsbOwn : dsbRow );
+		CG_DrawRect( x, y, colA, rh, 1, dsbBorder );
+		CG_DrawStringExt( x + 3, y + 3, ci->name, dsbWhite, qfalse, qfalse, cw, ch, 16 );
+		if ( sc->ping == -1 ) {
+			CG_DrawRect( x + colA, y, W - colA, rh, 1, dsbBorder );
+			CG_DrawStringExt( x + colA + 3, y + 3, "Connecting...", dsbWhite, qfalse, qfalse, cw, ch, 0 );
+		} else {
+			ix = x - ch - 3;
+			trap_R_SetColor( NULL );
+			if ( followed ) {
+				CG_DrawPic( ix, y + 3, ch, ch, dsbCam );
+				ix -= ch + 3;
+			} else if ( ci->team == TEAM_SPECTATOR ) {
+				CG_DrawPic( ix, y + 3, ch, ch, dsbEye );
+				ix -= ch + 3;
+			}
+			if ( sc->client == cg.speedAwardClient ) {
+				CG_DrawPic( ix, y + 3, ch, ch, dsbAward );
+			}
+			CG_DrawRect( x + colA, y, colB, rh, 1, dsbBorder );
+			CG_DrawStringExt( x + colA + 3, y + 3, DSB_Pad( sc->score ? CG_DF_FormatTime( sc->score ) : "-", 8 ), dsbWhite, qfalse, qfalse, cw, ch, 8 );
+			CG_DrawRect( x + colA + colB, y, colC, rh, 1, dsbBorder );
+			Com_sprintf( buf, sizeof( buf ), "%i", sc->ping );
+			CG_DrawStringExt( x + colA + colB + 3, y + 3, DSB_Pad( ci->team != TEAM_SPECTATOR ? buf : "-", 4 ), dsbWhite, qfalse, qfalse, cw, ch, 4 );
+		}
+		y += rh;
+	}
+
+	if ( wide ) {
+		y = 68;
+		x = 320 + ( df_hud_scoreboard_size.integer ? 10 : 18 ) / 2;
+	} else {
+		y += rh;
+	}
+
+	if ( anyFollowed && df_hud_scoreboard_showSpectators.integer ) {
+		CG_FillRect( x, y, W, rh, dsbHead );
+		CG_DrawRect( x, y, W, rh, 1, dsbBorder );
+		CG_DrawStringExt( x + 3, y + 3, "Spectators Info", dsbHeadText, qfalse, qfalse, cw, ch, 0 );
+		y += rh;
+		for ( i = 0; i < cg.numScores; i++ ) {
+			const score_t		*sc = &cg.scores[i];
+			const clientInfo_t	*ci = &cgs.clientinfo[sc->client];
+			int					len;
+
+			if ( ci->team != TEAM_SPECTATOR || sc->scoreFlags == -1 ) {
+				continue;
+			}
+			CG_FillRect( x, y, W, rh, dsbRow );
+			CG_DrawRect( x, y, W, rh, 1, dsbBorder );
+			CG_DrawStringExt( x + 3, y + 3, ci->name, dsbWhite, qfalse, qfalse, cw, ch, half );
+			len = CG_DrawStrlen( ci->name );
+			if ( len > half ) {
+				len = half;
+			}
+			CG_DrawStringExt( x + 3 + len * cw, y + 3, ":", dsbWhite, qfalse, qfalse, cw, ch, half );
+			CG_DrawStringExt( x + W - 3 - half * cw, y + 3, cgs.clientinfo[sc->scoreFlags & 63].name, dsbWhite, qfalse, qfalse, cw, ch, half );
+			y += rh;
+		}
+	}
+
+	if ( cg.speedAwardUps ) {
+		const char *name = cg.speedAwardClient == -1 ? cg.speedAwardName : cgs.clientinfo[cg.speedAwardClient].name;
+		int len;
+
+		y += rh;
+		CG_FillRect( x, y, W, rh, dsbHead );
+		CG_FillRect( x, y + rh, W, rh, dsbRow );
+		CG_DrawRect( x, y, W, ( ch << 1 ) + 12, 1, dsbBorder );
+		CG_DrawStringExt( x + 3, y + 3, "Speed Award", dsbHeadText, qfalse, qfalse, cw, ch, 0 );
+		y += rh;
+		CG_DrawStringExt( x + 3, y + 3, name, dsbWhite, qfalse, qfalse, cw, ch, 16 );
+		len = CG_DrawStrlen( name );
+		if ( len > 16 ) {
+			len = 16;
+		}
+		CG_DrawStringExt( x + 3 + len * cw, y + 3, va( "^7: %i ups", cg.speedAwardUps ), dsbWhite, qfalse, qfalse, cw, ch, 0 );
+	}
+
+	// footer: map [physics], server / client versions
+	{
+		int ver = atoi( CG_DF_Serverinfo( "defrag_vers" ) );
+
+		Com_sprintf( buf, sizeof( buf ), "%s [%s]", Info_ValueForKey( CG_ConfigString( CS_SERVERINFO ), "mapname" ),
+			atoi( CG_DF_Serverinfo( "df_promode" ) ) ? "cpm" : "vq3" );
+		CG_DrawStringExt( 472, 456, DSB_Pad( buf, 28 ), dsbWhite, qtrue, qfalse, 6, 8, 28 );
+		CG_DrawStringExt( 520, 464, DSB_Pad( va( "sv:%i.%02i.%02i", ver / 10000, ( ver / 100 ) % 100, ver % 100 ), 20 ), dsbWhite, qtrue, qfalse, 6, 8, 20 );
+		CG_DrawStringExt( 520, 472, DSB_Pad( "cl:1.91.31", 20 ), dsbWhite, qtrue, qfalse, 6, 8, 20 );
+	}
+	return qtrue;
+}
