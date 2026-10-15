@@ -327,7 +327,7 @@ static void CG_DF_ChsMisc( int item, char *label, char *value, const char *sep, 
 		Q_strncpyz( label, "country", CHS_BUF );
 		trap_Cvar_VariableStringBuffer( "df_country", value, CHS_BUF );
 		break;
-	case 190: case 191:		// cgame 0xeac2: only while playing a demo; cvar defrag_servername (set by the demo loader); 190 strips path and extension (0x8cfa / 0x8c53)
+	case 190: case 191:		// cgame 0xeac2: only while playing a demo; cvar defrag_servername (set by the ui connect screen); 190 strips path and extension (0x8cfa / 0x8c53)
 		Q_strncpyz( label, item == 190 ? "demoname" : "fulldemoname", CHS_BUF );
 		if ( cg.demoPlayback ) {
 			char	*p;

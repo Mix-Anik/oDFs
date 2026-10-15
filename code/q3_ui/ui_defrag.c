@@ -349,6 +349,7 @@ shaders come with the DeFRaG pk3s: when either is missing the stock cursor is us
 The widget under the pointer also receives callback events 101 (mouse in) and 102 (mouse out).
 =================
 */
+qboolean		uiDfNoCursor;		// set by a menu that wants no cursor this frame (DeFRaG menu flag +544)
 static qhandle_t	uiDfCursorBack, uiDfCursorFront;
 static menucommon_s	*uiDfHover;
 
@@ -374,6 +375,9 @@ void UI_DF_SetHover( menucommon_s *m ) {		// 0x88a
 qboolean UI_DF_DrawCursor( void ) {			// 0x807
 	vec4_t	color = { 0.50f, 0.80f, 1.00f, 1.00f };
 
+	if ( uiDfNoCursor ) {
+		return qtrue;
+	}
 	if ( !uiDfCursorBack || !uiDfCursorFront ) {
 		return qfalse;
 	}

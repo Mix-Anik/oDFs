@@ -174,6 +174,8 @@ void UI_DrawConnectScreen( qboolean overlay ) {
 
 	// see what information we should display
 	trap_GetClientState( &cstate );
+	// DeFRaG 0xd7b0: the name of the server being connected to is published for cgame (CHS items 190 / 191)
+	trap_Cvar_Set( "defrag_servername", cstate.servername );
 
 	info[0] = '\0';
 	if( trap_GetConfigString( CS_SERVERINFO, info, sizeof(info) ) ) {

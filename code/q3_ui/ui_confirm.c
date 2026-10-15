@@ -144,8 +144,8 @@ ConfirmMenu_Draw
 */
 static void ConfirmMenu_Draw( void ) {
 	UI_DrawNamedPic( 142, 118, 359, 256, ART_CONFIRM_FRAME );
-	UI_DrawProportionalString( 320, 204, s_confirm.question, s_confirm.style, color_red );
-	UI_DrawProportionalString( s_confirm.slashX, 265, "/", UI_LEFT|UI_INVERSE, color_red );
+	UI_DrawProportionalString( 320, 204, s_confirm.question, UI_CENTER|UI_INVERSE, uiDfColorBig );	// DeFRaG 0xfd95: Big colour, fixed style
+	UI_DrawProportionalString( s_confirm.slashX, 265, "/", UI_LEFT|UI_INVERSE, uiDfColorBig );
 
 	Menu_Draw( &s_confirm.menu );
 
@@ -212,7 +212,7 @@ void UI_ConfirmMenu_Style( const char *question, int style, void (*draw)( void )
 	s_confirm.yes.generic.x			= l1;
 	s_confirm.yes.generic.y			= 264;
 	s_confirm.yes.string			= "YES";
-	s_confirm.yes.color				= color_red;
+	s_confirm.yes.color				= color_green;		// DeFRaG 0xfdd6: YES green, NO red
 	s_confirm.yes.style				= UI_LEFT;
 
 	s_confirm.no.generic.type		= MTYPE_PTEXT;      

@@ -253,7 +253,10 @@ typedef struct
 	char*			string;
 	int				style;
 	float*			color;
+	float*			focusColor;		// DeFRaG (ui 0x13241): used instead of color while focused, with UI_FOCUSCOLOR in style
 } menutext_s;
+
+#define UI_FOCUSCOLOR	0x00020000
 
 extern void			Menu_Cache( void );
 extern void			Menu_Focus( menucommon_s *m );
@@ -294,6 +297,8 @@ extern vec4_t		list_color;
 extern vec4_t		listbar_color;
 extern vec4_t		text_color_disabled; 
 extern vec4_t		text_color_normal;
+extern vec4_t		uiDfColorMedium, uiDfColorBig;
+extern vec4_t		color_green;
 extern vec4_t		uiDfColorValue;		// DeFRaG: colour of the value part of a widget (df_ui_TextColorValue)
 #define UI_DF_VALUECOLOR( c )	( ( (c) == text_color_normal ) ? uiDfColorValue : (c) )
 extern vec4_t		text_color_highlight;
@@ -817,7 +822,22 @@ qboolean UI_DF_DemoQueueNext( void );
 void UI_DF_RegisterCursor( void );
 void UI_DF_SetHover( menucommon_s *m );
 qboolean UI_DF_DrawCursor( void );
+extern qboolean uiDfNoCursor;
 void UI_DF_DemoQueueClear( void );
+
+// ui_dfmaps.c -- start-map menu map database
+#define UIDF_MAPDB_DEFRAG	1
+#define UIDF_MAPDB_QUAKE3	2
+#define UIDF_MAP_VQ3		1
+#define UIDF_MAP_CPM		2
+#define UIDF_MAP_TRAINING	4
+#define UIDF_MAP_RUN		8
+#define UIDF_MAP_LEVEL		16
+#define UIDF_MAP_ACCURACY	32
+#define UIDF_MAP_CTF		64
+struct uiDfMapEntry_s;
+void UI_DF_StartMapMenu( int type, int variant );
+const struct uiDfMapEntry_s *UI_DF_MapNext( int type, int maskA, int maskB, const struct uiDfMapEntry_s *prev );
 void UI_DF_Q3ExtrasMenu( void );
 void UI_DF_HudMenu( void );
 void UI_DF_ChsMenu( void );

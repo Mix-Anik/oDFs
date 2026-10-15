@@ -1215,6 +1215,7 @@ void UI_Refresh( int realtime )
 
 	UI_UpdateCvars();
 
+	uiDfNoCursor = qfalse;
 	if ( uis.activemenu )
 	{
 		if (uis.activemenu->fullscreen)
@@ -1240,7 +1241,9 @@ void UI_Refresh( int realtime )
 	}
 
 	// draw cursor
-	if ( !UI_DF_DrawCursor() ) {
+	if ( uiDfNoCursor ) {
+		// DeFRaG menus can hide the cursor (menu flag +544)
+	} else if ( !UI_DF_DrawCursor() ) {
 		UI_SetColor( NULL );
 		UI_DrawHandlePic( uis.cursorx-16, uis.cursory-16, 32, 32, uis.cursor);
 	}

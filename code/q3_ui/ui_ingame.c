@@ -177,13 +177,13 @@ void InGame_MenuInit( void ) {
 	s_ingame.frame.generic.type			= MTYPE_BITMAP;
 	s_ingame.frame.generic.flags		= QMF_INACTIVE;
 	s_ingame.frame.generic.name			= INGAME_FRAME;
-	s_ingame.frame.generic.x			= 320-233;//142;
-	s_ingame.frame.generic.y			= 240-166;//118;
+	s_ingame.frame.generic.x			= 87;		// DeFRaG 0xfa6d: frame 466x256 at (87,112), items from y 156 every 28
+	s_ingame.frame.generic.y			= 112;
 	s_ingame.frame.width				= 466;//359;
-	s_ingame.frame.height				= 332 + INGAME_MENU_VERTICAL_SPACING;//256;
+	s_ingame.frame.height				= 256;
 
 	//y = 96;
-	y = 88;
+	y = 156;
 	s_ingame.team.generic.type			= MTYPE_PTEXT;
 	s_ingame.team.generic.flags			= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
 	s_ingame.team.generic.x				= 320;
@@ -191,7 +191,7 @@ void InGame_MenuInit( void ) {
 	s_ingame.team.generic.id			= ID_TEAM;
 	s_ingame.team.generic.callback		= InGame_Event; 
 	s_ingame.team.string				= "START";
-	s_ingame.team.color					= color_red;
+	s_ingame.team.color					= uiDfColorBig;
 	s_ingame.team.style					= UI_CENTER|UI_SMALLFONT;
 
 	y += INGAME_MENU_VERTICAL_SPACING;
@@ -202,7 +202,7 @@ void InGame_MenuInit( void ) {
 	s_ingame.addbots.generic.id			= ID_ADDBOTS;
 	s_ingame.addbots.generic.callback	= InGame_Event; 
 	s_ingame.addbots.string				= "ADD BOTS";
-	s_ingame.addbots.color				= color_red;
+	s_ingame.addbots.color				= uiDfColorBig;
 	s_ingame.addbots.style				= UI_CENTER|UI_SMALLFONT;
 	if( !trap_Cvar_VariableValue( "sv_running" ) || !trap_Cvar_VariableValue( "bot_enable" ) || (trap_Cvar_VariableValue( "g_gametype" ) == GT_SINGLE_PLAYER)) {
 		s_ingame.addbots.generic.flags |= QMF_GRAYED;
@@ -216,7 +216,7 @@ void InGame_MenuInit( void ) {
 	s_ingame.removebots.generic.id			= ID_REMOVEBOTS;
 	s_ingame.removebots.generic.callback	= InGame_Event; 
 	s_ingame.removebots.string				= "REMOVE BOTS";
-	s_ingame.removebots.color				= color_red;
+	s_ingame.removebots.color				= uiDfColorBig;
 	s_ingame.removebots.style				= UI_CENTER|UI_SMALLFONT;
 	if( !trap_Cvar_VariableValue( "sv_running" ) || !trap_Cvar_VariableValue( "bot_enable" ) || (trap_Cvar_VariableValue( "g_gametype" ) == GT_SINGLE_PLAYER)) {
 		s_ingame.removebots.generic.flags |= QMF_GRAYED;
@@ -230,7 +230,7 @@ void InGame_MenuInit( void ) {
 	s_ingame.teamorders.generic.id			= ID_TEAMORDERS;
 	s_ingame.teamorders.generic.callback	= InGame_Event; 
 	s_ingame.teamorders.string				= "TEAM ORDERS";
-	s_ingame.teamorders.color				= color_red;
+	s_ingame.teamorders.color				= uiDfColorBig;
 	s_ingame.teamorders.style				= UI_CENTER|UI_SMALLFONT;
 	if( !(trap_Cvar_VariableValue( "g_gametype" ) >= GT_TEAM) ) {
 		s_ingame.teamorders.generic.flags |= QMF_GRAYED;
@@ -252,7 +252,7 @@ void InGame_MenuInit( void ) {
 	s_ingame.setup.generic.id			= ID_SETUP;
 	s_ingame.setup.generic.callback		= InGame_Event; 
 	s_ingame.setup.string				= "SETUP";
-	s_ingame.setup.color				= color_red;
+	s_ingame.setup.color				= uiDfColorBig;
 	s_ingame.setup.style				= UI_CENTER|UI_SMALLFONT;
 
 	y += INGAME_MENU_VERTICAL_SPACING;
@@ -263,7 +263,7 @@ void InGame_MenuInit( void ) {
 	s_ingame.defragSetup.generic.id			= ID_DEFRAGSETUP;
 	s_ingame.defragSetup.generic.callback	= InGame_Event; 
 	s_ingame.defragSetup.string				= "DEFRAG SETUP";
-	s_ingame.defragSetup.color				= color_red;
+	s_ingame.defragSetup.color				= uiDfColorBig;
 	s_ingame.defragSetup.style				= UI_CENTER|UI_SMALLFONT;
 
 	y += INGAME_MENU_VERTICAL_SPACING;
@@ -274,7 +274,7 @@ void InGame_MenuInit( void ) {
 	s_ingame.server.generic.id			= ID_SERVERINFO;
 	s_ingame.server.generic.callback	= InGame_Event; 
 	s_ingame.server.string				= "SERVER INFO";
-	s_ingame.server.color				= color_red;
+	s_ingame.server.color				= uiDfColorBig;
 	s_ingame.server.style				= UI_CENTER|UI_SMALLFONT;
 
 	y += INGAME_MENU_VERTICAL_SPACING;
@@ -285,7 +285,7 @@ void InGame_MenuInit( void ) {
 	s_ingame.restart.generic.id			= ID_RESTART;
 	s_ingame.restart.generic.callback	= InGame_Event; 
 	s_ingame.restart.string				= "RESTART ARENA";
-	s_ingame.restart.color				= color_red;
+	s_ingame.restart.color				= uiDfColorBig;
 	s_ingame.restart.style				= UI_CENTER|UI_SMALLFONT;
 	if( !trap_Cvar_VariableValue( "sv_running" ) ) {
 		s_ingame.restart.generic.flags |= QMF_GRAYED;
@@ -299,7 +299,7 @@ void InGame_MenuInit( void ) {
 	s_ingame.resume.generic.id				= ID_RESUME;
 	s_ingame.resume.generic.callback		= InGame_Event; 
 	s_ingame.resume.string					= "RESUME GAME";
-	s_ingame.resume.color					= color_red;
+	s_ingame.resume.color					= uiDfColorBig;
 	s_ingame.resume.style					= UI_CENTER|UI_SMALLFONT;
 
 	y += INGAME_MENU_VERTICAL_SPACING;
@@ -310,7 +310,7 @@ void InGame_MenuInit( void ) {
 	s_ingame.leave.generic.id			= ID_LEAVEARENA;
 	s_ingame.leave.generic.callback		= InGame_Event; 
 	s_ingame.leave.string				= "LEAVE ARENA";
-	s_ingame.leave.color				= color_red;
+	s_ingame.leave.color				= uiDfColorBig;
 	s_ingame.leave.style				= UI_CENTER|UI_SMALLFONT;
 
 	y += INGAME_MENU_VERTICAL_SPACING;
@@ -321,17 +321,22 @@ void InGame_MenuInit( void ) {
 	s_ingame.quit.generic.id			= ID_QUIT;
 	s_ingame.quit.generic.callback		= InGame_Event; 
 	s_ingame.quit.string				= "EXIT GAME";
-	s_ingame.quit.color					= color_red;
+	s_ingame.quit.color					= uiDfColorBig;
 	s_ingame.quit.style					= UI_CENTER|UI_SMALLFONT;
+
+	// DeFRaG lists only these seven entries (add bots / remove bots / team orders / server info are built but never added)
+	s_ingame.team.generic.y			= 156;
+	s_ingame.setup.generic.y			= 184;
+	s_ingame.defragSetup.generic.y		= 212;
+	s_ingame.restart.generic.y			= 240;
+	s_ingame.resume.generic.y			= 268;
+	s_ingame.leave.generic.y			= 296;
+	s_ingame.quit.generic.y				= 324;
 
 	Menu_AddItem( &s_ingame.menu, &s_ingame.frame );
 	Menu_AddItem( &s_ingame.menu, &s_ingame.team );
-	Menu_AddItem( &s_ingame.menu, &s_ingame.addbots );
-	Menu_AddItem( &s_ingame.menu, &s_ingame.removebots );
-	Menu_AddItem( &s_ingame.menu, &s_ingame.teamorders );
 	Menu_AddItem( &s_ingame.menu, &s_ingame.setup );
 	Menu_AddItem( &s_ingame.menu, &s_ingame.defragSetup );
-	Menu_AddItem( &s_ingame.menu, &s_ingame.server );
 	Menu_AddItem( &s_ingame.menu, &s_ingame.restart );
 	Menu_AddItem( &s_ingame.menu, &s_ingame.resume );
 	Menu_AddItem( &s_ingame.menu, &s_ingame.leave );

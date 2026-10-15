@@ -47,6 +47,7 @@ vec4_t color_blue	    = {0.00f, 0.00f, 1.00f, 1.00f};
 vec4_t color_lightOrange    = {1.00f, 0.68f, 0.00f, 1.00f };
 vec4_t color_orange	    = {1.00f, 0.43f, 0.00f, 1.00f};
 vec4_t color_red	    = {1.00f, 0.00f, 0.00f, 1.00f};
+vec4_t color_green	    = {0.00f, 1.00f, 0.00f, 1.00f};	// DeFRaG (ui 10708)
 vec4_t color_dim	    = {0.00f, 0.00f, 0.00f, 0.25f};
 
 // current color scheme
@@ -228,6 +229,11 @@ static void PText_Draw( menutext_s *t )
 		else {
 			style |= UI_INVERSE;
 		}
+	}
+
+	// DeFRaG 0x13241: a focused widget with UI_FOCUSCOLOR draws with its focusColor
+	if ( ( t->style & UI_FOCUSCOLOR ) && t->focusColor && Menu_ItemAtCursor( t->generic.parent ) == t ) {
+		color = t->focusColor;
 	}
 
 	UI_DrawProportionalString( x, y, t->string, style, color );

@@ -154,8 +154,8 @@ static void Preferences_Event( void* ptr, int notification ) {
 		break;
 
 	case ID_ALLOWDOWNLOAD:
+		// DeFRaG 0x12cc3: only the client side cvar is set (stock Q3 also sets sv_allowDownload)
 		trap_Cvar_SetValue( "cl_allowDownload", s_preferences.allowdownload.curvalue );
-		trap_Cvar_SetValue( "sv_allowDownload", s_preferences.allowdownload.curvalue );
 		break;
 
 	case ID_BACK:
