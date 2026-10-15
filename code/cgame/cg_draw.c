@@ -2661,8 +2661,12 @@ static void CG_Draw2D(stereoFrame_t stereoFrame)
 #endif
 
 #ifndef MISSIONPACK
-	CG_DrawLowerRight();
-	CG_DrawLowerLeft();
+	// DeFRaG 0x2a12 (its own HUD) never calls the Q3 lower-right (scores, power-up timers) or lower-left (item pickup) blocks;
+	// df_hud draws its own power-up list and frag box, so drawing them again duplicated them
+	if ( !df_hud.integer ) {
+		CG_DrawLowerRight();
+		CG_DrawLowerLeft();
+	}
 #endif
 
 	if ( !CG_DrawFollow() ) {

@@ -163,25 +163,79 @@ if(BUILD_QVM)
     )
 
     # Build ui.qvm
-    set(UI_SOURCES
-        # ui_main.c must come first: vmMain() must be the first function in
-        # the first compiled source file, since the QVM interpreter always
-        # calls address 0 as the entry point.
-        code/ui/ui_main.c
-        code/game/bg_misc.c
-        code/game/bg_pmove.c
-        code/game/bg_slidemove.c
-        code/game/bg_lib.c
-        code/ui/ui_atoms.c
-        code/ui/ui_gameinfo.c
-        code/ui/ui_players.c
-        code/ui/ui_shared.c
-        code/qcommon/q_shared.c
-        code/qcommon/q_math.c
-    )
+    # DeFRaG's ui.qvm is built on the classic Q3 menu UI (q3_ui), not on the Team Arena UI (code/ui, kept for reference).
+    option(UI_BASE_TA "Build ui.qvm from the Team Arena UI (code/ui) instead of the classic q3_ui" OFF)
+    if(UI_BASE_TA)
+        set(UI_INC "code/ui")
+        set(UI_SOURCES
+            # ui_main.c must come first: vmMain() must be the first function in
+            # the first compiled source file, since the QVM interpreter always
+            # calls address 0 as the entry point.
+            code/ui/ui_main.c
+            code/game/bg_misc.c
+            code/game/bg_pmove.c
+            code/game/bg_slidemove.c
+            code/game/bg_lib.c
+            code/ui/ui_atoms.c
+            code/ui/ui_gameinfo.c
+            code/ui/ui_players.c
+            code/ui/ui_shared.c
+            code/qcommon/q_shared.c
+            code/qcommon/q_math.c
+        )
+    else()
+        set(UI_INC "code/q3_ui")
+        set(UI_SOURCES
+            code/q3_ui/ui_main.c
+            code/game/bg_misc.c
+            code/game/bg_lib.c
+            code/q3_ui/ui_addbots.c
+            code/q3_ui/ui_atoms.c
+            code/q3_ui/ui_cdkey.c
+            code/q3_ui/ui_cinematics.c
+            code/q3_ui/ui_confirm.c
+            code/q3_ui/ui_connect.c
+            code/q3_ui/ui_controls2.c
+            code/q3_ui/ui_credits.c
+            code/q3_ui/ui_defrag.c
+            code/q3_ui/ui_dfmenu.c
+            code/q3_ui/ui_demo2.c
+            code/q3_ui/ui_display.c
+            code/q3_ui/ui_gameinfo.c
+            code/q3_ui/ui_ingame.c
+            code/q3_ui/ui_loadconfig.c
+            code/q3_ui/ui_menu.c
+            code/q3_ui/ui_mfield.c
+            code/q3_ui/ui_mods.c
+            code/q3_ui/ui_network.c
+            code/q3_ui/ui_options.c
+            code/q3_ui/ui_playermodel.c
+            code/q3_ui/ui_players.c
+            code/q3_ui/ui_playersettings.c
+            code/q3_ui/ui_preferences.c
+            code/q3_ui/ui_qmenu.c
+            code/q3_ui/ui_removebots.c
+            code/q3_ui/ui_saveconfig.c
+            code/q3_ui/ui_serverinfo.c
+            code/q3_ui/ui_servers2.c
+            code/q3_ui/ui_setup.c
+            code/q3_ui/ui_sound.c
+            code/q3_ui/ui_sparena.c
+            code/q3_ui/ui_specifyserver.c
+            code/q3_ui/ui_splevel.c
+            code/q3_ui/ui_sppostgame.c
+            code/q3_ui/ui_spskill.c
+            code/q3_ui/ui_startserver.c
+            code/q3_ui/ui_team.c
+            code/q3_ui/ui_teamorders.c
+            code/q3_ui/ui_video.c
+            code/qcommon/q_shared.c
+            code/qcommon/q_math.c
+        )
+    endif()
     build_qvm(ui
         "${UI_SOURCES}"
-        "code/ui"
+        "${UI_INC}"
         "code/ui/ui_syscalls.asm"
     )
 
