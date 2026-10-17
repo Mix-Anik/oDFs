@@ -144,10 +144,25 @@ static void G_RaceFinished( gentity_t *ent ) {
 			             va( "%04i-%02d-%02d", qt.tm_year + 1900, qt.tm_mon + 1, qt.tm_mday ) );
 		}
 	} else {
+		qtime_t		qt;
+		char		comp[MAX_CVAR_VALUE_STRING];
+
 		trap_SendServerCommand( clientNum, "stats" );	// DeFRaG: triggers the cgame end-of-run stats dump
+		// DeFRaG 0x35ce (non-dedicated branch): date, competition, then the result line; the 'on route' form is only used when
+		// defrag_route is set (it is empty in run and fastcaps mode), and the line carries the DeFRaG version tag
+		trap_RealTime( &qt );
+		trap_SendServerCommand( clientNum, va( "print \"Date: %02i-%02i-%02i %02i:%02i\n\"", qt.tm_mon + 1, qt.tm_mday, qt.tm_year % 100,
+		                                qt.tm_hour, qt.tm_min ) );
+		trap_Cvar_VariableStringBuffer( "df_competition", comp, sizeof( comp ) );
+		trap_SendServerCommand( clientNum, va( "print \"Competition: %s\n\"", comp ) );
 		trap_Cvar_VariableStringBuffer( "defrag_route", route, sizeof( route ) );
-		trap_SendServerCommand( clientNum, va( "print \"Time performed by ^2%s^7 on route ^2%s^7 : ^3%s^7 (est. %s)\n\"",
-		                                ent->client->pers.netname, route, timeBuf, estBuf ) );
+		if ( route[0] ) {
+			trap_SendServerCommand( clientNum, va( "print \"Time performed by ^2%s^7 on route ^2%s^7 : ^3%s^7 (v1.91.31 beta) (est. %s)\n\"",
+			                                ent->client->pers.netname, route, timeBuf, estBuf ) );
+		} else {
+			trap_SendServerCommand( clientNum, va( "print \"Time performed by ^2%s^7 : ^3%s^7 (v1.91.31 beta) (est. %s)\n\"",
+			                                ent->client->pers.netname, timeBuf, estBuf ) );
+		}
 	}
 	trap_SendServerCommand( clientNum, va( "cp \"^2Finished: %s\"", estBuf ) );
 }
@@ -528,9 +543,12 @@ void G_ClockSanityFrame( void ) {
 static void G_PublishRaceTime( gentity_t *ent ) {
 	gclient_t	*cl = ent->client;
 	raceTimer_t	*t = G_GetTimerRecord( cl );
-	int			v;
+	int			v, ms;
 
-	if ( t->initialized ) {
+	// The cgame decodes the race time (and so handles the finish transition: demo autorecord, records, ghosts, stats, and shows the
+	// last-time / checkpoint boxes) only while bit 2 is set, so after the finish the bit and the final time stay published
+	// ('finished' latch) until the next start or respawn; G_TimerTick itself clears 'initialized' at the finish.
+	if ( t->initialized || t->finished ) {
 		cl->ps.stats[STAT_DEFRAG_FLAGS] |= 2;
 	} else {
 		cl->ps.stats[STAT_DEFRAG_FLAGS] &= ~2;
@@ -543,10 +561,11 @@ static void G_PublishRaceTime( gentity_t *ent ) {
 		cl->ps.stats[STAT_DEFRAG_FLAGS] |= 0x20;
 	}
 
+	ms = ( !t->initialized && t->finished ) ? t->finalMs : t->ms;
 	if ( g_dfVariant || trap_Cvar_VariableIntegerValue( "sv_cheats" ) ) {
-		v = t->ms;
+		v = ms;
 	} else {
-		v = G_EncodeRaceTime( t->ms, cl );
+		v = G_EncodeRaceTime( ms, cl );
 	}
 	cl->ps.stats[STAT_RACE_TIME_LO] = v & 0xffff;
 	cl->ps.stats[STAT_RACE_TIME_HI] = v >> 16;
@@ -741,6 +760,8 @@ void G_TimerTick( gentity_t *ent, int elapsed_ms ) {
 	if ( t->state == TIMER_FINISHED ) {
 		t->bestTime    = level.time - t->startTime + G_RoundHalf( t->fracAccum );
 		t->initialized = 0;
+		t->finalMs = t->bestTime;
+		t->finished = 1;
 		// One-shot event: toggle the finish bit; clear the running bit.
 		client->ps.stats[STAT_DEFRAG_FLAGS] ^= 0x8;
 		client->ps.stats[STAT_DEFRAG_FLAGS] &= ~0x4;
@@ -751,11 +772,8 @@ check_state:
 	if ( t->state == TIMER_RUNNING ) {
 		if ( t->initialized == 0 ) {
 			// First frame of running state — timer starting now
-			G_Printf( "^2Race started for %s\n", client->pers.netname );
-			G_Printf( "^3Setting stats[12] bit 0x4. Before: %d\n", client->ps.stats[STAT_DEFRAG_FLAGS] );
+			t->finished = 0;
 			client->ps.stats[STAT_DEFRAG_FLAGS] |= 0x4;
-			G_Printf( "^3After: %d (bit 0x4 is %s)\n", client->ps.stats[STAT_DEFRAG_FLAGS],
-				(client->ps.stats[STAT_DEFRAG_FLAGS] & 0x4) ? "SET" : "CLEAR" );
 		}
 		t->initialized = 1;
 		// Keep bit SET (not XOR'd) so the cgame sees a stable RUNNING signal.

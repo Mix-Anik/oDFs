@@ -239,7 +239,7 @@ static cvarTable_t cvarTable[] = {
 	{ &cg_drawFPS, "cg_drawFPS", "0", CVAR_ARCHIVE  },
 	{ &df_noTargetPrint, "df_noTargetPrint", "0", CVAR_ARCHIVE },
 	{ &df_checkpoints, "df_checkpoints", "2", CVAR_ARCHIVE },
-	{ &df_hud, "df_hud", "0", CVAR_ARCHIVE },
+	{ &df_hud, "df_hud", "1", CVAR_ARCHIVE },
 	{ &df_hud_drawStatus, "df_hud_drawStatus", "1", CVAR_ARCHIVE },
 	{ &df_hud_cgaz, "df_hud_cgaz", "0", CVAR_ARCHIVE },
 	{ &df_hud_cgaz_opacity, "df_hud_cgaz_opacity", "0.5", CVAR_ARCHIVE },

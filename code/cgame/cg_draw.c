@@ -1568,7 +1568,7 @@ LAGOMETER
 ===============================================================================
 */
 
-#define	LAG_SAMPLES		128
+#define	LAG_SAMPLES		256		// DeFRaG ring size (cgame 0x1c412 masks with 255); oDFs/ioq3 had 128
 
 
 typedef struct {
@@ -2615,12 +2615,12 @@ static void CG_Draw2D(stereoFrame_t stereoFrame)
 				CG_DrawTimedMenus();
 			}
 #else
-			if ( !df_hud.integer ) {
+			if ( !CG_DF_HudOn() ) {
 				CG_DrawStatusBar();
 			}
 #endif
       
-			if ( !df_hud.integer ) {
+			if ( !CG_DF_HudOn() ) {
 				CG_DrawAmmoWarning();
 			}
 
@@ -2630,7 +2630,9 @@ static void CG_Draw2D(stereoFrame_t stereoFrame)
 			if(stereoFrame == STEREO_CENTER)
 				CG_DrawCrosshair();
 			CG_DrawCrosshairNames();
-			CG_DrawWeaponSelect();
+			if ( !CG_DF_HudOn() ) {
+				CG_DrawWeaponSelect();
+			}
 
 #ifndef MISSIONPACK
 			CG_DrawHoldableItem();
@@ -2663,7 +2665,7 @@ static void CG_Draw2D(stereoFrame_t stereoFrame)
 #ifndef MISSIONPACK
 	// DeFRaG 0x2a12 (its own HUD) never calls the Q3 lower-right (scores, power-up timers) or lower-left (item pickup) blocks;
 	// df_hud draws its own power-up list and frag box, so drawing them again duplicated them
-	if ( !df_hud.integer ) {
+	if ( !CG_DF_HudOn() ) {
 		CG_DrawLowerRight();
 		CG_DrawLowerLeft();
 	}
@@ -2683,7 +2685,7 @@ static void CG_Draw2D(stereoFrame_t stereoFrame)
 	CG_DF_DrawChs( 1 );
 	CG_DF_DrawChs( 2 );
 
-	if ( df_hud.integer ) {
+	if ( CG_DF_HudOn() ) {
 		if ( !cg.showScores ) {
 			CG_DF_DrawHUD();
 		}

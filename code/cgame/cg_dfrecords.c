@@ -41,6 +41,33 @@ const char *CG_DF_FormatTime( int ms ) {
 	return s;
 }
 
+// DeFRaG 0x10c8( value, 0, 0, 1, 1, 1, 0 ): signed, colour-coded delta -- green '+' (ahead of the reference), red '-' (behind), white at 0
+const char *CG_DF_FormatDelta( int v ) {
+	static char	buf[2][32];
+	static int	idx;
+	char		*s, col = '2';
+	const char	*sign = "+";
+
+	idx ^= 1;
+	s = buf[idx];
+	if ( v < 0 ) {
+		v = -v;
+		sign = "-";
+		col = '1';
+	} else if ( v == 0 ) {
+		col = '7';
+	}
+	if ( v < 60000 ) {
+		Com_sprintf( s, sizeof( buf[0] ), "^%c%s%i:%03i", col, sign, v / 1000, v % 1000 );
+	} else {
+		Com_sprintf( s, sizeof( buf[0] ), "^%c%s%i:%02i:%03i", col, sign, v / 60000, ( v % 60000 ) / 1000, v % 1000 );
+	}
+	return s;
+}
+
+static qboolean dfRecRunStarted;		// 0x11d2a4+... (1168804): set by a start event, cleared by a respawn
+void CG_DF_RecRunStopped( void ) { dfRecRunStarted = qfalse; }
+
 // ---- file names (template expander 0x586d) -------------------------------------------------------------------
 
 static const char *dfGtShort[8]  = { "ac", "df", "tm", "fc", "res", "mdf", "mtm", "mfc" };
@@ -105,7 +132,7 @@ static void CG_DF_NameVar( dfName_t *n, const char **p ) {
 		CG_DF_NamePut( n, 0x40, CG_DF_Serverinfo( "mapname" ) );
 		*p += 3;
 	} else if ( !Q_stricmpn( *p, "phys", 4 ) ) {
-		CG_DF_NamePut( n, 3, ( cg.snap && ( cg.snap->ps.pm_flags & PMF_PROMODE ) ) ? "cpm" : "vq3" );
+		CG_DF_NamePut( n, 3, atoi( CG_DF_Serverinfo( "df_promode" ) ) ? "cpm" : "vq3" );		// 0x3b5e: serverinfo df_promode, known before the first snapshot
 		*p += 4;
 	} else if ( !Q_stricmpn( *p, "gt", 2 ) ) {
 		v = atoi( CG_DF_Serverinfo( "defrag_gametype" ) );
@@ -286,8 +313,8 @@ static void CG_DF_LoadR1( void ) {
 const char *CG_DF_CheckpointText( int i ) {
 	int N = dfRecB[DF_REC_COUNT];
 
-	if ( df_checkpoints.integer == 2 && dfRecR1[0] != 0 ) {
-		return CG_DF_FormatTime( dfRecR1[i] - dfRecB[i] );
+	if ( df_checkpoints.integer == 2 && dfRecRunStarted && dfRecR1[0] != 0 ) {		// 0x50c0..0x50f9 / 0x5179..0x51b2
+		return CG_DF_FormatDelta( dfRecR1[i] - dfRecB[i] );
 	}
 	if ( df_checkpoints.integer == 3 ) {
 		return CG_DF_FormatTime( dfRecB[i] );
@@ -329,6 +356,7 @@ void CG_DF_RecLoad( void ) {
 
 // start of a run (stats[12] bit 4 set): clear the current run, refresh the references
 void CG_DF_RecStart( void ) {
+	dfRecRunStarted = qtrue;
 	if ( dfRecDirty ) {
 		memcpy( dfRecR2, dfRecB, DF_REC_BYTES );
 		CG_DF_LoadR1();
@@ -341,6 +369,11 @@ void CG_DF_RecStart( void ) {
 		CG_DF_LoadR1();
 		dfSessionModCount = df_recfiles_session.modificationCount;
 	}
+}
+
+// the current (open) entry of the run record follows the race time every snapshot: the last row of the checkpoint list is the running timer
+void CG_DF_RecTrack( int ms ) {
+	dfRecB[dfRecB[DF_REC_COUNT]] = ms;
 }
 
 void CG_DF_RecCheckpoint( int t ) {
@@ -429,7 +462,7 @@ void CG_DF_DrawCheckpointListAt( float x, float y ) {
 	first = ( N > 7 ) ? N - 7 : 0;
 	for ( i = first; i <= N; i++ ) {
 		text = CG_DF_CheckpointText( i );
-		w = (int)strlen( text );
+		w = CG_DrawStrlen( text );		// 0x3265e: colour codes do not count
 		CG_DrawStringExt( (int)( x - 16.0f * w ), (int)y, text, colorWhite, qfalse, qtrue, 16, 16, 0 );
 		y -= 16.0f;
 	}

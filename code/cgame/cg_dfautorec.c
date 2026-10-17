@@ -15,11 +15,15 @@ vmCvar_t	df_autorecord, df_ar_stopdelay, df_ar_format, df_ar_speedcapture_format
 
 enum { AR_EV_START = 1, AR_EV_FINISH = 2, AR_EV_RESPAWN = 4 };
 
-static int		arState, arEvents, arFinishMs, arFinishKeep, arWarned, arDelay;
+static int		arState, arEvents, arFinishMs, arFinishKeep, arWarned, arDelay, arFinishedLife;
 
 void CG_DF_ArEvent( int ev, int ms, qboolean keep ) {
 	arEvents |= ev;
+	if ( ev & ( AR_EV_RESPAWN | AR_EV_START ) ) {
+		arFinishedLife = 0;
+	}
 	if ( ev == AR_EV_FINISH ) {
+		arFinishedLife = 1;
 		arFinishMs = ms;
 		arFinishKeep = keep;
 	}
@@ -282,7 +286,7 @@ static void AR_Start( void ) {		// 0x18ab
 }
 
 void CG_DF_AutoRecFrame( void ) {		// 0x19e0
-	if ( cg.demoPlayback || !cg.snap ) {
+	if ( cg.demoPlayback || !cg.snap || CG_DF_Cheats() ) {		// 0x19e4/0x19ea: no autorecord during demos or with sv_cheats
 		arEvents = 0;
 		return;
 	}
@@ -295,7 +299,7 @@ void CG_DF_AutoRecFrame( void ) {		// 0x19e0
 			AR_Stop();
 		}
 		if ( arState == 1 && ( arEvents & AR_EV_FINISH ) ) {
-			if ( arFinishKeep || df_autorecord.integer == 3 ) {		// 0x1887
+			if ( arFinishKeep || df_autorecord.integer != 3 ) {		// 0x1887: df_autorecord 3 keeps only records (and ties), every other non-zero value saves every finish
 				arState = 2;
 				arDelay = df_ar_stopdelay.integer;
 				AR_Say( "Autorecord: demo going to be saved." );
@@ -317,7 +321,7 @@ void CG_DF_AutoRecFrame( void ) {		// 0x19e0
 	if ( arState == 0 && df_autorecord.integer && cg.snap->ps.stats[STAT_HEALTH] > 0
 		&& cgs.clientinfo[cg.clientNum].team != TEAM_SPECTATOR ) {
 		if ( !( arEvents & AR_EV_START ) && CG_DF_RunActive() ) {		// the run began before we were recording
-			if ( !arWarned ) {
+			if ( !arWarned && !arFinishedLife ) {		// after a finish the run is merely still 'active' until the respawn: no warning, no restart
 				CG_Printf( "^3Autorecord: couldn't record from the beginning, please restart your run.^7\n" );
 				arWarned = 1;
 			}

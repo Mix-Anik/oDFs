@@ -9,6 +9,23 @@
 #include "cg_local.h"
 
 vmCvar_t	df_hud;
+
+// sv_cheats as the SERVER reports it (cgame global 0x11d40c, parsed from the systeminfo configstring by 0x3a70). The client-side cvar is not
+// used: while a demo plays it does not follow the recorded server (it read 1, which made the race time decoder take the plain path and
+// show garbage 'billions' in recorded demos).
+qboolean CG_DF_Cheats( void ) {
+	return atoi( Info_ValueForKey( CG_ConfigString( CS_SYSTEMINFO ), "sv_cheats" ) ) != 0 ? qtrue : qfalse;
+}
+
+// DeFRaG (cgame 0x1cd86 -> 0x2a12): the DeFRaG HUD is used when df_hud > 1, or df_hud == 1 on a server that publishes defrag_vers
+// (global 0x11d298); otherwise the vanilla Draw2D runs. df_hud defaults to 1, so a DeFRaG/oDFs server gets the DeFRaG HUD and no
+// vanilla weapon-select bar / status bar.
+qboolean CG_DF_HudOn( void ) {
+	if ( df_hud.integer > 1 ) {
+		return qtrue;
+	}
+	return ( df_hud.integer == 1 && CG_DF_Serverinfo( "defrag_vers" )[0] ) ? qtrue : qfalse;
+}
 vmCvar_t	df_hud_drawStatus;
 vmCvar_t	df_hud_drawSpectFollow;	// 0x11a9a0
 int			dfFollowStamp;			// 0x11ccec, cleared when the followed client changes
@@ -74,29 +91,42 @@ static const vec4_t	dfPalette[13] = {
 
 // ---- helpers --------------------------------------------------------------------------------------------------
 
-// DeFRaG 0x24ac: "R G B" (decimal 0..255) -> floats; returns qfalse on failure
+// DeFRaG 0x24ac: up to three numbers of at most 3 digits each (value 0..255 -> 0..1, clamped); the character after every number --
+// the delimiter, or the 4th digit of a longer run -- is skipped, so "150025001500" reads as 150 250 150. Returns qfalse unless three
+// numbers were found (out[3] is set to 1 on success).
 static qboolean CG_DF_ParseColor( const char *s, float *out ) {
-	int i, v;
+	char	buf[4];
+	int		i, lc, n = 0, len;
+	float	v;
 
-	for ( i = 0; i < 3; i++ ) {
-		while ( *s && ( *s < '0' || *s > '9' ) ) {
+	if ( !*s ) {
+		return qfalse;
+	}
+	len = strlen( s );
+	for ( i = 0; i < len && n < 3; i++ ) {
+		lc = 0;
+		while ( *s >= '0' && *s <= '9' && lc < 3 ) {
+			buf[lc++] = *s++;
+		}
+		if ( *s ) {
 			s++;
 		}
-		if ( !*s ) {
-			return qfalse;
+		if ( lc ) {
+			buf[lc] = 0;
+			v = atoi( buf ) / 255.0f;
+			out[n++] = v > 1.0f ? 1.0f : v;
 		}
-		v = 0;
-		while ( *s >= '0' && *s <= '9' ) {
-			v = v * 10 + ( *s++ - '0' );
-		}
-		out[i] = v / 255.0f;
 	}
+	if ( n != 3 ) {
+		return qfalse;
+	}
+	out[3] = 1.0f;
 	return qtrue;
 }
 
 // DeFRaG 0x2559
 static const float *CG_DF_HudColor( int index, const float *custom ) {
-	if ( custom[0] != 0 && !( custom[0] < 0 ) ) {
+	if ( custom && custom[0] >= 0 ) {		// 0x2559: a custom colour is in use unless its red component is negative (the 'unset' marker)
 		return custom;
 	}
 	if ( index >= 0 && index < 13 ) {
@@ -260,20 +290,19 @@ static void CG_DF_DrawHealthIcon( int x, int y, const playerState_t *ps ) {
 	if ( !df_hud_drawStatus.integer ) {
 		return;
 	}
-	// displayed health follows the real value by at most one point every 100 ms
-	if ( !dfHealthNext ) {
-		dfHealthNext = cg.time;
-	}
-	do {
+	// 0x2367: every 100 ms the shown value moves by (difference / 10), a difference below 10 counts as 10 (so it moves by exactly 1);
+	// the catch-up loop is a plain `while ( next < cg.time )` that starts from 0, as in DeFRaG
+	while ( dfHealthNext < cg.time ) {
 		dfHealthNext += 100;
 		d = ps->stats[STAT_HEALTH] - dfShownHealth;
-		if ( d > 0 && d >= 10 ) {
+		if ( d > 0 && d < 10 ) {
 			d = 10;
-		} else if ( d < 0 && d <= -10 ) {
+		}
+		if ( d < 0 && d > -10 ) {
 			d = -10;
 		}
 		dfShownHealth += d / 10;
-	} while ( dfHealthNext < cg.time );
+	}
 	disp = dfShownHealth;
 
 	if ( disp <= 50 ) {
@@ -294,8 +323,7 @@ static void CG_DF_DrawHealthIcon( int x, int y, const playerState_t *ps ) {
 	trap_R_SetColor( color );
 	CG_DrawPic( x, y, 16, 16, dfSh[SH_ICON_HEALTH] );
 	if ( disp > 0 ) {
-		// red halo: DeFRaG uses alpha (disp-100)/100 below 100 (negative -> invisible) and 1.0 from 100 up
-		color[0] = 1.0f;
+		// halos keep the icon's colour and only change the alpha: (disp-100)/100 below 100 (negative -> invisible), 1.0 from 100 up
 		a = ( disp < 100 ) ? ( disp - 100 ) / 100.0f : 1.0f;
 		color[3] = a < 0 ? 0 : a;
 		trap_R_SetColor( color );
@@ -339,7 +367,7 @@ static void CG_DF_DrawCheckpointLine( dfWidget_t *w, int fragsShown ) {
 	int		v, big = 0, summary;
 
 	w->y = y0;
-	if ( df_hud_drawStatus.integer && ( CG_DF_DefragFlags() & 2 ) && dfLastRunMs != 0 && df_drawCheckpointStats.integer ) {
+	if ( df_hud_drawStatus.integer && ( CG_DF_DefragFlags() & 2 ) && dfLastRunMs != 0 && df_drawCheckpointStats.integer && !CG_DF_Cheats() ) {		// 0x2d8d..0x2da3: hidden with sv_cheats
 		v = N > 7 ? 7 : N;
 		w->visible = 1;
 		w->y -= 16 * v;
@@ -612,7 +640,7 @@ static void CG_DF_DrawCGAZ( int flags, float opacity, int ypos ) {
 
 // the frame function below is skipped for spectators and while the scoreboard is up; the vanilla upper-right timer/FPS must then stay
 qboolean CG_DF_HudDrawsUpperRight( void ) {
-	return ( df_hud.integer && cg.snap && cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR && !cg.showScores ) ? qtrue : qfalse;
+	return ( CG_DF_HudOn() && cg.snap && cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR && !cg.showScores ) ? qtrue : qfalse;
 }
 
 // ---- frame (0x2a12) -------------------------------------------------------------------------------------------------------
@@ -625,7 +653,7 @@ void CG_DF_DrawHUD( void ) {
 	float		speed;
 	int			ms;
 
-	if ( !df_hud.integer || !cg.snap ) {
+	if ( !CG_DF_HudOn() || !cg.snap ) {
 		return;
 	}
 	ps = &cg.snap->ps;

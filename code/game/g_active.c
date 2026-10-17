@@ -1119,7 +1119,6 @@ void ClientThink_real( gentity_t *ent ) {
 		DeFRaG_TouchTriggers( ent );
 	}
 	G_TimerTick( ent, msec );
-	G_UpdateRacePs( ent );
 
 	// execute client events
 	ClientEvents( ent, oldEventSequence );
@@ -1334,6 +1333,12 @@ void ClientEndFrame( gentity_t *ent ) {
 		BG_PlayerStateToEntityState( &ent->client->ps, &ent->s, qtrue );
 	}
 	SendPendingPredictableEvents( &ent->client->ps );
+
+	// DeFRaG 0x38ba (called from the 0x259a ClientEndFrame hook): publish the race time AFTER ps.stats[STAT_HEALTH] was synced and the
+	// frame's last ps changes were made. The encoded time (non-dedicated, sv_cheats 0) folds in health / origin.x / velocity.x /
+	// movementDir, so publishing earlier (from ClientThink_real) made the cgame's decode fail whenever health changed afterwards
+	// (e.g. the once-a-second health decay above max) -> the run timer and checkpoint box blinked once per second.
+	G_UpdateRacePs( ent );
 
 	// DeFRaG 0x259a head: authentication timeout / delayed request (a dropped client skips the rest of that frame)
 	if ( G_AuthFrame( ent ) ) {

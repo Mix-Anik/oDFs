@@ -15,33 +15,11 @@ int			cg_dfOptions;				// 0x11d2b8: set by the "df_options" server command (unus
 // (< 2^22) on dedicated servers or with sv_cheats; otherwise the obfuscated form of qagame 0x3f0c (G_EncodeRaceTime), undone here (cgame 0x5fd7):
 // undo the playerstate xors (origin.x, velocity.x, health, movementDir), the byte chain, the level-time/map salt and the replicated nibble, then
 // verify the 6-bit checksum. Returns qfalse (ms = 0) when the timer is not running or the value fails the check.
-static qboolean CG_DF_RaceTime( const playerState_t *ps, int *ms ) {
-	unsigned int	e, x, r, a, t;
+static byte CG_DF_MapSalt( void ) {
 	static byte		mapSalt;
 	static char		saltMap[MAX_QPATH];
 	char			map[MAX_QPATH];
-	int				i, v;
 
-	*ms = 0;
-	if ( !( ps->stats[STAT_DEFRAG_FLAGS] & 2 ) ) {
-		return qfalse;
-	}
-	e = ( (unsigned int)ps->stats[STAT_RACE_TIME_HI] << 16 ) | ( (unsigned int)ps->stats[STAT_RACE_TIME_LO] & 0xffff );
-	if ( !( e >> 22 ) ) {		// plain
-		*ms = (int)e;
-		return qtrue;
-	}
-	// obfuscated
-	e ^= (unsigned int)( ps->movementDir & 0xf ) << 28;
-	v = ps->stats[STAT_HEALTH];
-	e ^= ( v > 0 ) ? (unsigned int)( v & 0xff ) : 0x96u;
-	v = (int)floor( ps->velocity[0] );
-	e ^= (unsigned int)( v < 0 ? -v : v ) << 16;
-	v = (int)floor( ps->origin[0] );
-	e ^= (unsigned int)( v < 0 ? -v : v ) & 0xffff;
-	for ( i = 2; i >= 0; i-- ) {
-		( (byte *)&e )[i + 1] ^= ( (byte *)&e )[i];
-	}
 	Q_strncpyz( map, Info_ValueForKey( CG_ConfigString( CS_SERVERINFO ), "mapname" ), sizeof( map ) );
 	Q_strlwr( map );
 	if ( strcmp( map, saltMap ) ) {
@@ -53,7 +31,23 @@ static qboolean CG_DF_RaceTime( const playerState_t *ps, int *ms ) {
 			mapSalt += (byte)*c;
 		}
 	}
-	t = (unsigned int)cg.snap->serverTime;
+	return mapSalt;
+}
+
+// 0x5fd7 core: e = the two stats words, t = the time the server scrambled it with
+static qboolean CG_DF_DecodeCore( unsigned int e, unsigned int t, float originX, float velX, int health, int moveDir, byte mapSalt, int *ms ) {
+	unsigned int	x, r, a;
+	int				i, v;
+
+	e ^= (unsigned int)( moveDir & 0xf ) << 28;
+	e ^= ( health > 0 ) ? (unsigned int)( health & 0xff ) : 0x96u;
+	v = (int)floor( velX );
+	e ^= (unsigned int)( v < 0 ? -v : v ) << 16;
+	v = (int)floor( originX );
+	e ^= (unsigned int)( v < 0 ? -v : v ) & 0xffff;
+	for ( i = 2; i >= 0; i-- ) {
+		( (byte *)&e )[i + 1] ^= ( (byte *)&e )[i];
+	}
 	x = t << 2;
 	x += ( (unsigned int)mapSalt + 19131u ) << 8;
 	x ^= t << 24;
@@ -73,6 +67,131 @@ static qboolean CG_DF_RaceTime( const playerState_t *ps, int *ms ) {
 	}
 	*ms = (int)( e & 0x3fffff );
 	return qtrue;
+}
+
+// Recorded demos on some engines carry snapshot times that are shifted against the game clock the time was scrambled with (seen: a constant
+// -3072 ms in a listen-server demo; the shift is not part of DeFRaG). While a demo plays, after four consecutive undecodable snapshots the
+// shift is searched (multiples of 1024 ms up to ~4.6 h either way, then single milliseconds within +-8 s) and accepted only if all four
+// samples decode at the same shift and their times are consistent with each other.
+typedef struct { int time; unsigned int e; float ox, vx; int hp, md; } dfTimeSample_t;
+static dfTimeSample_t	dfSamples[4];
+static int				dfSampleCount;
+static qboolean			dfDemoOffValid;
+static int				dfDemoOff, dfDemoFails;
+static qboolean			dfSeenZero;		// the previous snapshot published time 0 (a run is about to start)
+
+static qboolean CG_DF_SamplesDecode( int off, byte salt ) {
+	int i, ms[4];
+
+	for ( i = 0; i < 4; i++ ) {
+		if ( !CG_DF_DecodeCore( dfSamples[i].e, (unsigned int)( dfSamples[i].time + off ), dfSamples[i].ox, dfSamples[i].vx,
+				dfSamples[i].hp, dfSamples[i].md, salt, &ms[i] ) ) {
+			return qfalse;
+		}
+	}
+	// the samples start with the first snapshot of the run (a wrong shift can also decode, to a constant larger time, so the first value
+	// must be a run that just started) and advance with the snapshot clock
+	if ( ms[0] > 300 ) {
+		return qfalse;
+	}
+	for ( i = 1; i < 4; i++ ) {
+		int dms = ms[i] - ms[i - 1], dt = dfSamples[i].time - dfSamples[i - 1].time;
+
+		if ( dms < dt - 20 || dms > dt + 20 ) {
+			return qfalse;
+		}
+	}
+	return qtrue;
+}
+
+static qboolean CG_DF_FindDemoOffset( byte salt ) {
+	int k, off;
+
+	for ( k = -64; k <= 16384; k++ ) {
+		if ( CG_DF_SamplesDecode( k * 1024, salt ) ) {
+			dfDemoOff = k * 1024;
+			return qtrue;
+		}
+	}
+	for ( off = -8192; off <= 8192; off++ ) {
+		if ( CG_DF_SamplesDecode( off, salt ) ) {
+			dfDemoOff = off;
+			return qtrue;
+		}
+	}
+	return qfalse;
+}
+
+static qboolean CG_DF_RaceTime( const playerState_t *ps, int *ms ) {
+	unsigned int	e;
+	byte			salt;
+	int				t;
+
+	*ms = 0;
+	if ( !( ps->stats[STAT_DEFRAG_FLAGS] & 2 ) ) {
+		return qfalse;
+	}
+	e = ( (unsigned int)ps->stats[STAT_RACE_TIME_HI] << 16 ) | ( (unsigned int)ps->stats[STAT_RACE_TIME_LO] & 0xffff );
+	if ( !e ) {
+		dfSeenZero = qtrue;
+		return qtrue;		// 0x5fd7: both words zero -> time 0
+	}
+	// DeFRaG 0x5fd7: the plain form is used by variant servers (defrag_gametype >= 5; this server also publishes it plain with sv_cheats,
+	// as reported by the server), everything else is decoded. (The port used to guess 'plain' whenever the top 10 bits were zero; an
+	// encoded value can hit that about once in a thousand snapshots, which showed up as a one-snapshot garbage time.)
+	if ( atoi( CG_DF_Serverinfo( "defrag_gametype" ) ) >= 5 || CG_DF_Cheats() ) {
+		*ms = (int)e;
+		return qtrue;
+	}
+	salt = CG_DF_MapSalt();
+	t = cg.snap->serverTime;
+	if ( !cg.demoPlayback ) {
+		return CG_DF_DecodeCore( e, (unsigned int)t, ps->origin[0], ps->velocity[0], ps->stats[STAT_HEALTH], ps->movementDir, salt, ms );
+	}
+	if ( dfDemoOffValid ) {
+		if ( CG_DF_DecodeCore( e, (unsigned int)( t + dfDemoOff ), ps->origin[0], ps->velocity[0], ps->stats[STAT_HEALTH], ps->movementDir, salt, ms ) ) {
+			dfDemoFails = 0;
+			return qtrue;
+		}
+		if ( ++dfDemoFails > 40 ) {		// the shift changed (seek / another segment): search again
+			dfDemoOffValid = qfalse;
+			dfSampleCount = 0;
+		}
+		return qfalse;
+	}
+	if ( CG_DF_DecodeCore( e, (unsigned int)t, ps->origin[0], ps->velocity[0], ps->stats[STAT_HEALTH], ps->movementDir, salt, ms ) ) {
+		dfSampleCount = 0;
+		return qtrue;
+	}
+	// collect consecutive failing snapshots, starting with the first one after the time was 0 (one sample per snapshot time)
+	if ( dfSampleCount == 0 && !dfSeenZero ) {
+		return qfalse;
+	}
+	if ( dfSampleCount == 0 || dfSamples[dfSampleCount - 1].time != t ) {
+		dfSeenZero = qfalse;
+		if ( dfSampleCount == 4 ) {
+			memmove( &dfSamples[0], &dfSamples[1], 3 * sizeof( dfSamples[0] ) );
+			dfSampleCount = 3;
+		}
+		dfSamples[dfSampleCount].time = t;
+		dfSamples[dfSampleCount].e = e;
+		dfSamples[dfSampleCount].ox = ps->origin[0];
+		dfSamples[dfSampleCount].vx = ps->velocity[0];
+		dfSamples[dfSampleCount].hp = ps->stats[STAT_HEALTH];
+		dfSamples[dfSampleCount].md = ps->movementDir;
+		dfSampleCount++;
+		if ( dfSampleCount == 4 ) {
+			qboolean found = CG_DF_FindDemoOffset( salt );
+
+			dfSampleCount = 0;		// one search per run start; the next one waits for the time to be 0 again
+			if ( found ) {
+				dfDemoOffValid = qtrue;
+				dfDemoFails = 0;
+				return CG_DF_DecodeCore( e, (unsigned int)( t + dfDemoOff ), ps->origin[0], ps->velocity[0], ps->stats[STAT_HEALTH], ps->movementDir, salt, ms );
+			}
+		}
+	}
+	return qfalse;
 }
 
 
@@ -1141,9 +1260,10 @@ void CG_DF_SnapshotTransition( const playerState_t *ops, const playerState_t *ps
 	{		// DeFRaG 0x5248 -> 0x11d284: the current race time, refreshed every snapshot (the 'last time' HUD widget shows it live)
 		int live;
 
-		if ( CG_DF_RaceTime( ps, &live ) && live > 0 ) {
-			CG_DF_SetLastRunTime( live );
-		}
+		// 0x1c8b -> 0x5248 returns the decoded race time (0 while the timer is not initialized); it is stored every snapshot, so the
+		// last-time and checkpoint boxes disappear again once the player respawns (bit 2 clears) until a run is active
+		CG_DF_SetLastRunTime( ( CG_DF_RaceTime( ps, &live ) && live > 0 ) ? live : 0 );
+		CG_DF_RecTrack( ( CG_DF_RaceTime( ps, &live ) && live > 0 ) ? live : 0 );		// 0x5248 @0x52b8: B[N] = the running time, every snapshot
 	}
 	CG_DF_TrackStats( ops, ps, changed );
 	// bit 0x4: run (re)started
@@ -1211,6 +1331,7 @@ void CG_DF_ScriptEvents( const snapshot_t *old, const snapshot_t *cur ) {
 		return;
 	}
 	CG_DF_ArRespawnEvent();
+	CG_DF_RecRunStopped();
 	if ( ( ev & 1 ) && df_script_onMapLoad.integer ) {
 		trap_SendConsoleCommand( va( "exec %s.cfg\n", Info_ValueForKey( CG_ConfigString( CS_SERVERINFO ), "mapname" ) ) );
 	}
@@ -1329,8 +1450,8 @@ void CG_DF_SmokeFragmentPre( localEntity_t *le ) {		// 0x9154
 		le->endTime = cg.time;
 	}
 }
-qboolean CG_DF_RunActive( void ) {		// 0x11d288
-	return runActive;
+qboolean CG_DF_RunActive( void ) {		// 0x11d288: written by 0x1c8b as (snapshot stats[12] & 2) -- the timer 'initialized' bit, not our run flag
+	return ( cg.snap && ( cg.snap->ps.stats[STAT_DEFRAG_FLAGS] & 2 ) ) ? qtrue : qfalse;
 }
 
 // 0x9cf3: explosions (LE_EXPLOSION / LE_SPRITE_EXPLOSION) tagged with their owner in color[0] follow the missile rule of df_mp_NoDrawRadius

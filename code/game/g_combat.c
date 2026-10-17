@@ -491,16 +491,11 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 		obit = modNames[meansOfDeath];
 	}
 
-	G_LogPrintf("Kill: %i %i %i: %s killed %s by %s\n", 
-		killer, self->s.number, meansOfDeath, killerName, 
-		self->client->pers.netname, obit );
-
-	// broadcast the death event to everyone
-	ent = G_TempEntity( self->r.currentOrigin, EV_OBITUARY );
-	ent->s.eventParm = meansOfDeath;
-	ent->s.otherEntityNum = self->s.number;
-	ent->s.otherEntityNum2 = killer;
-	ent->r.svFlags = SVF_BROADCAST;	// send to everyone
+	// DeFRaG (player_die 0x1fc5a): the 'Kill:' log line and the EV_OBITUARY broadcast are gone, so clients never print
+	// 'X killed itself.' / 'X died.' (killerName / obit / ent stay computed but unused, as in the original)
+	(void)killerName;
+	(void)obit;
+	(void)ent;
 
 	self->enemy = attacker;
 

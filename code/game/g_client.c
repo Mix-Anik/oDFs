@@ -1348,9 +1348,14 @@ void ClientSpawn(gentity_t *ent) {
 	// bit 0x6 is set unconditionally whenever df_ndm_weaponsPickup != 0 (and
 	// never otherwise) — i.e. a plain boolean gate, not a real bitmask.
 	client->ps.ammo[WP_MACHINEGUN] = ( g_ndm.flags & 0x6 ) ? 100 : 200;
+	// DeFRaG func_0x274b (0x27e5..0x2821): with (flags & 6) a weapon in weaponsSet gets its item quantity and every other weapon
+	// is left at 0 (ps is cleared on spawn); only without that flag does every weapon start with 200. (oDFs used to give the
+	// weapons outside weaponsSet 200 too, so picking up e.g. a rocket launcher in run mode ended with 200 rockets instead of 10.)
 	for ( i = WP_SHOTGUN; i < WP_GRAPPLING_HOOK; i++ ) {
-		if ( ( g_ndm.flags & 0x6 ) && ( g_ndm.weaponsSet & ( 1 << i ) ) ) {
-			client->ps.ammo[i] = BG_FindItemForWeapon( (weapon_t)i )->quantity;
+		if ( g_ndm.flags & 0x6 ) {
+			if ( g_ndm.weaponsSet & ( 1 << i ) ) {
+				client->ps.ammo[i] = BG_FindItemForWeapon( (weapon_t)i )->quantity;
+			}
 		} else {
 			client->ps.ammo[i] = 200;
 		}

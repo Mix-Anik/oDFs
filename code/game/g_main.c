@@ -601,9 +601,10 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	G_ApplyModeExclusion();
 
 	// After spawning: build defrag_route from what entities were found.
-	// Format mirrors DeFRaG's G_InitRaceMode default-path: "df[-df][-df]"
-	// DeFRaG cgame also reads this to configure the timer display layout.
-	if ( g_startTimerReady ) {
+	// DeFRaG (func_0x1e60): defrag_route is "" in run (1) and fastcaps (3) mode and is only built, as
+	// "<start>-<checkpoint>-<stop>" (format "%s-%s%s%s"), on the default path = tricks mode (2).
+	// It ends up in demo names (autorecord $route), record file names and the 'Time performed ... on route' message.
+	if ( g_dfMode == 2 && g_startTimerReady ) {
 		trap_Cvar_Set( "defrag_route", va( "df%s%s",
 		    g_stopTimerReady   ? "-df" : "",
 		    g_checkpointReady  ? "-df" : "" ) );
