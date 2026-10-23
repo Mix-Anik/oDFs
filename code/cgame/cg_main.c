@@ -33,6 +33,12 @@ int forceModelModificationCount = -1;
 static int recordMessageModificationCount = -1;
 
 void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum );
+int CG_ProxyDraw2DAddress( void );
+
+// Self-description for cgame-proxymod (it interprets this QVM itself and needs two VM addresses that change with every build).
+// The proxymod finds the magic in the initialized data segment, and reads the filled-in fields lazily (see CG_Init).
+// Layout: { magic, version, &cg.predictedPlayerState, CG_Draw2D instruction index }
+int cg_proxyInfo[4] = { 0x59585064, 1, 0, 0 };		// 0x59585064 = 'dPXY' little-endian
 void CG_Shutdown( void );
 
 
@@ -2024,6 +2030,8 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	// clear everything
 	memset( &cgs, 0, sizeof( cgs ) );
 	memset( &cg, 0, sizeof( cg ) );
+	cg_proxyInfo[2] = (int)&cg.predictedPlayerState;
+	cg_proxyInfo[3] = CG_ProxyDraw2DAddress();
 	CG_DF_Reset();
 	memset( cg_entities, 0, sizeof(cg_entities) );
 	memset( cg_weapons, 0, sizeof(cg_weapons) );

@@ -398,7 +398,9 @@ void CG_DF_RecFinish( int t ) {
 
 	dfRecKeep = qfalse;
 	dfRecB[*N] = t;
-	if ( cg.snap && cgs.clientinfo[cg.snap->ps.clientNum].team != TEAM_SPECTATOR ) {
+	// DeFRaG skips both the checkpoint popups and this whole block with sv_cheats; here the checkpoints stay visible (user choice),
+	// only the record files are not written for cheated runs
+	if ( !CG_DF_Cheats() && cg.snap && cgs.clientinfo[cg.snap->ps.clientNum].team != TEAM_SPECTATOR ) {
 		best = dfRecR2[dfRecR2[DF_REC_COUNT]];
 		if ( best == 0 || t < best ) {
 			isNew = qtrue;

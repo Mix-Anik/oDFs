@@ -367,7 +367,7 @@ static void CG_DF_DrawCheckpointLine( dfWidget_t *w, int fragsShown ) {
 	int		v, big = 0, summary;
 
 	w->y = y0;
-	if ( df_hud_drawStatus.integer && ( CG_DF_DefragFlags() & 2 ) && dfLastRunMs != 0 && df_drawCheckpointStats.integer && !CG_DF_Cheats() ) {		// 0x2d8d..0x2da3: hidden with sv_cheats
+	if ( df_hud_drawStatus.integer && ( CG_DF_DefragFlags() & 2 ) && dfLastRunMs != 0 && df_drawCheckpointStats.integer ) {		// DeFRaG 0x2d8d..0x2da3 also hides it with sv_cheats; kept visible on purpose
 		v = N > 7 ? 7 : N;
 		w->visible = 1;
 		w->y -= 16 * v;

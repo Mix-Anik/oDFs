@@ -760,7 +760,7 @@ void G_TimerTick( gentity_t *ent, int elapsed_ms ) {
 	if ( t->state == TIMER_FINISHED ) {
 		t->bestTime    = level.time - t->startTime + G_RoundHalf( t->fracAccum );
 		t->initialized = 0;
-		t->finalMs = t->bestTime;
+		t->finalMs = t->ms;		// rec[0] of the original: the whole-frame time is what is published; only '(est. ...)' carries the sub-frame correction
 		t->finished = 1;
 		// One-shot event: toggle the finish bit; clear the running bit.
 		client->ps.stats[STAT_DEFRAG_FLAGS] ^= 0x8;

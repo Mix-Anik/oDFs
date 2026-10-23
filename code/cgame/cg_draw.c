@@ -2700,6 +2700,11 @@ static void CG_Draw2D(stereoFrame_t stereoFrame)
 	}
 }
 
+// cgame-proxymod hook point: a function pointer in a QVM is its instruction index, which is what the proxymod's interpreter compares against
+int CG_ProxyDraw2DAddress( void ) {
+	return (int)CG_Draw2D;
+}
+
 
 /*
 =====================
