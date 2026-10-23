@@ -58,3 +58,4 @@ dkms.conf
 build
 build-dll
 build-qvm
+testing

@@ -6,7 +6,6 @@ help:
 	@echo "Available targets:"
 	@echo "  make qvm   - Build qagame/cgame/ui as Q3VM bytecode and pack into $(QVM_PK3)"
 	@echo "  make dll   - Build qagame as native DLL"
-	@echo "  make test  - Build and run the testing/ standalone diagnostics"
 	@echo "  make clean - Remove build directories"
 
 qvm:
