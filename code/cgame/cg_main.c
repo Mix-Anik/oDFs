@@ -2145,6 +2145,9 @@ Called before every level change or subsystem restart
 void CG_Shutdown( void ) {
 	// some mods may need to do cleanup work here,
 	// like closing files or archiving session data
+	CG_DF_GhostShutdown();		// cgame 0xf36: ghost files closed, replay VARs restored, a still-armed autorecord stopped
+	CG_DF_ReplayShutdown();
+	CG_DF_AutorecShutdown();
 }
 
 

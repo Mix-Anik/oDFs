@@ -4,9 +4,10 @@
 // cg.predictedPlayerEntity every df_ghostN_RecordInterval ms), the DeFRaG ghost file (header + packet stream, types 2/3/4/7;
 // types 5/6/8 of files written by DeFRaG are skipped when reading), time-synchronised playback with interpolation, loop
 // handling, and drawing through the normal CG_Player (DrawPlayer modes 1/2/3, NoDrawRadius).
-// NOT ported: recorded missiles (type 5) and sprites (type 6), monitored variables (type 8), the sprite/label (0x12fc5),
-// DrawPlayer mode 4 (marker), miniview (0x12a10), AutoMode, play camera modes, negative play timescale, the animation timescale
-// field (DeFRaG's extra centity float at +624), the `demo` command, DeFRaG's status texts (0x13721; ours are our own wording).
+// Later iterations added missiles/sprites, the label, the marker (DrawPlayer 4), miniview, AutoMode and the play camera modes
+// (see disasm/PORT_STATUS.md).
+// NOT ported: monitored variables (type 8), negative play timescale (reverse playback), the animation timescale
+// field (DeFRaG's extra centity float at +624).
 // Assumptions (no decode): files live in system/ghosts/<name>.<df_ghosts_FileExtension, "ghost" when empty>; the default name is
 // <mapname>_<NN>; slots 0/1 read df_ghost1_* / df_ghost2_*, slots 2..4 use the defaults.
 
@@ -38,15 +39,27 @@ typedef struct {
 	int			numSpr;
 } dgFrame_t;
 
+typedef struct {		// one monitored variable (slot+312952, 76 bytes): a cvar whose value is recorded with the ghost (format 3)
+	char		name[64];			// empty = unused
+	float		cur;				// +64 current / recorded value
+	float		last;				// +68 value last written to the file
+	float		orig;				// +72 cvar value before the playback changed it
+} dgVar_t;
+
 typedef struct {
 	int			state;				// 0 idle, 1 recording, 2 playing (slot+164)
+	dgVar_t		var[10];
+	int			camWord;			// slot+312216: df_ghostN_PlayCameraMode as it was when the slot started
 	fileHandle_t f;
 	int			remain;				// bytes left to read (playing)
 	int			fileLen;			// slot+132: file length (SIZE in the status line)
+	int			frames;				// slot+136: recording: frames written; playing: ((fileLen - 24) / 624) << 2 (CHS ghost info items)
 	int			lastTime;			// recording: last sample time; playing: anchor of the current frame
 	int			discont;			// recording: pending discontinuity (teleport) flag
 	qboolean	haveNext;
-	dgFrame_t	a, b;				// playing: current and next frame
+	int			ia, ib;				// ring indices of the frames a / b (slot+172 / +176)
+	qboolean	anchor;				// slot+312188: the time base is set at the first cursor update after loading
+	dgFrame_t	a, b;				// playing: current and next frame (in reverse playback: the later and the earlier one)
 	dgFrame_t	p;				// playing: the frame before the current one (velocity, CHS items)
 	centity_t	cent;
 	qboolean	centInit;
@@ -55,11 +68,17 @@ typedef struct {
 
 static dgSlot_t	dgSlot[DG_SLOTS];
 
+// The frame ring of a playing slot (slot+180, 500 frames of 624 bytes in DeFRaG): frames are streamed from the file into the ring, the cursor
+// (slot+168) is the index of the NEXT frame; a frame with time 0 is empty.  Playing backwards walks the frames that are still in the ring.
+#define DG_RING			500
+static dgFrame_t	dgRing[DG_SLOTS][DG_RING];
+static int			dgCur[DG_SLOTS];
+
 // ---- cvars ----
 typedef struct { const char *name, *def; } dgCv_t;
 static const dgCv_t dgCvars[] = {
 	{ "df_ghosts_NoDrawRadius", "200" }, { "df_ghosts_FileExtension", "" }, { "df_ghosts_AutoMode", "4" }, { "df_ghosts_AutoModeMP", "0" },
-	{ "df_ghosts_SelfMissilesOnly", "1" }, { "df_ghosts_Command", "" }, { "df_ghosts_SpriteInfo", "" }, { "df_ghosts_SpriteSize", "8" }, { "df_ghosts_DrawOutput", "0" },
+	{ "df_ghosts_SelfMissilesOnly", "1" }, { "df_ghosts_LiveAmmo", "0" }, { "df_ghosts_Command", "" }, { "df_ghosts_SpriteInfo", "" }, { "df_ghosts_SpriteSize", "8" }, { "df_ghosts_DrawOutput", "0" },
 	{ "df_ghost1_RecordFileFormat", "2" }, { "df_ghost1_RecordInterval", "50" }, { "df_ghost1_RecordView", "0" },
 	{ "df_ghosts_MiniviewDraw", "3" }, { "df_ghosts_MiniviewDrawGun", "1" }, { "df_ghosts_MiniviewCameraMode", "1" }, { "df_ghosts_MiniviewSize", "25" },
 	{ "df_ghosts_MiniviewOffsetX", "235" }, { "df_ghosts_MiniviewOffsetY", "-155" }, { "df_ghosts_MiniviewBorderSize", "4" }, { "df_ghosts_MiniviewFOV", "90" },
@@ -157,6 +176,179 @@ static void DG_GetLerp( int slot, lerpFrame_t *l ) {
 	l->animationTime = v[11];
 }
 
+// ---- monitored variables (record format 3 / packet 8; 0x10f3a / 0x10fff / 0x11046 / 0x11bf5 / 0x1141c / 0x116d3 / 0x11ee4 / 0x110ff) ----
+// The names come from system/Ghost-MonitoredVars.cfg (up to 10 tokens). Recording at format 3 writes a packet 8 (name[64] + float) whenever a
+// value changed; playing with a camera mode of 15 or 16 sets the cvars to the recorded values every frame and restores them when the ghost stops.
+// The pseudo variable "cg_thirdperson" is the actual third-person state of the view. (DeFRaG writes the cvars through its safe-set 0x80bf;
+// here they are set directly.)
+#define DG_VARS_FILE	"system/Ghost-MonitoredVars.cfg"
+
+static float DG_CvarValue( const char *name ) {
+	char buf[MAX_CVAR_VALUE_STRING];
+
+	trap_Cvar_VariableStringBuffer( name, buf, sizeof( buf ) );
+	return atof( buf );
+}
+
+static void DG_VarSet( const char *name, float v, qboolean precise ) {
+	trap_Cvar_Set( name, v == (float)(int)v ? va( "%i", (int)v ) : va( precise ? "%.3f" : "%f", v ) );
+}
+
+// 0x10fff: the values that do not come from a cvar
+static void DG_VarsSpecial( int slot ) {
+	int i;
+
+	for ( i = 0; i < 10; i++ ) {
+		if ( dgSlot[slot].var[i].name[0] && !Q_stricmp( "cg_thirdperson", dgSlot[slot].var[i].name ) ) {
+			dgSlot[slot].var[i].cur = (float)cg.renderingThirdPerson;
+		}
+	}
+}
+
+// 0x11bf5 (format 3 only): current values from the cvars
+static void DG_VarsRefresh( int slot ) {
+	int i;
+
+	for ( i = 0; i < 10; i++ ) {
+		if ( dgSlot[slot].var[i].name[0] ) {
+			dgSlot[slot].var[i].cur = DG_CvarValue( dgSlot[slot].var[i].name );
+		}
+	}
+	DG_VarsSpecial( slot );
+}
+
+// 0x10f3a + 0x11046: load the name list and take the start values (record format 3)
+static void DG_VarsStart( int slot ) {
+	dgSlot_t *s = &dgSlot[slot];
+	int verbose = (int)DG_CvarF( "df_ghosts_DrawOutput", 0 ) != 0;		// 0x11046: message flags 7 / 0
+	char buf[10000 + 1];
+	const char *p, *tok;
+	fileHandle_t f;
+	int len, n = 0, i;
+
+	if ( (int)DG_SlotCvar( slot, "RecordFileFormat", 2 ) != 3 ) {
+		return;
+	}
+	Com_Memset( s->var, 0, sizeof( s->var ) );
+	len = trap_FS_FOpenFile( DG_VARS_FILE, &f, FS_READ );		// 0x8da0 (max 10000 bytes)
+	if ( !f ) {
+		if ( verbose ) {
+			CG_Printf( "^1ERROR: File Not Found --> ( %s )\n", DG_VARS_FILE );
+			CG_Printf( "^3GHOST WARNING:^7 Empty MonitorVars File ^4-->^7 ( ^3%s^7 )\n", DG_VARS_FILE );
+		}
+		return;
+	}
+	if ( len >= 10000 ) {
+		if ( verbose ) {
+			CG_Printf( "^1ERROR: File Too Large --> ( %s is %i, max allowed is %i )\n", DG_VARS_FILE, len, 10000 );
+			CG_Printf( "^3GHOST WARNING:^7 Empty MonitorVars File ^4-->^7 ( ^3%s^7 )\n", DG_VARS_FILE );
+		}
+		trap_FS_FCloseFile( f );
+		return;
+	}
+	trap_FS_Read( buf, len, f );
+	buf[len] = 0;
+	trap_FS_FCloseFile( f );
+	if ( verbose ) {
+		CG_Printf( "^2GHOST:^7 Parsing File ^4-->^7 ( ^2%s^7 )\n", DG_VARS_FILE );
+	}
+	p = buf;
+	while ( n < 10 ) {
+		tok = COM_Parse( &p );
+		if ( !tok[0] ) {
+			break;
+		}
+		Q_strncpyz( s->var[n++].name, tok, sizeof( s->var[0].name ) );
+	}
+	if ( !n ) {
+		CG_Printf( "^1GHOST ERROR:^7 While Parsing File ^4-->^7 ( ^1%s^7 )\n", DG_VARS_FILE );
+		return;
+	}
+	if ( verbose ) {
+		CG_Printf( "^2GHOST:^7 Success Parsing File ^4-->^7 ( ^2%s^7 )\n", DG_VARS_FILE );
+	}
+	for ( i = 0; i < n; i++ ) {
+		s->var[i].orig = DG_CvarValue( s->var[i].name );
+		s->var[i].last = -10000.0f;			// (float)0xffffd8f1: differs from any real value, so the first sample writes every variable
+		s->var[i].cur = s->var[i].orig;
+	}
+	DG_VarsSpecial( slot );
+}
+
+// 0x1141c: packet 8 for every variable whose value changed since the last write
+static void DG_VarsWrite( int slot ) {
+	dgSlot_t *s = &dgSlot[slot];
+	int i;
+
+	for ( i = 0; i < 10 && s->var[i].name[0]; i++ ) {
+		if ( s->var[i].cur == s->var[i].last ) {
+			continue;
+		}
+		DG_PutI( slot, 8 );
+		trap_FS_Write( s->var[i].name, 64, s->f );
+		trap_FS_Write( &s->var[i].cur, 4, s->f );
+		s->var[i].last = s->var[i].cur;
+	}
+}
+
+// 0x116d3: a packet 8 read from the file
+static void DG_VarsPacket( int slot, const char *name, float value ) {
+	dgSlot_t *s = &dgSlot[slot];
+	int i;
+
+	for ( i = 0; i < 10; i++ ) {
+		if ( s->var[i].name[0] && !Q_stricmp( s->var[i].name, name ) ) {
+			s->var[i].cur = value;
+			return;
+		}
+	}
+	for ( i = 0; i < 10; i++ ) {
+		if ( !s->var[i].name[0] ) {
+			Q_strncpyz( s->var[i].name, name, sizeof( s->var[i].name ) );
+			s->var[i].cur = value;
+			s->var[i].orig = DG_CvarValue( s->var[i].name );
+			return;
+		}
+	}
+}
+
+// 0x11ee4 (every frame of a playing slot) and 0x110ff (when it stops): camera modes 15 / 16 only
+static void DG_VarsApply( int slot ) {
+	dgSlot_t *s = &dgSlot[slot];
+	int i, verbose = (int)DG_CvarF( "df_ghosts_DrawOutput", 0 ) != 0;
+
+	if ( s->camWord != 15 && s->camWord != 16 ) {
+		return;
+	}
+	for ( i = 0; i < 10 && s->var[i].name[0]; i++ ) {
+		if ( DG_CvarValue( s->var[i].name ) == s->var[i].cur ) {
+			continue;
+		}
+		DG_VarSet( s->var[i].name, s->var[i].cur, qfalse );
+		if ( verbose ) {
+			CG_Printf( "GHOST: Var [ %i ] ^4-->^7 Change ( %s = %.3f )\n", i, s->var[i].name, s->var[i].cur );
+		}
+	}
+}
+
+static void DG_VarsRestore( int slot ) {
+	dgSlot_t *s = &dgSlot[slot];
+	int i, verbose = (int)DG_CvarF( "df_ghosts_DrawOutput", 0 ) != 0;
+
+	if ( s->camWord != 15 && s->camWord != 16 ) {
+		return;
+	}
+	if ( verbose ) {
+		CG_Printf( "GHOST: Cleanup\n" );
+	}
+	for ( i = 0; i < 10 && s->var[i].name[0]; i++ ) {
+		DG_VarSet( s->var[i].name, s->var[i].orig, qtrue );
+		if ( verbose ) {
+			CG_Printf( "GHOST: Var Restored [ %i ] ( %s = %.3f )\n", i, s->var[i].name, s->var[i].orig );
+		}
+	}
+}
+
 // 0x11786: one frame = packet 2 (time), then packets until 7; returns qfalse at the end of data / on a bad packet
 static qboolean DG_ReadFrame( int slot, dgFrame_t *fr ) {
 	int type, first = 1, skip, tmp[8];
@@ -214,7 +406,17 @@ static qboolean DG_ReadFrame( int slot, dgFrame_t *fr ) {
 			}
 			skip = 16;
 			goto skipit;
-		case 8: skip = 68; goto skipit;		// monitored variable: not used
+		case 8: {			// monitored variable (0x116d3): name[64] + float
+			char	nm[64];
+			float	val;
+
+			if ( !DG_Get( slot, nm, 64 ) || !DG_Get( slot, &val, 4 ) ) {
+				return qfalse;
+			}
+			nm[63] = 0;
+			DG_VarsPacket( slot, nm, val );
+			break;
+		}
 		skipit:
 			while ( skip > 0 ) {
 				int n = skip > (int)sizeof( tmp ) ? (int)sizeof( tmp ) : skip;
@@ -296,6 +498,9 @@ static void DG_Close( int slot, int flags ) {		// 0x139df: stop (0x11b8a) + stat
 		}
 		return;
 	}
+	if ( s->state == 2 ) {
+		DG_VarsRestore( slot );		// 0x139df -> 0x110ff
+	}
 	if ( s->f ) {
 		trap_FS_FCloseFile( s->f );
 	}
@@ -310,6 +515,19 @@ static void DG_Close( int slot, int flags ) {		// 0x139df: stop (0x11b8a) + stat
 
 static void DG_Stop( int slot, int flags ) {
 	DG_Close( slot, flags );
+}
+
+// 0x10ec6 (from CG_Shutdown 0x7969): every slot's file is closed (0x11b8a), no status lines and no monitored-variable restore
+void CG_DF_GhostShutdown( void ) {
+	int i;
+
+	for ( i = 0; i < DG_SLOTS; i++ ) {
+		if ( dgSlot[i].f ) {
+			trap_FS_FCloseFile( dgSlot[i].f );
+		}
+		dgSlot[i].f = 0;
+		dgSlot[i].state = 0;
+	}
 }
 
 // 0x118ae: default ghost name = record base name + "_NN" (NN = slot + 1, two digits)
@@ -357,6 +575,8 @@ static void DG_Record( int slot, const char *name, int flags ) {		// 0x13913 -> 
 	trap_FS_Write( hdr, 16, s->f );
 	s->state = 1;
 	s->lastTime = 0;
+	s->camWord = (int)DG_SlotCvar( slot, "PlayCameraMode", 0 );
+	DG_VarsStart( slot );		// 0x11a04 -> 0x11046
 	if ( flags & 4 ) {
 		DG_Status( slot, DG_ST_RECORD );
 	}
@@ -385,6 +605,7 @@ static void DG_Play( int slot, const char *name, int flags ) {		// 0x13979 -> 0x
 	}
 	s->remain = len;
 	s->fileLen = len;
+	s->frames = ( ( len - 24 ) / 624 ) << 2;		// 0x11a61
 	if ( !DG_Get( slot, &type, 4 ) || type != 1 || !DG_Get( slot, &magic, 4 ) || !DG_Get( slot, &ver, 4 ) || !DG_Get( slot, hdr, 16 ) ) {
 		CG_Printf( "^1GHOST: [ %s ] --> Error ( bad header )\n", s->name );
 		trap_FS_FCloseFile( s->f );
@@ -397,13 +618,18 @@ static void DG_Play( int slot, const char *name, int flags ) {		// 0x13979 -> 0x
 		s->f = 0;
 		return;
 	}
-	if ( !DG_ReadFrame( slot, &s->a ) ) {
+	Com_Memset( dgRing[slot], 0, sizeof( dgRing[slot] ) );
+	dgCur[slot] = 0;
+	s->camWord = (int)DG_SlotCvar( slot, "PlayCameraMode", 0 );
+	if ( !DG_ReadFrame( slot, &dgRing[slot][0] ) ) {
 		CG_Printf( "^1GHOST: [ %s ] --> empty ghost\n", s->name );
 		trap_FS_FCloseFile( s->f );
 		s->f = 0;
 		return;
 	}
-	s->haveNext = DG_ReadFrame( slot, &s->b );
+	s->a = s->b = dgRing[slot][0];
+	s->haveNext = qfalse;
+	s->anchor = qtrue;
 	s->lastTime = cg.time;
 	s->state = 2;
 	if ( flags & 4 ) {
@@ -425,6 +651,9 @@ static void DG_Sample( int slot ) {
 	}
 	if ( cg.nextFrameTeleport ) {
 		s->discont = 1;
+	}
+	if ( format == 3 ) {
+		DG_VarsRefresh( slot );		// 0x11bf5
 	}
 	Com_Memset( &fr, 0, sizeof( fr ) );
 	fr.time = cg.time;
@@ -515,7 +744,11 @@ static void DG_Sample( int slot ) {
 			DG_PutI( slot, fr.spr[k].code );
 		}
 	}
+	if ( format >= 3 ) {		// 0x1141c
+		DG_VarsWrite( slot );
+	}
 	DG_PutI( slot, 7 );
+	s->frames++;		// 0x114a2
 	s->lastTime = cg.time;
 }
 
@@ -606,10 +839,39 @@ static void DG_Label( int slot, const vec3_t origin ) {
 	}
 }
 
+// df_ghosts_LiveAmmo 1..4 on a server with sv_cheats (0x12290: the constant at data 8348 is always 1, 1221252 = LiveAmmo, 1182676 = cheats on):
+// the ghost's missiles are not drawn but fired for real
+static int DG_LiveAmmo( void ) {
+	int v = (int)Com_Clamp( 0, 4, DG_CvarF( "df_ghosts_LiveAmmo", 0 ) );
+
+	return CG_DF_Cheats() ? v : 0;
+}
+
+static int dgLastFire[DG_SLOTS];		// 1221056: frame ring index of the last frame that fired for each slot
+
+// 0x122ad: a missile that has no counterpart in the previous frame was just fired: shoot a real one with the server's `firemissile` cheat
+// command from the ghost's eye (origin + 24 up) along its view angles; LiveAmmo 2 = quaded, 3 = self-style, 4 = both
+static void DG_LiveFire( int slot, const dgFrame_t *fr, const dgMissile_t *r, qboolean matched, int bIdx, int live ) {
+	vec3_t fwd;
+
+	if ( r->weapon == WP_GRAPPLING_HOOK ) {
+		return;
+	}
+	if ( !matched && dgLastFire[slot] < bIdx ) {
+		AngleVectors( fr->angles, fwd, NULL, NULL );
+		trap_SendConsoleCommand( va( "firemissile %f %f %f %f %f %f %i %i %i\n", fr->origin[0], fr->origin[1], fr->origin[2] + 24.0f,
+			fwd[0], fwd[1], fwd[2], r->weapon, ( live == 2 || live == 4 ) ? 1 : 0, ( live == 3 || live == 4 ) ? 1 : 0 ) );
+		dgLastFire[slot] = bIdx;
+	}
+	if ( bIdx < dgLastFire[slot] ) {
+		dgLastFire[slot] = 0;
+	}
+}
+
 static void DG_DrawMissiles( int slot, float frac, qboolean discont, int skipIdx ) {		// 0x13317 / 0x12199 / 0x1f3a0
 	dgSlot_t *s = &dgSlot[slot];
 	const dgFrame_t *to = s->haveNext ? &s->b : &s->a, *from = &s->a;
-	int k, m, i;
+	int k, m, i, live = DG_LiveAmmo();
 
 	for ( k = 0; k < to->numMis; k++ ) {
 		const dgMissile_t *r = &to->mis[k], *q = NULL;
@@ -627,6 +889,10 @@ static void DG_DrawMissiles( int slot, float frac, qboolean discont, int skipIdx
 				q = &from->mis[m];
 				break;
 			}
+		}
+		if ( live ) {
+			DG_LiveFire( slot, to, r, q != NULL, s->haveNext ? s->ib : s->ia, live );
+			continue;		// 0x13317: the ghost's missile is not drawn while LiveAmmo is on
 		}
 		Com_Memset( &me, 0, sizeof( me ) );
 		if ( q && s->haveNext && !discont ) {
@@ -692,6 +958,49 @@ typedef struct {
 
 static int		dgDelta[3];			// 1221076: persistent view-angle delta of 0x8523
 static qboolean	dgCamClaimed;		// only the first playing slot with a camera mode gets the view each frame (0x127af)
+static qboolean	dgInMini;			// 1221216: rendering the miniview
+
+// 0x1296b(1): the view weapon drawn from a blank player state (only the weapon survives)
+static void DG_BlankGun( void ) {
+	playerState_t	savedPS = cg.predictedPlayerState;
+	centity_t		savedEnt = cg.predictedPlayerEntity;
+	centity_t		*cent = &cg_entities[cg.predictedPlayerState.clientNum];
+	int				savedFlags = cent->currentState.eFlags;
+
+	cent->currentState.eFlags = 0;
+	Com_Memset( &cg.predictedPlayerState, 0, sizeof( cg.predictedPlayerState ) );
+	Com_Memset( &cg.predictedPlayerEntity, 0, sizeof( cg.predictedPlayerEntity ) );
+	cg.predictedPlayerState.weapon = savedPS.weapon;
+	cg.predictedPlayerEntity.currentState.weapon = savedEnt.currentState.weapon;
+	CG_AddViewWeapon( &cg.predictedPlayerState );
+	cg.predictedPlayerState = savedPS;
+	cg.predictedPlayerEntity = savedEnt;
+	cent->currentState.eFlags = savedFlags;
+}
+
+// 0x129fe (the part that maps onto oDFs state): no powerups on the view entity, no land bob
+static void DG_ClearViewState( void ) {
+	cg.predictedPlayerEntity.currentState.powerups = 0;
+	cg.landChange = 0;
+	cg.xyspeed = 0;			// 0x129fe also clears the three view-bob words (976508 / 976512 / 976516)
+	cg.bobcycle = 0;
+	cg.bobfracsin = 0;
+}
+
+// 0x15280, called by demo camera mode 8 while the tracked client is not the viewer: that client's weapon becomes the view weapon and,
+// with cg_drawGun set, its gun is drawn at once from a blank state (third-person flag off meanwhile)
+void CG_DF_TrackedViewGun( int weapon ) {
+	int third = cg.renderingThirdPerson;
+
+	cg.renderingThirdPerson = qfalse;
+	cg.predictedPlayerState.weapon = weapon;
+	cg.predictedPlayerEntity.currentState.weapon = weapon;
+	if ( cg_drawGun.integer ) {
+		DG_ClearViewState();
+		DG_BlankGun();
+	}
+	cg.renderingThirdPerson = third;
+}
 
 // 0x128d6: cg.renderingThirdPerson (958772) for a camera mode; unlisted modes keep the current value
 static void DG_ThirdPersonFor( int mode ) {
@@ -783,15 +1092,24 @@ static void DG_TargetPos( vec3_t out ) {
 
 // 0x165e7: the replay camera owns the view
 static qboolean DG_ReplayCamOwnsView( void ) {
-	int rm = (int)DG_CvarF( "df_demos_ReplayMode", 0 ), cm = (int)DG_CvarF( "df_demos_CameraMode", 0 );
+	return CG_DF_ReplayOwnsView();
+}
 
-	if ( cg.demoPlayback && cm ) {
-		return qfalse;
+// 0x1a265 (ghost follow): the first playing ghost with a camera mode, when that mode is 17: its position and frame time
+qboolean CG_DF_GhostFollow( vec3_t pos, int *time ) {
+	int i;
+
+	for ( i = 0; i < DG_SLOTS; i++ ) {
+		if ( dgSlot[i].state == 2 && (int)DG_SlotCvar( i, "PlayCameraMode", 0 ) != 0 ) {
+			if ( dgSlot[i].camWord != 17 ) {
+				return qfalse;
+			}
+			VectorCopy( dgSlot[i].cent.lerpOrigin, pos );
+			*time = dgRing[i][dgCur[i]].time;
+			return qtrue;
+		}
 	}
-	if ( cg.demoPlayback ) {
-		return rm >= 1 && rm <= 3;
-	}
-	return rm >= 2 && rm <= 3;		// (ReplayMode 1 with the key state 2823496 == 1 is not ported)
+	return qfalse;
 }
 
 // 0x12a10: returns qtrue when the mode claimed the view
@@ -969,8 +1287,118 @@ static qboolean DG_Camera( int slot, const vec3_t org, const vec3_t ang, int mod
 		if ( df_ghosts_CheckPVS.integer ) {
 			CG_DF_CheckPVS( cg.refdef.vieworg );
 		}
+		if ( !dgInMini ) {
+			DG_BlankGun();		// tail of 0x12a10: 0x1296b(1) (CG_DrawActiveFrame skips its own gun while a ghost camera plays, 0x109d6)
+		}
 	}
 	return handled;
+}
+
+static int DG_RingPrev( int i ) {		// 0x123bd
+	return i > 0 ? i - 1 : DG_RING - 1;
+}
+
+static int DG_RingNext( int i ) {		// 0x123d3
+	return ( i + 1 ) % DG_RING;
+}
+
+// 0x11786 into a ring slot: an unreadable frame leaves the slot empty (time 0)
+static void DG_RingFill( int slot, int idx ) {
+	dgFrame_t *f = &dgRing[slot][idx];
+
+	if ( !DG_ReadFrame( slot, f ) ) {
+		f->time = 0;
+	}
+}
+
+// df_ghosts_AutoModeMP (clamped 0..1, 1221244) with a play timescale of exactly 1: the playback follows the recorded frame times in absolute
+// time (0x12421 / 0x11e15), otherwise the time base is advanced by the scaled frame gaps
+static qboolean DG_AbsoluteSync( float ts ) {
+	return (int)Com_Clamp( 0, 1, DG_CvarF( "df_ghosts_AutoModeMP", 0 ) ) != 0 && ts == 1.0f;
+}
+
+// 0x12421 (+ 0x123e2 time-base anchor): advances the cursor in the frame ring until the pair (A, B) brackets the playback time.  Forward:
+// A = the frame before the cursor, B = the cursor.  Backwards (negative timescale): the pair is swapped (A = the later frame, B = the
+// earlier one) and only frames still in the ring can be reached; at the oldest one the ghost stands still.  Fills s->a / s->b / s->p.
+static void DG_Advance( int slot, float ts ) {
+	dgSlot_t *s = &dgSlot[slot];
+	dgFrame_t *ring = dgRing[slot];
+	int *cur = &dgCur[slot];
+	float ats = ts < 0 ? -ts : ts;
+	qboolean absSync = DG_AbsoluteSync( ts );
+	int a, b, nxt;
+
+	if ( s->anchor ) {		// 0x123e2
+		s->lastTime = absSync ? cg.time - ring[*cur].time : cg.time;
+		s->anchor = qfalse;
+	}
+	a = DG_RingPrev( *cur );
+	b = *cur;
+	for ( ;; ) {
+		if ( ts == 0 ) {
+			a = b;
+			break;
+		}
+		if ( ts > 0 && ring[a].time != 0 && ring[b].time == 0 ) {		// the end of the file: nothing to advance to
+			break;
+		}
+		if ( ring[a].time == 0 || ring[a].time >= ring[b].time ) {		// 0x1252e: no valid pair
+			if ( ts < 0 ) {
+				a = b;
+				break;
+			}
+		} else if ( absSync ) {
+			if ( !( ring[b].time + s->lastTime < cg.time ) ) {
+				break;
+			}
+		} else {
+			float dt = (float)( ring[b].time - ring[a].time ), el = ( cg.time - s->lastTime ) * ats, q = 1.0f;
+
+			if ( el != 0 ) {
+				q = dt / el;
+				if ( q < 0 ) {
+					q = -q;
+				}
+			}
+			if ( q >= 1.0f ) {
+				break;
+			}
+			s->lastTime = (int)( s->lastTime + dt / ats );
+		}
+		if ( ts > 0 ) {		// 0x1253b
+			nxt = DG_RingNext( *cur );
+			if ( ring[nxt].time < ring[*cur].time ) {
+				DG_RingFill( slot, nxt );
+			}
+			a = *cur;
+			*cur = nxt;
+			b = *cur;
+			if ( ring[*cur].time == 0 ) {
+				goto done;
+			}
+		} else {			// 0x125c8
+			*cur = a;
+			a = DG_RingPrev( *cur );
+			b = *cur;
+		}
+	}
+	if ( ts > 0 ) {		// 0x125e8
+		a = DG_RingPrev( *cur );
+		b = *cur;
+	} else {
+		int t = b;
+
+		b = a;
+		a = t;
+	}
+done:
+	s->ia = a;
+	s->ib = b;
+	s->a = ring[a];
+	s->b = ring[b];
+	s->haveNext = a != b && ring[a].time != 0 && ring[b].time != 0;
+	nxt = DG_RingPrev( a );
+	s->p = ( ring[nxt].time != 0 && ring[nxt].time < ring[a].time ) ? ring[nxt] : ring[a];
 }
 
 static void DG_PlayFrame( int slot, qboolean mini ) {
@@ -985,42 +1413,22 @@ static void DG_PlayFrame( int slot, qboolean mini ) {
 	qboolean near, invis, discont, nearFlag, hideBody, drawBody;
 	dgCtx_t ctx;
 
-	if ( ts < 0 ) {
-		ts = -ts;		// reverse playback is not ported
-	}
+	float ats = ts < 0 ? -ts : ts;
+
 	if ( mini && (int)DG_CvarF( "df_ghosts_MiniviewCameraMode", 1 ) == 0 ) {		// 0x127af: b != 0 and mode word 0 -> skip the slot
 		return;
 	}
-	elapsed = ( cg.time - s->lastTime ) * ts;
-	for ( ; !mini; ) {		// the miniview pass (0x127af a = 0) does not advance the cursor
-		if ( !s->haveNext ) {
-			break;
-		}
-		dt = s->b.time - s->a.time;
-		if ( dt > 0 && elapsed < dt ) {
-			break;
-		}
-		if ( ts > 0 ) {
-			s->lastTime += (int)( ( dt > 0 ? dt : 0 ) / ts );
-		}
-		s->p = s->a;
-		s->a = s->b;
-		s->haveNext = DG_ReadFrame( slot, &s->b );
-		elapsed = ( cg.time - s->lastTime ) * ts;
+	if ( !mini ) {		// the miniview pass (0x127af a = 0) does not advance the cursor
+		DG_Advance( slot, ts );
 	}
-	if ( !mini && !s->haveNext && elapsed > 0 && s->remain <= 0 ) {		// end of data (0x127af: PlayLoop)
-		char keep[sizeof( s->name )];
-
-		Q_strncpyz( keep, s->name, sizeof( keep ) );
-		DG_Close( slot, 0 );
-		if ( loop >= 1 ) {
-			DG_Play( slot, keep, 0 );
-		}
-		return;
-	}
+	// 0x11e15: the playback time since the time base, in frame-time units (absolute against frame A for the AutoModeMP sync)
+	elapsed = DG_AbsoluteSync( ts ) ? (float)( cg.time - ( s->a.time + s->lastTime ) ) : ( cg.time - s->lastTime ) * ats;
 	discont = s->haveNext && ( s->b.discont || s->a.discont );
 	if ( s->haveNext && !discont ) {
 		dt = s->b.time - s->a.time;
+		if ( dt < 0 ) {
+			dt = -dt;		// backwards: A is the later frame
+		}
 		frac = dt > 0 ? elapsed / dt : 0;
 		frac = frac < 0 ? 0 : ( frac > 1 ? 1 : frac );
 		{
@@ -1102,8 +1510,23 @@ static void DG_PlayFrame( int slot, qboolean mini ) {
 			drawBody = !hideBody;
 		}
 		break;
+	case 4:		// marker (0x13125 case 4): a white radius-10 sprite with the "medal_gauntlet" shader at the interpolated position
+		drawBody = qfalse;
+		if ( !hideBody ) {
+			refEntity_t re;
+
+			Com_Memset( &re, 0, sizeof( re ) );
+			re.reType = RT_SPRITE;
+			re.customShader = cgs.media.medalGauntlet;
+			re.radius = 10;
+			re.shaderRGBA[0] = re.shaderRGBA[1] = re.shaderRGBA[2] = re.shaderRGBA[3] = 255;
+			VectorCopy( org, re.origin );
+			trap_R_AddRefEntityToScene( &re );
+			DG_Label( slot, c->lerpOrigin );
+		}
+		break;
 	default:
-		drawBody = qfalse;		// 0 = hidden; mode 4 (marker) is not ported
+		drawBody = qfalse;		// 0 = hidden
 		break;
 	}
 	if ( drawBody ) {
@@ -1118,12 +1541,31 @@ static void DG_PlayFrame( int slot, qboolean mini ) {
 
 		CG_PlayerShadow( c, &plane );		// 0x26a50
 	}
+	if ( !mini ) {
+		DG_VarsApply( slot );		// 0x11ee4
+		if ( dgRing[slot][dgCur[slot]].time == 0 ) {		// 0x12872: the cursor ran into an empty frame = the end of the file
+			char keep[sizeof( s->name )];
+
+			switch ( loop ) {
+			case 2:			// freeze on the last frame
+				dgCur[slot] = DG_RingPrev( dgCur[slot] );
+				break;
+			case 1:			// restart
+				Q_strncpyz( keep, s->name, sizeof( keep ) );
+				DG_Close( slot, 7 );
+				DG_Play( slot, keep, 7 );
+				break;
+			default:
+				DG_Close( slot, 7 );
+				break;
+			}
+		}
+	}
 }
 
 // ---- miniview (cgame 0x7a04 -> gate 0x13488 -> 0x134dc; doc CGAME/ghost_camera.md "Miniview") ----
 // After the main frame (HUD included) a second small scene is rendered: the player seen with the opposite third-person state,
 // the tracked client (df_mp_TrackPlayerNum), or a playing ghost through df_ghosts_MiniviewCameraMode.
-static qboolean	dgInMini;		// 1221216
 
 static qboolean DG_AnyPlaying( void ) {		// 0x140ea
 	int i;
@@ -1145,6 +1587,15 @@ static qboolean DG_GhostCamActive( void ) {		// 0x13e70: a playing ghost whose o
 		}
 	}
 	return qfalse;
+}
+
+// CG_DrawActiveFrame (0x29d7d): the ordinary view weapon is skipped while a ghost camera plays (0x109d6, the camera draws the gun itself)
+// or in demo camera mode 2 (0x146fa)
+qboolean CG_DF_SkipViewWeapon( void ) {
+	if ( DG_GhostCamActive() ) {
+		return qtrue;
+	}
+	return cg.demoPlayback && df_demos_CameraMode.integer == 2;
 }
 
 // 0x10912: the tracked-client miniview is active (record of the tracked client is valid and it is not the viewer)
@@ -1200,20 +1651,7 @@ static void DG_MiniGun( qboolean blank ) {
 	if ( !blank ) {
 		CG_AddViewWeapon( &cg.predictedPlayerState );
 	} else {
-		playerState_t	savedPS = cg.predictedPlayerState;
-		centity_t		savedEnt = cg.predictedPlayerEntity;
-		centity_t		*cent = &cg_entities[cg.predictedPlayerState.clientNum];
-		int				savedFlags = cent->currentState.eFlags;
-
-		cent->currentState.eFlags = 0;
-		Com_Memset( &cg.predictedPlayerState, 0, sizeof( cg.predictedPlayerState ) );
-		Com_Memset( &cg.predictedPlayerEntity, 0, sizeof( cg.predictedPlayerEntity ) );
-		cg.predictedPlayerState.weapon = savedPS.weapon;
-		cg.predictedPlayerEntity.currentState.weapon = savedEnt.currentState.weapon;
-		CG_AddViewWeapon( &cg.predictedPlayerState );
-		cg.predictedPlayerState = savedPS;
-		cg.predictedPlayerEntity = savedEnt;
-		cent->currentState.eFlags = savedFlags;
+		DG_BlankGun();
 	}
 	cg_drawGun.integer = keep;
 }
@@ -1341,8 +1779,7 @@ static void DG_Miniview( void ) {
 			}
 		} else if ( drawGun ) {
 			// 0x129fe: clear powerups and the land-bob state, then the blank-state view weapon
-			cg.predictedPlayerEntity.currentState.powerups = 0;
-			cg.landChange = 0;
+			DG_ClearViewState();
 			DG_MiniGun( qtrue );
 		}
 	}
@@ -1717,6 +2154,56 @@ int CG_DF_GhostHeader( int slot, int which ) {		// 0x13e18 / 0x13e44: header for
 		return 0;
 	}
 	return which ? DG_FILE_VERSION : DG_FILE_MAGIC;
+}
+
+// 0x13e70 + the head of the CHS item function: the first playing ghost with a camera mode is "tracked", and the position / velocity / angles
+// items then read that ghost instead of the player
+qboolean CG_DF_GhostTracked( vec3_t pos, vec3_t vel, vec3_t ang ) {
+	int i;
+
+	for ( i = 0; i < DG_SLOTS; i++ ) {
+		if ( dgSlot[i].state == 2 && dgSlot[i].camWord != 0 ) {
+			CG_DF_GhostVelocity( i, vel );
+			VectorCopy( dgSlot[i].cent.lerpOrigin, pos );
+			VectorCopy( dgSlot[i].cent.lerpAngles, ang );
+			return qtrue;
+		}
+	}
+	return qfalse;
+}
+
+// CHS items 81..86 (cgame 0xd6b5..0xd8ab): kind 0 = the state of the slot, 1 = its record settings, 2 = its play settings
+void CG_DF_GhostInfo( int slot, int kind, char *label, char *value, int size ) {
+	const dgSlot_t *s = &dgSlot[slot];
+	const char *state = s->state == 1 ? "recording" : s->state == 2 ? "playing" : "stopped";
+
+	switch ( kind ) {
+	case 3:		// item 80: the settings shared by all ghosts (label set by the caller)
+		Com_sprintf( value, size, "%i %i", (int)DG_CvarF( "df_ghosts_AutoMode", 4 ), (int)DG_CvarF( "df_ghosts_NoDrawRadius", 200 ) );
+		break;
+	case 0:
+		Com_sprintf( label, size, "MODE [ghost #%i]", slot + 1 );
+		if ( s->state == 1 ) {
+			Com_sprintf( value, size, "%s [ %s - %3i ]", state, s->name, s->frames );
+		} else if ( s->state == 2 ) {
+			Com_sprintf( value, size, "%s [ %s - %3i %i %3.3f ]", state, s->name, dgCur[slot], dgRing[slot][dgCur[slot]].time,
+				Com_Clamp( -10.0f, 10.0f, DG_SlotCvar( slot, "PlayTimescale", 1.0f ) ) );
+		} else {
+			Com_sprintf( value, size, "%s", state );
+		}
+		break;
+	case 1:
+		Com_sprintf( label, size, "SET [ghost #%i] (rec): (File View Int)", slot + 1 );
+		Com_sprintf( value, size, "%i %i %i", (int)DG_SlotCvar( slot, "RecordFileFormat", 2 ), (int)DG_SlotCvar( slot, "RecordView", 0 ),
+			(int)DG_SlotCvar( slot, "RecordInterval", 50 ) );
+		break;
+	case 2:
+		Com_sprintf( label, size, "SET [ghost #%i] (play): (Cam DrawP DrawM Loop TS)", slot + 1 );
+		Com_sprintf( value, size, "%i %i %i %i %3.3f", (int)DG_SlotCvar( slot, "PlayCameraMode", 0 ), (int)DG_SlotCvar( slot, "PlayDrawPlayer", 3 ),
+			(int)DG_SlotCvar( slot, "PlayDrawMissiles", 2 ), (int)DG_SlotCvar( slot, "PlayLoop", 0 ),
+			Com_Clamp( -10.0f, 10.0f, DG_SlotCvar( slot, "PlayTimescale", 1.0f ) ) );
+		break;
+	}
 }
 
 qboolean CG_DF_GhostPos( int slot, vec3_t out ) {		// the ghost's drawn position (0x...: cent.lerpOrigin at slot+312928)

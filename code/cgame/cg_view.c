@@ -812,6 +812,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	// decide on third person view
 	cg.renderingThirdPerson = cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR
 							&& (cg_thirdPerson.integer || (cg.snap->ps.stats[STAT_HEALTH] <= 0));
+	CG_DF_ReplayViewPrep();		// DeFRaG 0x7972: replay / demo cameras force the third-person view, replay FOV override
 
 	// build cg.refdef
 	inwater = CG_CalcViewValues();
@@ -832,7 +833,9 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 		CG_AddLocalEntities();
 		CG_DF_GhostFrame();		// DeFRaG ghosts: record / play back (drawn through CG_Player)
 	}
-	CG_AddViewWeapon( &cg.predictedPlayerState );
+	if ( !CG_DF_SkipViewWeapon() ) {		// DeFRaG 0x29d7d: ghost camera (0x109d6) / demo camera mode 2 (0x146fa) draw or hide the gun themselves
+		CG_AddViewWeapon( &cg.predictedPlayerState );
+	}
 
 	// add buffered sounds
 	CG_PlayBufferedSounds();

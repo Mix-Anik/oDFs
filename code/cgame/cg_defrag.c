@@ -235,28 +235,52 @@ static void CG_DF_Violation( int code, const char *text ) {
 	CG_Printf( "^2%s: ^3%s\n", dfViolations[code].category, text );
 }
 
-static void CG_DF_CheckCvar( const char *info, const char *name, const char *expected, qboolean isFloat ) {
+static float	dfCvarCache[16];			// 0x11d744.. / 0x11d76c..: last value looked at, per cvar
+static qboolean	dfSysPassed, dfSrvPassed;	// 0x11d740 / 0x11d76c: the first pass of the systeminfo / serverinfo validator is done
+
+// A cvar is looked at when it is first seen or when its value changed (0x5b89 / 0x5dd5); an acceptable one is listed as "Cvar: name value",
+// an unacceptable one is reported (codes 13 / 14). `expected` NULL = information only.
+static void CG_DF_CheckCvar( const char *info, const char *name, const char *expected, qboolean isFloat, int slot, qboolean passed ) {
 	const char *v = Info_ValueForKey( info, name );
+	float		val;
 
 	if ( !v[0] ) {
 		CG_DF_Violation( 12, va( dfViolations[12].format, name ) );
-	} else if ( isFloat ? ( atof( v ) != atof( expected ) ) : ( atoi( v ) != atoi( expected ) ) ) {
-		CG_DF_Violation( isFloat ? 14 : 13, isFloat ? va( dfViolations[14].format, name, atof( v ) ) : va( dfViolations[13].format, name, atoi( v ) ) );
+		return;
+	}
+	val = isFloat ? atof( v ) : (float)atoi( v );
+	if ( passed && val == dfCvarCache[slot] ) {
+		return;
+	}
+	dfCvarCache[slot] = val;
+	if ( expected && val != (float)atof( expected ) ) {
+		CG_DF_Violation( isFloat ? 14 : 13, isFloat ? va( dfViolations[14].format, name, val ) : va( dfViolations[13].format, name, (int)val ) );
+	} else if ( isFloat ) {
+		CG_Printf( "^2Cvar: ^3%s %.2f\n", name, val );
+	} else {
+		CG_Printf( "^2Cvar: ^3%s %i\n", name, (int)val );
 	}
 }
 
-// the server settings DeFRaG requires (cgame 0x5b89 systeminfo / 0x5dd5 serverinfo validators)
+// the server settings DeFRaG requires (cgame 0x5b89 systeminfo / 0x5dd5 serverinfo validators; the sv_fps / com_maxfps / sv_maxclients
+// lines are only checked for defrag_gametype >= 5 and so never apply here)
 static void CG_DF_CheckServerSettings( void ) {
 	char	sys[BIG_INFO_STRING], srv[MAX_INFO_STRING];
 
 	Q_strncpyz( sys, CG_ConfigString( CS_SYSTEMINFO ), sizeof( sys ) );
 	Q_strncpyz( srv, CG_ConfigString( CS_SERVERINFO ), sizeof( srv ) );
-	CG_DF_CheckCvar( sys, "sv_cheats", "0", qfalse );
-	CG_DF_CheckCvar( sys, "timescale", "1", qtrue );
-	CG_DF_CheckCvar( sys, "g_speed", "320", qfalse );
-	CG_DF_CheckCvar( sys, "g_gravity", "800", qfalse );
-	CG_DF_CheckCvar( sys, "g_knockback", "1000", qfalse );
-	CG_DF_CheckCvar( srv, "dmflags", "0", qfalse );
+	CG_DF_CheckCvar( sys, "sv_cheats", "0", qfalse, 0, dfSysPassed );
+	CG_DF_CheckCvar( sys, "timescale", "1", qtrue, 1, dfSysPassed );
+	CG_DF_CheckCvar( sys, "g_synchronousClients", NULL, qfalse, 2, dfSysPassed );
+	CG_DF_CheckCvar( sys, "pmove_fixed", NULL, qfalse, 3, dfSysPassed );
+	CG_DF_CheckCvar( sys, "pmove_msec", NULL, qfalse, 4, dfSysPassed );
+	CG_DF_CheckCvar( sys, "g_speed", "320", qfalse, 5, dfSysPassed );
+	CG_DF_CheckCvar( sys, "g_gravity", "800", qfalse, 6, dfSysPassed );
+	CG_DF_CheckCvar( sys, "g_knockback", "1000", qfalse, 7, dfSysPassed );
+	dfSysPassed = qtrue;
+	CG_DF_CheckCvar( srv, "df_promode", NULL, qfalse, 8, dfSrvPassed );
+	CG_DF_CheckCvar( srv, "dmflags", "0", qfalse, 9, dfSrvPassed );
+	dfSrvPassed = qtrue;
 }
 
 static void CG_DF_Validate( const playerState_t *ops, const playerState_t *ps ) {
@@ -491,6 +515,17 @@ void CG_DF_PrintStats( int runMs ) {
 		CG_Printf( " (%i miles)", (int)CG_ConvertDistance( jumpHighest ) );
 	}
 	CG_Printf( "\n" );
+	CG_Printf( " Farthest Jump  : %i units", (int)jumpLongest );		// 0x7e4c, value 0x11d24c
+	if ( df_unit.integer == 1 ) {
+		CG_Printf( " (%i meters)", (int)CG_ConvertDistance( jumpLongest ) );
+	} else if ( df_unit.integer == 2 ) {
+		CG_Printf( " (%i miles)", (int)CG_ConvertDistance( jumpLongest ) );
+	}
+	CG_Printf( "\n" );
+	CG_Printf( " Health Used    : %i\n", statHealthSpent );
+	CG_Printf( " Armor Used     : %i\n", statArmorSpent );		// always 0 in DeFRaG (see CG_DF_TrackStats)
+	CG_Printf( " Shots Fired    : %i\n", statShots );
+	CG_Printf( "-----------------\n" );
 }
 
 // the "stats" server command (finish handler, non-variant servers)
@@ -847,6 +882,32 @@ void CG_DF_GetStats( dfStats_t *o ) {
 	o->shotsFired = statShots;
 }
 
+// The "dfn" key of a client's configstring (the server's copy of its df_name) as DeFRaG's CG_NewClientInfo keeps it (cgame 0x253c6 -> 0xf48): at most 19
+// characters, colour codes dropped, every character that is not valid in a file name removed, "UnnamedPlayer" when nothing is left. Read by the
+// autorecord `$pl` token and by the player line of svinfo_report / the summary. `out` holds at least 20 bytes.
+void CG_DF_ClientDfName( int clientNum, char *out ) {
+	char		raw[20];
+	const char	*s = raw;
+	char		*d = out;
+
+	Q_strncpyz( raw, Info_ValueForKey( CG_ConfigString( CS_PLAYERS + clientNum ), "dfn" ), sizeof( raw ) );
+	for ( ; *s; s++ ) {
+		int c = (byte)*s;
+
+		if ( c == '^' && s[1] && s[1] != '^' ) {
+			s++;
+			continue;
+		}
+		if ( c > 32 && c < 126 && !strchr( ":*?\"<>|\\/.()[]", c ) ) {
+			*d++ = c;
+		}
+	}
+	*d = 0;
+	if ( !out[0] ) {
+		Q_strncpyz( out, "UnnamedPlayer", 20 );
+	}
+}
+
 // ---- svinfo_report (cgame 0x4795): writes a server/run information report to system/reports/<name>.txt ----
 static const char *dfGametypeNames[8] = {
 	"Auto-config mode", "Defrag", "Tricks Mode", "Fast Caps", "Reserved", "MP Defrag", "MP Tricks Mode", "MP Fast Caps"
@@ -977,7 +1038,14 @@ static void CG_DF_WriteReport( const char *arg, int runMs, qboolean usage ) {
 	} else {
 		CG_DF_ReportPrintf( f, "%-24s %i\r\n", "gametype", gt );
 	}
-	CG_DF_ReportPrintf( f, "%-24s %s\r\n", "player", cg.snap ? cgs.clientinfo[cg.snap->ps.clientNum].name : "" );
+	if ( cg.snap && v ) {		// 0x48c7: a DeFRaG server reports the client's df_name ("dfn"), anything else the net name (0x4950)
+		char dfn[20];
+
+		CG_DF_ClientDfName( cg.snap->ps.clientNum, dfn );
+		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "player", dfn );
+	} else {
+		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "player", cg.snap ? cgs.clientinfo[cg.snap->ps.clientNum].name : "" );
+	}
 	if ( v ) {
 		Com_sprintf( vers, sizeof( vers ), "%i.%02i.%02i", v / 10000, ( v / 100 ) % 100, v % 100 );
 		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "comp", Info_ValueForKey( si, "df_competition" ) );
@@ -1068,11 +1136,10 @@ static void CG_DF_WriteSummary( const char *arg, int runMs, qboolean usage ) {
 			CG_DF_SummaryLine( f, 1, "overbounces", tmp );
 		}
 		if ( cg.snap ) {
-			char clean[MAX_QPATH];
+			char dfn[20];
 
-			Q_strncpyz( clean, cgs.clientinfo[cg.snap->ps.clientNum].name, sizeof( clean ) );
-			Q_CleanStr( clean );
-			CG_DF_SummaryLine( f, 1, "player", clean );
+			CG_DF_ClientDfName( cg.snap->ps.clientNum, dfn );		// 0x4c6b
+			CG_DF_SummaryLine( f, 1, "player", dfn );
 		}
 		if ( Info_ValueForKey( si, "df_competition" )[0] ) {
 			CG_DF_SummaryLine( f, 1, "comp", Info_ValueForKey( si, "df_competition" ) );

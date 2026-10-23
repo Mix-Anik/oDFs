@@ -105,7 +105,8 @@ static void AR_Token( char **out, char *start, int *left, const char **fmt, int 
 		trap_Cvar_VariableStringBuffer( "df_country", tmp, sizeof( tmp ) );
 		AR_PutToken( out, left, tmp, 20 );
 	} else if ( TOK( "pl" ) ) {
-		AR_PutToken( out, left, cgs.clientinfo[cg.clientNum].name, 20 );
+		CG_DF_ClientDfName( cg.clientNum, tmp );		// 0x5543: ci[cg.clientNum].dfn
+		AR_PutToken( out, left, tmp, 20 );
 	} else if ( TOK( "route" ) ) {
 		const char *r = CG_DF_Serverinfo( "defrag_route" );
 
@@ -262,6 +263,13 @@ static void AR_Stop( void ) {		// 0x1873
 	trap_SendConsoleCommand( "silent stoprecord\n" );
 	arState = 0;
 	AR_Say( "Autorecord: demo discarded." );
+}
+
+// 0x19d4 (from CG_Shutdown via 0x3a44): a recording that is still armed (state 1-3) is stopped; plain `stoprecord`, not the silent form
+void CG_DF_AutorecShutdown( void ) {
+	if ( arState ) {
+		trap_SendConsoleCommand( "stoprecord\n" );
+	}
 }
 
 static void AR_Start( void ) {		// 0x18ab

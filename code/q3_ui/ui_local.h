@@ -818,6 +818,7 @@ void UI_RankStatusMenu( void );
 void UI_DF_RegisterCvars( void );
 void UI_DF_UpdateCvars( void );
 qboolean UI_DF_ConsoleCommand( const char *cmd );
+void UI_DF_Shutdown( void );
 qboolean UI_DF_DemoQueueNext( void );
 void UI_DF_RegisterCursor( void );
 void UI_DF_SetHover( menucommon_s *m );

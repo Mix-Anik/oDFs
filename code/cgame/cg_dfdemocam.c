@@ -5,8 +5,8 @@
 // 100 units; 10 / 11 = third person at cg_thirdPersonRange), the smooth transition between targets (df_demos_CameraTransitionSpeed), the
 // df_demos_CamOffset* cvars of the replay camera, the tracked-client record (df_mp_TrackPlayerNum) and the hide-body list (modes 2 and 8).
 // Modes 1..3: key-driven free cameras (free fly / first person at the tracked client with free look / third person around it).
-// Not ported: the PVS fix, 0x15280 (viewed-client weapon/HUD state), the CamSeq* position
-// sequences (0x14d30), the `targetposname` presets.
+// Mode 8 on another client also takes that client's weapon and draws its gun (0x15280, CG_DF_TrackedViewGun in cg_dfghost.c).
+// Not ported: the PVS fix, the `targetposname` presets.
 
 #include "cg_local.h"
 
@@ -338,6 +338,28 @@ static void DC_FreeUpdate( float dt ) {
 }
 
 // the engine proper (0x1549d for a camera object); speed < 0 is distance based
+// 0x1469c: the demo camera modes that show the player: the third-person view is forced (decided before the view is built, from the last frame's
+// tracked client)
+static int dcLastClient = -1;
+
+void CG_DF_DemoCamState( vec3_t pos, vec3_t ang ) {		// CHS items 320..324: the demo camera object's current pose (2790364 / 2790376)
+	VectorCopy( dcDemoCam.posCur, pos );
+	VectorCopy( dcDemoCam.angCur, ang );
+}
+
+qboolean CG_DF_DemoCamThirdPerson( void ) {
+	static const char third[12] = { 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1 };
+	int mode = df_demos_CameraMode.integer;
+
+	if ( !cg.demoPlayback || mode == 0 ) {
+		return qfalse;
+	}
+	if ( dcLastClient != cg.clientNum ) {
+		return qtrue;
+	}
+	return mode >= 0 && mode <= 11 && third[mode];
+}
+
 static void DC_Run( int mode, float speed ) {
 	dcTrack_t	t;
 	vec3_t		pos, ang, dir;
@@ -355,6 +377,9 @@ static void DC_Run( int mode, float speed ) {
 	dc.lastTime = cg.time;
 	dc.speed = speed;
 	DC_Track( &t );
+	if ( dcCur == &dcDemoCam ) {
+		dcLastClient = t.client;
+	}
 	if ( mode >= 1 && mode <= 3 ) {		// 0x152a8 / 0x152e9 / 0x1532a
 		vec3_t p, a;
 
@@ -381,6 +406,9 @@ static void DC_Run( int mode, float speed ) {
 		VectorCopy( t.ang, dc.angOut );
 		CG_DF_CamOffsets( dc.posOut, dc.angOut );
 		DC_Apply( dc.posOut, dc.angOut );
+		if ( t.client != cg.predictedPlayerState.clientNum ) {
+			CG_DF_TrackedViewGun( t.weapon );		// 0x15280
+		}
 		return;
 	}
 	if ( !DC_Target( &t, pos, ang ) ) {

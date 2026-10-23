@@ -30,7 +30,7 @@ static drTran_t	drTrans[DR_MAX_TRAN];
 static drAct_t	drActs[DR_MAX_ACT];
 static drLink_t	drLinks[DR_MAX_LINK];
 
-static int		drEnabled;			// 0x2b1504 (set by VALIDATE; gates the overlay, which is not ported)
+static int		drEnabled;			// 0x2b1504 (set by VALIDATE / a loaded script; gates the edit overlay)
 vmCvar_t		df_demos_ReplayVerbose;
 vmCvar_t		df_demos_ReplayMode, df_demos_ReplayFilename, df_demos_ReplayDrawMask;
 
@@ -154,13 +154,9 @@ static qboolean DR_Verbose( void ) {
 	return df_demos_ReplayVerbose.integer != 0;
 }
 
-// ---- 0x18287 : GET printer (format 0 = full record; 1 = CHAIN header only; 2 / 3 print as 0 -- tables not decoded) ----
+// ---- 0x18287 : GET printer, full record (format 0); the other formats are in DR_Print ----
 static void DR_PrintRecord( int type, int id, int format ) {
 	CG_Printf( "^2%s^7 ^3[ %i ]^7\n", drTypeNames[type], id );
-	if ( format == 1 ) {
-		CG_Printf( " ^4-->^7 ^2CHAIN^7\n" );		// the users of the record (0x1816e) are not decoded
-		return;
-	}
 	switch ( type ) {
 	case DR_VAR: {
 		drVar_t *v = &drVars[id];
@@ -210,9 +206,63 @@ static void DR_PrintRecord( int type, int id, int format ) {
 	}
 }
 
-// id == -1: every slot of the type. Unused slots are skipped
+static qboolean DR_RowVar( char *b, int id );
+static qboolean DR_RowCam( char *b, int id );
+static qboolean DR_RowTran( char *b, int id );
+static qboolean DR_RowAct( char *b, int id );
+static qboolean DR_RowLink( char *b, int id );
+static void DR_ActHeader( char *b, int actType );
+static void DR_Cat( char *buf, const char *fmt, ... ) Q_PRINTF_FUNC(2,3);
+#define DR_ROWBUF 1024
+
+// 0x1816e: the users of record (dtype, id): kind DR_TRAN = the transitions that use it as an endpoint, kind DR_LINK = the links that name it.
+// Appends `( n n n )` to the line (DeFRaG's "first entry" flag is never set, so every entry is written with a leading space).
+static void DR_Chain( char *b, int kind, int dtype, int id ) {
+	int i;
+
+	DR_Cat( b, "(" );
+	if ( kind == DR_TRAN ) {
+		for ( i = 0; i < DR_MAX_TRAN; i++ ) {
+			if ( drTrans[i].dtype == dtype && ( drTrans[i].id1 == id || drTrans[i].id2 == id ) ) {
+				DR_Cat( b, " %i", i );
+			}
+		}
+	} else if ( kind == DR_LINK ) {
+		for ( i = 0; i < DR_MAX_LINK; i++ ) {
+			if ( ( drLinks[i].dtype1 == dtype && drLinks[i].id1 == id ) || ( drLinks[i].dtype2 == dtype && drLinks[i].id2 == id ) ) {
+				DR_Cat( b, " %i", i );
+			}
+		}
+	}
+	DR_Cat( b, " )" );
+}
+
+// the column headers of the table formats (0x16d3d / 0x16e45 / 0x17069 / 0x175bc; ACT 0x17357 once per ActType)
+static void DR_PrintHeaders( int type ) {
+	char	b[DR_ROWBUF];
+	int		i;
+
+	switch ( type ) {
+	case DR_VAR:	Com_sprintf( b, sizeof( b ), "%s  ID VarName                              Value", drTypeNames[DR_VAR] ); break;
+	case DR_CAM:	Com_sprintf( b, sizeof( b ), "%s  ID      X      Y      Z    P    Y    R", drTypeNames[DR_CAM] ); break;
+	case DR_TRAN:	Com_sprintf( b, sizeof( b ), "%s  ID TranType DType  ID  ID Speed Loop", drTypeNames[DR_TRAN] ); break;
+	case DR_LINK:	Com_sprintf( b, sizeof( b ), "%s  ID DType  ID DType  ID", drTypeNames[DR_LINK] ); break;
+	default:
+		for ( i = 0; i < 6; i++ ) {
+			DR_ActHeader( b, i );
+			CG_Printf( i == 0 ? "^2%s\n" : "^3%s\n", b );
+		}
+		return;
+	}
+	CG_Printf( "^2%s\n", b );
+}
+
+// 0x18287: id == -1 = every slot of the type (unused ones skipped), otherwise that slot (printed even when unused).
+// format 0 = full record, 1 = CHAIN (the users of the record), 2 = table row (the header first when printing all), 3 = header only
 static void DR_Print( int type, int id, int format, qboolean warn ) {
-	int i, n;
+	char		b[DR_ROWBUF];
+	qboolean	headerDone = qfalse;
+	int			i, n;
 
 	if ( type < DR_VAR || type > DR_LINK ) {
 		return;
@@ -221,14 +271,52 @@ static void DR_Print( int type, int id, int format, qboolean warn ) {
 	if ( id != -1 && !DR_RangeOk( type, id, warn ) ) {
 		return;
 	}
-	for ( i = ( id == -1 ? 0 : id ); i < ( id == -1 ? n : id + 1 ); i++ ) {
-		if ( id == -1 && !DR_InUse( type, i ) ) {
-			continue;
+	for ( i = ( id == -1 ? 0 : id ); ; ) {
+		if ( id != -1 || DR_InUse( type, i ) ) {
+			if ( format == 2 ) {
+				if ( !headerDone && id == -1 ) {
+					DR_PrintHeaders( type );
+					headerDone = qtrue;
+				}
+				switch ( type ) {
+				case DR_VAR:	DR_RowVar( b, i ); break;
+				case DR_CAM:	DR_RowCam( b, i ); break;
+				case DR_TRAN:	DR_RowTran( b, i ); break;
+				case DR_ACT:	DR_RowAct( b, i ); break;
+				default:		DR_RowLink( b, i ); break;
+				}
+				CG_Printf( "%s\n", b );
+			} else if ( format == 3 ) {
+				DR_PrintHeaders( type );
+				if ( type == DR_TRAN ) {		// 0x17077: the list of the transition types
+					int k;
+
+					b[0] = 0;
+					for ( k = 1; k < 11; k++ ) {
+						DR_Cat( b, k == 1 ? "%s" : ", %s", drTranNames[k] );
+					}
+					CG_Printf( "^3%s\n", b );
+				}
+				i = n;		// one header is enough
+			} else if ( format == 0 ) {
+				DR_PrintRecord( type, i, 0 );
+			} else if ( format == 1 ) {
+				CG_Printf( "^2%s^7 ^3[ %i ]^7 ^4-->^7 ^2CHAIN^7\n", drTypeNames[type], i );
+				if ( type == DR_VAR || type == DR_CAM ) {
+					Com_sprintf( b, sizeof( b ), " ^4-->^7 %s ", drTypeNames[DR_TRAN] );
+					DR_Chain( b, DR_TRAN, type, i );
+					CG_Printf( "%s\n", b );
+				}
+				if ( type != DR_LINK ) {
+					Com_sprintf( b, sizeof( b ), " ^4-->^7 %s ", drTypeNames[DR_LINK] );
+					DR_Chain( b, DR_LINK, type, i );
+					CG_Printf( "%s\n", b );
+				}
+			}
 		}
-		if ( id != -1 && !DR_InUse( type, i ) ) {
-			continue;
+		if ( id != -1 || ++i >= n ) {
+			break;
 		}
-		DR_PrintRecord( type, i, format );
 	}
 }
 
@@ -546,8 +634,6 @@ static void DR_Cat( char *buf, const char *fmt, ... ) {
 	Q_strcat( buf, 1024, text );
 }
 
-#define DR_ROWBUF 1024
-
 static qboolean DR_RowVar( char *b, int id ) {		// 0x16ce4
 	Com_sprintf( b, DR_ROWBUF, "%s ", drTypeNames[DR_VAR] );
 	DR_Cat( b, "%3i ", id );
@@ -809,19 +895,21 @@ static void DR_CmdSet( void ) {
 static char		drFileName[128];
 static int		drLoaded;
 
+// the 14 replay cvars: reset by 0x190e1 and the only VAR names the partial cleanup 0x1a3ec restores (table at data 9412)
+static const char *drResetCvars[14] = {
+	"df_demos_ReplayCameraMode", "df_demos_ReplayTransitionSpeed",
+	"df_demos_CamOffsetPositionX", "df_demos_CamOffsetPositionY", "df_demos_CamOffsetPositionZ",
+	"df_demos_CamOffsetAngleX", "df_demos_CamOffsetAngleY", "df_demos_CamOffsetAngleZ",
+	"df_demos_CamOffsetRadiusF", "df_demos_CamOffsetRadiusR", "df_demos_CamOffsetRadiusU",
+	"df_demos_TargetPositionX", "df_demos_TargetPositionY", "df_demos_TargetPositionZ"
+};
+
 static void DR_ResetCvars( void ) {			// 0x190e1
-	static const char *cv[] = {
-		"df_demos_ReplayCameraMode", "df_demos_ReplayTransitionSpeed",
-		"df_demos_CamOffsetPositionX", "df_demos_CamOffsetPositionY", "df_demos_CamOffsetPositionZ",
-		"df_demos_CamOffsetAngleX", "df_demos_CamOffsetAngleY", "df_demos_CamOffsetAngleZ",
-		"df_demos_CamOffsetRadiusF", "df_demos_CamOffsetRadiusR", "df_demos_CamOffsetRadiusU",
-		"df_demos_TargetPositionX", "df_demos_TargetPositionY", "df_demos_TargetPositionZ"
-	};
 	char fov[16];
 	int i;
 
 	for ( i = 0; i < 14; i++ ) {
-		trap_Cvar_Set( cv[i], "0" );
+		trap_Cvar_Set( drResetCvars[i], "0" );
 	}
 	trap_Cvar_VariableStringBuffer( "cg_fov", fov, sizeof( fov ) );
 	trap_Cvar_Set( "df_demos_ReplayVar_FOV", fov );
@@ -993,12 +1081,12 @@ static void DR_CmdActivate( void ) {		// 0x17f21: only MANUAL activators react; 
 }
 
 // ---- playback runtime (cgame 0x1a4ed driver -> 0x1a4ac frame; see disasm/CGAME/replay_system.md "Iter 73") ----
-// Per frame (ReplayMode 2 / 3, script loaded): activators 0x197e6 -> active transitions 0x1a033 -> camera 0x1a119.
-// Not ported: ReplayMode 1 (key-driven toggle state machine 0x1a323 / 0x1a2bf), the edit overlay 0x18873 (modes 3 / 4), camera modes 9..11
-// (0x15550 free camera), ghost-follow of 0x1a265, the cvar-restore cleanup 0x1a3a6 / 0x1a3c3, the df_ghosts_CheckPVS areamask fix and the verbose debug prints.
+// Per frame (ReplayMode 1 / 2 / 3, script loaded): activators 0x197e6 -> active transitions 0x1a033 -> camera 0x1a119.
+// The edit overlay 0x18873 (modes 3 / 4) is DR_Overlay.  Not ported: some verbose debug prints.
 static vec3_t	drCamOrigin, drCamAngles;	// 2823440 / 2823452: camera output of the transitions
 static vec3_t	drTarget;					// 2823468: tracked position (the viewed player's origin)
 static int		drTime;						// 2823492
+static qboolean	drFreeCam;					// 2823504: the AUTOCHASE camera is active
 static int		drLastTime;					// 2791292
 
 static float DR_CvarF( const char *name ) {
@@ -1435,6 +1523,526 @@ void CG_DF_CamOffsets( vec3_t pos, vec3_t ang ) {
 	DR_AddRadius( pos, ang );
 }
 
+// ---- ReplayMode 1: spectator key state machine (0x1a323 / 0x1a2bf) and the cleanup (0x1a3a6 / 0x1a3c3 / 0x1a3ec / 0x194bf) ----
+// While following another player (PMF_FOLLOW) the jump key cycles 0 = NORMAL, 1 = REPLAY (the script runs), 2 = AUTOCHASE (replay free camera, mode 9);
+// the crouch key sends `team spectator`. The state is reset when the follow ends.
+static int		drKey;				// 2823496
+static int		drCleanup;			// 2823500: restore the replay cvars when the state leaves REPLAY
+static int		drKeyStamp;			// data 9840: time of the last jump / crouch press (debounced by 500 ms)
+static qboolean	drVerbose;			// 2823436: ReplayMode >= 2
+
+static qboolean DR_KeyChange( int to, qboolean announce ) {
+	qboolean ok;
+
+	if ( drKey == to ) {
+		return qfalse;
+	}
+	drKey = to;
+	if ( drKey <= 0 || drKey >= 3 ) {
+		drKey = 0;
+	}
+	ok = drKey == to;
+	if ( !announce ) {
+		return ok;
+	}
+	switch ( drKey ) {
+	case 0:
+		CG_Printf( "^2Spectator Mode: ^3NORMAL\n" );
+		break;
+	case 1:
+		if ( drEnabled ) {
+			CG_Printf( "^2Spectator Mode: ^3REPLAY\n" );
+		}
+		break;
+	case 2:
+		CG_Printf( "^2Spectator Mode: ^3AUTOCHASE\n" );
+		break;
+	}
+	return ok;
+}
+
+static void DR_KeyFrame( int mode ) {
+	usercmd_t cmd;
+
+	drCleanup = 0;
+	if ( !( cg.snap->ps.pm_flags & PMF_FOLLOW ) ) {
+		drKey = 0;
+		return;
+	}
+	if ( drKey == 1 && mode != 1 ) {
+		drCleanup = 1;
+	}
+	trap_GetUserCmd( trap_GetCurrentCmdNumber(), &cmd );
+	if ( cg.time - drKeyStamp < 500 ) {
+		return;
+	}
+	if ( cmd.upmove ) {
+		drKeyStamp = cg.time;
+	}
+	if ( cmd.upmove < 0 ) {
+		trap_SendConsoleCommand( "team spectator\n" );
+	}
+	if ( mode == 1 ) {
+		if ( cmd.upmove > 0 ) {
+			if ( drKey == 1 ) {
+				drCleanup = 1;
+			}
+			DR_KeyChange( drKey + 1, qtrue );
+		}
+		if ( cmd.upmove < 0 && drKey == 1 ) {
+			drCleanup = 1;
+		}
+	}
+}
+
+// 0x1a3ec: the cvars of the script's VAR records are set back to their original values (a partial cleanup only restores the 14 replay cvars)
+static void DR_RestoreVars( void ) {
+	qboolean	changed = qfalse;
+	int			i, j;
+
+	if ( drVerbose ) {
+		CG_Printf( "^2REPLAY:^7 ^3( %i )^7 ^4-->^7 ^2%s^7 Cleanup\n", drTime, drTypeNames[DR_VAR] );
+	}
+	for ( i = 0; i < DR_MAX_VAR; i++ ) {
+		float v;
+
+		if ( drCleanup ) {
+			for ( j = 0; j < 14; j++ ) {
+				if ( !Q_stricmp( drResetCvars[j], drVars[i].name ) ) {
+					break;
+				}
+			}
+			if ( j == 14 ) {
+				continue;
+			}
+		}
+		if ( !DR_InUse( DR_VAR, i ) ) {
+			continue;
+		}
+		v = drVars[i].original;
+		trap_Cvar_Set( drVars[i].name, v == (float)(int)v ? va( "%i", (int)v ) : va( "%.3f", v ) );
+		changed = qtrue;
+		if ( drVerbose ) {
+			CG_Printf( "^2%s^7 Restored ^3[ %i ]^7 ( %s = %.3f )\n", drTypeNames[DR_VAR], i, drVars[i].name, drVars[i].original );
+		}
+	}
+	if ( changed && drVerbose ) {
+		CG_Printf( "\n" );
+	}
+}
+
+static void DR_ClearLatches( void ) {		// 0x194bf
+	int i;
+
+	for ( i = 0; i < DR_MAX_ACT; i++ ) {
+		drActs[i].activated = 0;
+	}
+}
+
+// 0x1a3c3: restore the cvars and (arg) unload the script
+static void DR_Cleanup( qboolean unload ) {
+	if ( !drEnabled || drKey == 1 ) {
+		return;
+	}
+	DR_RestoreVars();
+	DR_ClearLatches();
+	if ( unload ) {
+		DR_ClearAll( qfalse );
+		drLoaded = 0;
+		drEnabled = 0;
+	}
+}
+
+// 0x1a4a6 (from CG_Shutdown 0x7969): the script's VAR cvars are put back, whatever the ReplayMode (no unload, the module is going away)
+void CG_DF_ReplayShutdown( void ) {
+	DR_RestoreVars();
+}
+
+// 0x165e7: the replay camera owns the view
+qboolean CG_DF_ReplayOwnsView( void ) {
+	int rm = df_demos_ReplayMode.integer;
+
+	if ( cg.demoPlayback && DR_CvarF( "df_demos_CameraMode" ) != 0 ) {
+		return qfalse;
+	}
+	if ( cg.demoPlayback ) {
+		return rm >= 1 && rm <= 3;
+	}
+	return ( rm == 1 && drKey == 1 ) || ( rm >= 2 && rm <= 3 );
+}
+
+// 0x16631 + 0x1666d + 0x1469c, called right after the third-person decision of CG_DrawActiveFrame (0x7972): while the replay camera owns the
+// view cg_fov is replaced by `$df_demos_ReplayVar_FOV` (put back afterwards), and the camera modes that look at the player force the third-person view
+void CG_DF_ReplayViewPrep( void ) {
+	static int fovVar = -99999, fovSaved = -99999;
+	int rcm;
+
+	if ( CG_DF_ReplayOwnsView() ) {
+		char buf[64];
+
+		Q_strncpyz( buf, "$df_demos_ReplayVar_FOV", sizeof( buf ) );
+		if ( CG_DF_ExpandVar( buf, sizeof( buf ) ) ) {
+			fovVar = atoi( buf );
+		}
+		if ( fovVar != -99999 ) {
+			if ( fovSaved == -99999 ) {
+				fovSaved = cg_fov.integer;
+			}
+			cg_fov.integer = fovVar;
+			cg_fov.value = (float)fovVar;
+		}
+	} else {
+		if ( fovSaved != -99999 ) {
+			cg_fov.integer = fovSaved;
+			cg_fov.value = (float)fovSaved;
+		}
+		fovVar = fovSaved = -99999;
+	}
+	if ( CG_DF_DemoCamThirdPerson() ) {
+		cg.renderingThirdPerson = qtrue;
+		return;
+	}
+	rcm = (int)DR_CvarF( "df_demos_ReplayCameraMode" );
+	if ( drFreeCam ) {
+		cg.renderingThirdPerson = qtrue;
+	} else if ( df_demos_ReplayMode.integer != 0 && rcm != 0 && CG_DF_ReplayOwnsView() ) {
+		static const char third[13] = { 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1 };
+
+		if ( rcm >= 0 && rcm <= 12 && third[rcm] ) {
+			cg.renderingThirdPerson = qtrue;
+		}
+	}
+}
+
+// 0x1a265: the tracked position / time; the ghost-follow variant (live play, ReplayMode >= 2, a ghost playing with camera mode 17) uses the ghost's
+static void DR_Track( int mode ) {
+	VectorCopy( cg.predictedPlayerState.origin, drTarget );
+	drTime = cg.time;
+	if ( !cg.demoPlayback && mode >= 2 ) {
+		vec3_t	pos;
+		int		t;
+
+		if ( CG_DF_GhostFollow( pos, &t ) ) {
+			VectorCopy( pos, drTarget );
+			drTime = t;
+		}
+	}
+}
+
+// ---- the edit-mode world overlay (0x18873; ReplayMode 3 / 4 with a validated script) ----
+// Draws the script's data in the world; df_demos_ReplayDrawMask selects the parts: 1 = id numbers at the markers, 2 = a rocket at every camera pointing
+// along its angles, 4 = lines between the two cameras of every camera transition, 8 = lines from an activator to the camera of its link, 16 = the
+// activators (white marker sprites, plasma / BFG balls at the radius ends and the box corners), 32 = box wireframe of VOLUME activators, 64 = their
+// translucent faces.  Colours: cameras and transitions red, links and RADIUS activators green, VOLUME centre / box blue, corners yellow / green.
+static const byte drRed[4] = { 255, 0, 0, 255 }, drGreen[4] = { 0, 255, 0, 255 }, drBlue[4] = { 0, 0, 255, 255 }, drYellow[4] = { 255, 255, 0, 255 };
+
+static void DR_OvLine( const vec3_t a, const vec3_t b, const byte *rgba ) {		// 0x948a
+	refEntity_t re;
+
+	Com_Memset( &re, 0, sizeof( re ) );
+	VectorCopy( a, re.origin );
+	VectorCopy( b, re.oldorigin );
+	AxisClear( re.axis );
+	re.reType = RT_RAIL_CORE;
+	re.customShader = cgs.media.railCoreShader;
+	Com_Memcpy( re.shaderRGBA, rgba, 4 );
+	trap_R_AddRefEntityToScene( &re );
+}
+
+// 0x9229: the decimal digits of `n` as camera-facing sprites (cgs.media.numberShaders, 10 = minus) centred on `pos`
+static void DR_OvNumber( const vec3_t pos, int n, int size, const byte *rgba ) {
+	static const vec3_t up = { 0, 0, 1 };
+	refEntity_t	re;
+	vec3_t		d, right;
+	int			digits[16], count = 0, k;
+	qboolean	neg = n < 0;
+
+	if ( neg ) {
+		n = -n;
+	}
+	do {
+		digits[count++] = n % 10;
+		n /= 10;
+	} while ( n != 0 && count < 14 );
+	if ( neg ) {
+		digits[count++] = 10;
+	}
+	Com_Memset( &re, 0, sizeof( re ) );
+	re.reType = RT_SPRITE;
+	re.radius = (float)( size / 2 );
+	Com_Memcpy( re.shaderRGBA, rgba, 4 );
+	VectorSubtract( cg.refdef.vieworg, pos, d );
+	CrossProduct( d, up, right );
+	VectorNormalize( right );
+	for ( k = 0; k < count; k++ ) {
+		VectorMA( pos, ( (float)count / 2.0f - (float)k ) * (float)size, right, re.origin );
+		re.customShader = cgs.media.numberShaders[digits[count - 1 - k]];
+		if ( re.customShader ) {
+			trap_R_AddRefEntityToScene( &re );
+		}
+	}
+}
+
+// the number above (and optionally below) a marker: DeFRaG offsets it by 15 units and uses size 8 (data 9400 / 9404)
+static void DR_OvTag( const vec3_t pos, float dz, int id, const byte *rgba ) {
+	vec3_t p;
+
+	VectorCopy( pos, p );
+	p[2] += dz;
+	DR_OvNumber( p, id, 8, rgba );
+}
+
+static void DR_OvBox( const vec3_t p1, const vec3_t p2, const byte *rgba ) {		// 0x94c9: the 12 edges
+	int		c, k;
+	vec3_t	a, b;
+
+	for ( c = 0; c < 8; c++ ) {
+		for ( k = 0; k < 3; k++ ) {
+			if ( c & ( 1 << k ) ) {
+				continue;
+			}
+			a[0] = ( c & 1 ) ? p2[0] : p1[0];
+			a[1] = ( c & 2 ) ? p2[1] : p1[1];
+			a[2] = ( c & 4 ) ? p2[2] : p1[2];
+			VectorCopy( a, b );
+			b[k] = p2[k];
+			DR_OvLine( a, b, rgba );
+		}
+	}
+}
+
+static void DR_OvPoly( const vec3_t v0, const vec3_t v1, const vec3_t v2, const vec3_t v3, const float *rgba ) {		// 0x973c
+	static const float	st[4][2] = { { 0, 1 }, { 1, 0 }, { 1, 1 }, { 0, 0 } };
+	polyVert_t	verts[4];
+	const float	*v[4];
+	qhandle_t	shader;
+	int			i, j;
+
+	v[0] = v0; v[1] = v1; v[2] = v2; v[3] = v3;
+	for ( i = 0; i < 4; i++ ) {
+		VectorCopy( v[i], verts[i].xyz );
+		verts[i].st[0] = st[i][0];
+		verts[i].st[1] = st[i][1];
+		for ( j = 0; j < 4; j++ ) {
+			verts[i].modulate[j] = (byte)(int)rgba[j];
+		}
+	}
+	shader = trap_R_RegisterShader( "flatpolygon" );
+	if ( shader ) {
+		trap_R_AddPolyToScene( shader, 4, verts );
+	}
+}
+
+static void DR_OvFaces( const vec3_t p1, const vec3_t p2, const float *rgba ) {		// 0x99b7: the six faces of the box
+	vec3_t	half, c, A, B, C, D, E, F, G, H;
+	int		i;
+
+	for ( i = 0; i < 3; i++ ) {
+		half[i] = ( p2[i] - p1[i] ) / 2.0f;
+		c[i] = p1[i] + half[i];
+	}
+#define OV_CORNER( out, sx, sy, sz ) out[0] = c[0] + (sx) * half[0]; out[1] = c[1] + (sy) * half[1]; out[2] = c[2] + (sz) * half[2]
+	OV_CORNER( A, -1, -1, -1 ); OV_CORNER( B, -1, -1, 1 ); OV_CORNER( C, 1, -1, 1 ); OV_CORNER( D, 1, -1, -1 );
+	OV_CORNER( E, -1, 1, -1 ); OV_CORNER( F, -1, 1, 1 ); OV_CORNER( G, 1, 1, 1 ); OV_CORNER( H, 1, 1, -1 );
+#undef OV_CORNER
+	DR_OvPoly( A, B, C, D, rgba );
+	DR_OvPoly( C, G, H, D, rgba );
+	DR_OvPoly( E, F, G, H, rgba );
+	DR_OvPoly( A, B, F, E, rgba );
+	DR_OvPoly( B, F, G, C, rgba );
+	DR_OvPoly( A, E, H, D, rgba );
+}
+
+static void DR_OvMarker( const vec3_t pos ) {		// the white sprite on an activator point (medal_gauntlet, radius 10)
+	refEntity_t re;
+
+	Com_Memset( &re, 0, sizeof( re ) );
+	re.reType = RT_SPRITE;
+	re.customShader = cgs.media.medalGauntlet;
+	re.radius = 10;
+	Com_Memset( re.shaderRGBA, 255, 4 );
+	VectorCopy( pos, re.origin );
+	trap_R_AddRefEntityToScene( &re );
+}
+
+static vec3_t	ovDir;		// the missile direction of the shared overlay entity (DeFRaG leaves it set between uses)
+
+static void DR_OvBall( int weapon, const vec3_t org ) {		// 0x1f3a0 on the overlay entity: a rocket (5), plasma (8) or BFG (9) missile
+	centity_t c;
+
+	Com_Memset( &c, 0, sizeof( c ) );
+	c.currentState.eType = ET_MISSILE;
+	c.currentState.weapon = weapon;
+	VectorCopy( ovDir, c.currentState.pos.trDelta );
+	VectorCopy( org, c.lerpOrigin );
+	CG_DF_AddGhostMissile( &c );
+}
+
+// a ball at `p`, its direction taken from `from` to `p`, with the id number above or below it
+static void DR_OvEnd( const vec3_t from, const vec3_t p, int id, qboolean below, int mask, const byte *rgba ) {
+	vec3_t d;
+
+	VectorSubtract( p, from, d );
+	VectorNormalize( d );
+	VectorCopy( d, ovDir );
+	if ( mask & 16 ) {
+		DR_OvBall( 9, p );
+	}
+	if ( mask & 1 ) {
+		DR_OvTag( p, below ? -15.0f : 15.0f, id, rgba );
+	}
+}
+
+static void DR_Overlay( void ) {		// 0x18873
+	int		mask = df_demos_ReplayDrawMask.integer;
+	vec3_t	p, q, mid, fwd;
+	int		i, k;
+
+	if ( !drEnabled ) {
+		return;
+	}
+	VectorClear( ovDir );
+	for ( i = 0; i < DR_MAX_CAM; i++ ) {		// cameras: a rocket along the view, the id above and below
+		if ( !DR_InUse( DR_CAM, i ) ) {
+			continue;
+		}
+		VectorCopy( drCams[i].origin, p );
+		AngleVectors( drCams[i].angles, fwd, NULL, NULL );
+		VectorCopy( fwd, ovDir );
+		if ( mask & 2 ) {
+			DR_OvBall( 5, p );
+		}
+		if ( mask & 1 ) {
+			DR_OvTag( p, 15.0f, i, drRed );
+			DR_OvTag( p, -15.0f, i, drRed );
+		}
+	}
+	for ( i = 0; i < DR_MAX_TRAN; i++ ) {		// camera transitions: a line between the two cameras
+		if ( drTrans[i].dtype == DR_CAM && DR_InUse( DR_CAM, drTrans[i].id1 ) && DR_InUse( DR_CAM, drTrans[i].id2 ) && ( mask & 4 ) ) {
+			DR_OvLine( drCams[drTrans[i].id1].origin, drCams[drTrans[i].id2].origin, drRed );
+		}
+	}
+	for ( i = 0; i < DR_MAX_LINK; i++ ) {		// links: a line from the activator to the camera it moves to
+		const drLink_t *l = &drLinks[i];
+		qboolean haveFrom = qfalse, haveTo = qfalse;
+
+		if ( !DR_InUse( DR_LINK, i ) || !DR_InUse( DR_ACT, l->id1 ) ) {
+			continue;
+		}
+		if ( drActs[l->id1].type == 4 ) {
+			VectorCopy( drActs[l->id1].pos1, p );
+			haveFrom = qtrue;
+		} else if ( drActs[l->id1].type == 5 ) {
+			for ( k = 0; k < 3; k++ ) {
+				p[k] = drActs[l->id1].pos1[k] + 0.5f * ( drActs[l->id1].pos2[k] - drActs[l->id1].pos1[k] );
+			}
+			haveFrom = qtrue;
+		}
+		if ( l->dtype2 == DR_CAM ) {
+			if ( !DR_InUse( DR_CAM, l->id2 ) ) {
+				continue;
+			}
+			VectorCopy( drCams[l->id2].origin, q );
+			haveTo = qtrue;
+		} else if ( l->dtype2 == DR_TRAN ) {
+			if ( drTrans[l->id2].dtype != DR_CAM || !DR_InUse( DR_CAM, drTrans[l->id2].id1 ) ) {
+				continue;
+			}
+			VectorCopy( drCams[drTrans[l->id2].id1].origin, q );
+			haveTo = qtrue;
+		}
+		if ( haveFrom && haveTo && ( mask & 8 ) ) {
+			DR_OvLine( p, q, drGreen );
+		}
+	}
+	for ( i = 0; i < DR_MAX_ACT; i++ ) {
+		drAct_t *a = &drActs[i];
+
+		if ( a->type == 4 ) {		// RADIUS: a marker, a plasma ball and BFG balls at the six axis ends
+			if ( VectorLength( a->pos1 ) == 0 ) {
+				continue;
+			}
+			if ( mask & 16 ) {
+				DR_OvMarker( a->pos1 );
+			}
+			if ( mask & 16 ) {
+				DR_OvBall( 8, a->pos1 );
+			}
+			if ( mask & 1 ) {
+				DR_OvTag( a->pos1, 15.0f, i, drGreen );
+				DR_OvTag( a->pos1, -15.0f, i, drGreen );
+			}
+			for ( k = 0; k < 3; k++ ) {
+				VectorCopy( a->pos1, p );
+				p[k] += a->value;
+				DR_OvEnd( a->pos1, p, i, qfalse, mask, drGreen );
+				VectorCopy( a->pos1, p );
+				p[k] -= a->value;
+				DR_OvEnd( a->pos1, p, i, k == 2, mask, drGreen );
+			}
+		}
+		if ( a->type == 5 ) {		// VOLUME: the box between pos1 and pos2
+			static const float faceRgba[4] = { 0, 0, 255, 25 };
+
+			if ( VectorLength( a->pos1 ) == 0 && VectorLength( a->pos2 ) == 0 ) {
+				continue;
+			}
+			if ( mask & 16 ) {
+				DR_OvMarker( a->pos1 );
+				DR_OvMarker( a->pos2 );
+			}
+			for ( k = 0; k < 3; k++ ) {
+				mid[k] = a->pos1[k] + 0.5f * ( a->pos2[k] - a->pos1[k] );
+			}
+			if ( mask & 16 ) {
+				DR_OvBall( 8, mid );
+			}
+			if ( mask & 1 ) {
+				DR_OvTag( mid, 15.0f, i, drBlue );
+				DR_OvTag( mid, -15.0f, i, drBlue );
+			}
+			for ( k = 0; k < 2; k++ ) {		// the two defining corners (yellow): the number goes to the outside
+				const float *pt = k ? a->pos2 : a->pos1;
+
+				VectorSubtract( pt, mid, fwd );
+				VectorNormalize( fwd );
+				DR_OvEnd( mid, pt, i, fwd[2] >= 0, mask, drYellow );
+			}
+			for ( k = 0; k < 3; k++ ) {		// the other six corners (green)
+				VectorCopy( a->pos1, p );
+				p[k] = a->pos2[k];
+				VectorSubtract( p, mid, fwd );
+				VectorNormalize( fwd );
+				DR_OvEnd( mid, p, i, fwd[2] >= 0, mask, drGreen );
+				VectorCopy( a->pos2, p );
+				p[k] = a->pos1[k];
+				VectorSubtract( p, mid, fwd );
+				VectorNormalize( fwd );
+				DR_OvEnd( mid, p, i, fwd[2] >= 0, mask, drGreen );
+			}
+			if ( mask & 32 ) {
+				DR_OvBox( a->pos1, a->pos2, drBlue );
+			}
+			if ( mask & 64 ) {
+				DR_OvFaces( a->pos1, a->pos2, faceRgba );
+			}
+		}
+	}
+}
+
+// 0x1a4ac: the per-mode work table (modes 1 and 2: activators, transitions, camera; 3 adds the edit overlay; 4 is the overlay alone)
+static void DR_Table( int mode ) {
+	DR_Track( mode );
+	if ( mode >= 1 && mode <= 3 ) {
+		DR_Activators();
+		DR_StepTrans();
+		DR_CameraView();
+	}
+	if ( mode >= 3 ) {
+		DR_Overlay();
+	}
+}
+
 // 0x19156 clamps ReplayMode to 0..4, then 0x1a4ed runs the frame. Called after CG_CalcViewValues.
 void CG_DF_ReplayFrame( void ) {
 	int mode = df_demos_ReplayMode.integer;
@@ -1443,20 +2051,36 @@ void CG_DF_ReplayFrame( void ) {
 		mode = (int)DR_Clamp( (float)mode, 0, 4 );
 		trap_Cvar_Set( "df_demos_ReplayMode", va( "%i", mode ) );
 	}
-	if ( mode < 2 ) {
-		return;
+	drFreeCam = qfalse;
+	drVerbose = mode >= 2;
+	DR_KeyFrame( mode );
+	if ( drEnabled && drCleanup ) {		// 0x1a3a6
+		DR_RestoreVars();
+		DR_ClearLatches();
+		drCleanup = 0;
 	}
 	if ( cg.demoPlayback && DR_CvarF( "df_demos_CameraMode" ) != 0 ) {
+		DR_Cleanup( qtrue );
+	} else if ( mode == 0 ) {
+		DR_Cleanup( qtrue );
+	} else if ( mode == 1 && !cg.demoPlayback && drKey == 0 ) {
 		return;
+	} else {
+		qboolean loaded = DR_EnsureLoaded();
+
+		if ( !loaded && mode != 1 ) {
+			return;
+		}
+		if ( mode == 1 && ( !loaded || drKey == 2 ) ) {		// AUTOCHASE: the replay free camera (mode 9)
+			CG_DF_ReplayFreeCamera( 9, 0 );
+			if ( drKey == 1 ) {
+				DR_KeyChange( 2, qtrue );
+			}
+			drFreeCam = qtrue;
+		} else {
+			DR_Table( mode );
+		}
 	}
-	if ( !DR_EnsureLoaded() || mode == 4 ) {
-		return;
-	}
-	drTime = cg.time;
-	VectorCopy( cg.predictedPlayerState.origin, drTarget );
-	DR_Activators();
-	DR_StepTrans();
-	DR_CameraView();
 }
 
 void CG_DF_Replay_f( void ) {			// 0x18006

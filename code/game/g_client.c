@@ -1333,6 +1333,9 @@ void ClientSpawn(gentity_t *ent) {
 	// stopped/reset by respawning. (DeFRaG keeps the touch-driven state/fracDelta words across the wipe; oDFs's TIMER_RUNNING
 	// persists for the whole run, so here it must be cleared too, otherwise the next tick would restart the timer.)
 	memset( G_GetTimerRecord( client ), 0, sizeof(raceTimer_t) );
+	if ( g_ndmTimer[0].mode == 3 ) {
+		G_StartRace( ent );		// df_ndm_timer_start "resp": the timer starts at every (re)spawn (func_0x274b: StartRace when the start flag == 3)
+	}
 
 	client->ps.stats[STAT_WEAPONS] = g_ndm.weaponsSet;
 	client->ps.ammo[WP_GAUNTLET] = -1;

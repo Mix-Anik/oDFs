@@ -640,12 +640,81 @@ static void CG_DF_ChsOb( int item, char *label, char *value, const char *sep, co
 	}
 	if ( item >= 300 && item <= 308 ) {
 		slot = obItemSlot[item - 300];
-	} else if ( item == 310 ) {
-		slot = 13;
+	} else if ( item >= 310 && item <= 317 ) {
+		slot = obItemSlot[item - 301];		// 310 -> 13, 311..313 -> 14..16, 314..317 -> 7..10
 	}
 	if ( slot >= 0 ) {
 		Com_sprintf( label, CHS_BUF, "OB(%s) offsets", dfObNames[slot] );
 		Com_sprintf( value, CHS_BUF, "%.3f | %.3f", dfObOut1[slot], dfObOut2[slot] );
+	}
+}
+
+// items 26..28 (cgame 0xc908..0xcaf2): speed along the view's right vector (S), with F and XY: a '<' in front of |S| when it is negative, a '>' behind it
+// when it is positive (the pad is a blank otherwise). 26 uses the narrow number format, 27 / 28 the wide one
+static void CG_DF_ChsSideSpeed( int item, char *label, char *value, const char *sep, const char *fmt, const char *w, const vec3_t vel, const vec3_t ang ) {
+	vec3_t	f, r;
+	char	pre[2] = " ", post[2] = " ";
+	float	xy, F, S;
+
+	AngleVectors( ang, f, r, NULL );
+	f[2] = 0;
+	VectorNormalize( f );
+	r[2] = 0;
+	VectorNormalize( r );
+	F = vel[0] * f[0] + vel[1] * f[1];
+	S = vel[0] * r[0] + vel[1] * r[1];
+	xy = sqrt( vel[0] * vel[0] + vel[1] * vel[1] );
+	if ( S < 0 ) {
+		pre[0] = '<';
+	}
+	if ( S > 0 ) {
+		post[0] = '>';
+	}
+	if ( S < 0 ) {
+		S = -S;
+	}
+	switch ( item ) {
+	case 26:
+		Q_strncpyz( label, "speed S", CHS_BUF );
+		Com_sprintf( value, CHS_BUF, va( "%%s%s%%s", fmt ), pre, S, post );
+		break;
+	case 27:
+		Com_sprintf( label, CHS_BUF, "speed F%sS", sep );
+		Com_sprintf( value, CHS_BUF, va( "%s%s%%s%s%%s", w, sep, w ), F, pre, S, post );
+		break;
+	case 28:
+		Com_sprintf( label, CHS_BUF, "speed XY%sF%sS", sep, sep );
+		Com_sprintf( value, CHS_BUF, va( "%s%s%s%s%%s%s%%s", w, sep, w, sep, w ), xy, F, pre, S, post );
+		break;
+	}
+}
+
+// items 320..324 (cgame 0xf153..0xf2d3): the demo camera's pose
+static void CG_DF_ChsDemoCam( int item, char *label, char *value, const char *sep, const char *w ) {
+	vec3_t	pos, ang;
+
+	CG_DF_DemoCamState( pos, ang );
+	switch ( item ) {
+	case 320:
+		Q_strncpyz( label, "dcam pos", CHS_BUF );
+		Com_sprintf( value, CHS_BUF, va( "%s %s %s", w, w, w ), pos[0], pos[1], pos[2] );
+		break;
+	case 321:
+		Q_strncpyz( label, "dcam ang", CHS_BUF );
+		Com_sprintf( value, CHS_BUF, va( "%s %s %s", w, w, w ), ang[0], ang[1], ang[2] );
+		break;
+	case 322:
+		Q_strncpyz( label, "dcam pos ang", CHS_BUF );
+		Com_sprintf( value, CHS_BUF, va( "%s %s %s %s %s %s", w, w, w, w, w, w ), pos[0], pos[1], pos[2], ang[0], ang[1], ang[2] );
+		break;
+	case 323:
+		Q_strncpyz( label, "dcam pos ang", CHS_BUF );
+		Com_sprintf( value, CHS_BUF, va( "%s,%s,%s,%s,%s,%s", w, w, w, w, w, w ), pos[0], pos[1], pos[2], ang[0], ang[1], ang[2] );
+		break;
+	case 324:
+		Q_strncpyz( label, "dcam pos ang", CHS_BUF );
+		Com_sprintf( value, CHS_BUF, va( "(%s %s %s) %s%s%s%s%s", w, w, w, w, sep, w, sep, w ), pos[0], pos[1], pos[2], ang[0], ang[1], ang[2] );
+		break;
 	}
 }
 
@@ -671,6 +740,7 @@ static void CG_DF_ChsItem( int id, char *label, char *value, const char *sep ) {
 	VectorCopy( ps->viewangles, ang );
 	health = cg.snap->ps.stats[STAT_HEALTH];
 	armor = cg.snap->ps.stats[STAT_ARMOR];
+	CG_DF_GhostTracked( pos, vel, ang );		// 0xc447: a ghost with a camera mode replaces position / velocity / angles
 
 	switch ( item ) {
 	case 1:
@@ -719,6 +789,13 @@ static void CG_DF_ChsItem( int id, char *label, char *value, const char *sep ) {
 		f[2] = 0;
 		VectorNormalize( f );
 		CG_DF_ChsFloat( value, fmt, vel[0] * f[0] + vel[1] * f[1] );
+		break;
+	}
+	case 26: case 27: case 28: {
+		char wf[24];
+
+		Com_sprintf( wf, sizeof( wf ), "%%%i.%if", 4 + dec + ( dec > 0 ? 1 : 0 ), dec );
+		CG_DF_ChsSideSpeed( item, label, value, sep, fmt, wf, vel, ang );
 		break;
 	}
 	case 30: case 31: case 32: {
@@ -834,6 +911,31 @@ static void CG_DF_ChsItem( int id, char *label, char *value, const char *sep ) {
 		}
 		break;
 	}
+	case 80:
+		Q_strncpyz( label, "SET [all ghosts] (Auto NoDrawR)", CHS_BUF );
+		CG_DF_GhostInfo( 0, 3, NULL, value, CHS_BUF );
+		break;
+	case 81: case 82: case 83: case 84: case 85: case 86:
+		CG_DF_GhostInfo( item > 83, ( item - 81 ) % 3, label, value, CHS_BUF );
+		break;
+	case 320: case 321: case 322: case 323: case 324: {
+		char wf[24];
+
+		Com_sprintf( wf, sizeof( wf ), "%%%i.%if", 4 + dec + ( dec > 0 ? 1 : 0 ), dec );
+		CG_DF_ChsDemoCam( item, label, value, sep, wf );
+		break;
+	}
+	case 900:
+		Q_strncpyz( label, "Verbose OB Result", CHS_BUF );
+		break;
+	case 901:
+		Q_strncpyz( label, "OSP Offset (1=X,2=Y,3=Z,4=X*,5=Y*,6=Z*,7=bOut,8=bOn)", CHS_BUF );
+		Com_sprintf( value, CHS_BUF, "%.3f %.3f %.3f %.3f %.3f %.3f", 670.0f, 400.0f, 245.0f, 7.0f, 10.0f, 2.0f );		// the constants at data 5216
+		break;
+	case 999:
+		Q_strncpyz( label, "O3J VERSION", CHS_BUF );
+		Com_sprintf( value, CHS_BUF, "%s | %s", "1016 (29-DEC-2003)", "OzoneJunkie@hotmail.com" );
+		break;
 	case 160: case 161: case 162: case 163: {
 		char wf[24];
 
@@ -841,7 +943,7 @@ static void CG_DF_ChsItem( int id, char *label, char *value, const char *sep ) {
 		CG_DF_ChsSavePosDist( item, label, value, sep, wf, pos );
 		break;
 	}
-	case 50: case 51: case 52: case 53: case 54: case 55: case 56: case 57: case 58: case 59: case 60: case 61: case 62: case 63: case 64: case 65: case 66: case 67: case 68: case 69: case 70: case 71: case 72: case 73: case 74: case 75: case 76: case 77: case 79: case 300: case 301: case 302: case 303: case 304: case 305: case 306: case 307: case 308: case 310: {
+	case 50: case 51: case 52: case 53: case 54: case 55: case 56: case 57: case 58: case 59: case 60: case 61: case 62: case 63: case 64: case 65: case 66: case 67: case 68: case 69: case 70: case 71: case 72: case 73: case 74: case 75: case 76: case 77: case 79: case 300: case 301: case 302: case 303: case 304: case 305: case 306: case 307: case 308: case 310: case 311: case 312: case 313: case 314: case 315: case 316: case 317: {
 		char wf[24];
 
 		Com_sprintf( wf, sizeof( wf ), "%%%i.%if", 4 + dec + ( dec > 0 ? 1 : 0 ), dec );

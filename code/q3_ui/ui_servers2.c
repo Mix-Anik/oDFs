@@ -657,6 +657,11 @@ static void ArenaServers_Insert( char* adrstr, char* info, int pingtime )
 		return;
 	}
 
+	// DeFRaG (ui 0x153d4): only servers whose game starts with "defrag" are listed (df_ui_browserDefragOnly 0 = every game)
+	if ( trap_Cvar_VariableValue( "df_ui_browserDefragOnly" ) && Q_stricmpn( Info_ValueForKey( info, "game" ), "defrag", 6 ) ) {
+		return;
+	}
+
 	if (*g_arenaservers.numservers >= g_arenaservers.maxservers) {
 		// list full;
 		servernodeptr = g_arenaservers.serverlist+(*g_arenaservers.numservers)-1;

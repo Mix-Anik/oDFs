@@ -317,12 +317,153 @@ void G_InitRaceMode( void ) {
 	g_hasTeamItem      = qfalse;
 	G_FragsFilterInit();
 	G_SpeedAwardInit();
-	// Clear the SERVERINFO cvars that cgame reads to detect timer entities.
-	// SP_target_* will re-set them to "df" if entities exist on this map.
-	trap_Cvar_Set( "df_ndm_timer_start",      "" );
-	trap_Cvar_Set( "df_ndm_timer_stop",        "" );
-	trap_Cvar_Set( "df_ndm_timer_checkpoint",  "" );
+	// The timer cvars (df_ndm_timer_*) are advertised by SP_target_* ("df") when still empty and chosen by the player otherwise;
+	// they are cleared on a map change, not on a map_restart (G_NdmClearTimerCvars, DeFRaG 0x24825 / G_WriteSessionData).
+	memset( g_ndmTimer, 0, sizeof( g_ndmTimer ) );
 	trap_Cvar_Set( "defrag_route",             "" );
+}
+
+// --- timers bound to items / respawn / flags (non-defrag maps and fastcaps) -------------------------------------------------
+// DeFRaG func_0x1de9 (parse), 0x1e35 (name), 0x3adb (alias lookup, data 2684 = aliases, 2872 = bg_itemlist), 0x3b96 (pickup hook),
+// 0x3c23 (is a timer item), 0x274b (respawn start). See disasm/G_TRIGGER/ndm_item_timers.md.
+
+ndmTimer_t g_ndmTimer[3];
+
+static const struct { const char *alias, *classname; } ndmAliases[] = {
+	{ "as", "item_armor_shard" }, { "ya", "item_armor_combat" }, { "ra", "item_armor_body" },
+	{ "h5", "item_health_small" }, { "h25", "item_health" }, { "h50", "item_health_large" }, { "mh", "item_health_mega" },
+	{ "gt", "weapon_gauntlet" }, { "sg", "weapon_shotgun" }, { "mg", "weapon_machinegun" }, { "gl", "weapon_grenadelauncher" },
+	{ "rl", "weapon_rocketlauncher" }, { "lg", "weapon_lightning" }, { "rg", "weapon_railgun" }, { "pg", "weapon_plasmagun" },
+	{ "bfg", "weapon_bfg" }, { "hook", "weapon_grapplinghook" },
+	{ "asg", "ammo_shells" }, { "amg", "ammo_bullets" }, { "agl", "ammo_grenades" }, { "apg", "ammo_cells" }, { "alg", "ammo_lightning" },
+	{ "arl", "ammo_rockets" }, { "arg", "ammo_slugs" }, { "abfg", "ammo_bfg" },
+	{ "tp", "holdable_teleporter" }, { "med", "holdable_medkit" },
+	{ "quad", "item_quad" }, { "bs", "item_enviro" }, { "hast", "item_haste" }, { "inv", "item_invis" }, { "reg", "item_regen" },
+	{ "fli", "item_flight" },
+};
+
+static void G_NdmParseTimer( int slot, const char *cvar ) {
+	ndmTimer_t	*t = &g_ndmTimer[slot];
+	char		buf[64];
+	int			i;
+
+	memset( t, 0, sizeof( *t ) );
+	trap_Cvar_VariableStringBuffer( cvar, buf, sizeof( buf ) );
+	if ( !buf[0] || !Q_stricmp( buf, "df" ) ) {
+		return;				// "df" / unset: the map's target_* entities drive this timer event
+	}
+	if ( !Q_stricmp( buf, "resp" ) ) {
+		if ( slot == 0 ) {	// the respawn only works as a start (the checkpoint / stop value 3 is discarded)
+			t->mode = 3;
+			Q_strncpyz( t->name, "resp", sizeof( t->name ) );
+		}
+		return;
+	}
+	for ( i = 0; i < ARRAY_LEN( ndmAliases ); i++ ) {
+		if ( !Q_stricmp( ndmAliases[i].alias, buf ) ) {
+			t->item = G_NdmItemByClassname( ndmAliases[i].classname );
+			if ( t->item ) {
+				t->mode = 4;
+				Q_strncpyz( t->name, ndmAliases[i].alias, sizeof( t->name ) );
+			}
+			return;
+		}
+	}
+}
+
+// Called by G_ResolveDfMode once the mode is known. Run mode: only the entities. Fastcaps: the enemy flag starts, touching the own flag stops.
+// Otherwise (tricks): the three df_ndm_timer_* cvars.
+void G_NdmTimerInit( void ) {
+	memset( g_ndmTimer, 0, sizeof( g_ndmTimer ) );
+	if ( g_dfMode == 1 ) {
+		return;
+	}
+	if ( g_dfMode == 3 ) {
+		g_ndmTimer[0].mode = 2;
+		g_ndmTimer[2].mode = 2;
+	} else {
+		G_NdmParseTimer( 0, "df_ndm_timer_start" );
+		G_NdmParseTimer( 1, "df_ndm_timer_checkpoint" );
+		G_NdmParseTimer( 2, "df_ndm_timer_stop" );
+	}
+	if ( g_ndmTimer[0].mode ) {
+		g_startTimerReady = qtrue;
+	}
+	if ( g_ndmTimer[1].mode ) {
+		g_checkpointReady = qtrue;
+	}
+	if ( g_ndmTimer[2].mode ) {
+		g_stopTimerReady = qtrue;
+	}
+}
+
+qboolean G_IsTimerItem( gitem_t *item ) {		// func_0x3c23: the item chosen as start / checkpoint / stop
+	return item && ( ( g_ndmTimer[0].mode == 4 && item == g_ndmTimer[0].item ) || ( g_ndmTimer[1].mode == 4 && item == g_ndmTimer[1].item )
+		|| ( g_ndmTimer[2].mode == 4 && item == g_ndmTimer[2].item ) );
+}
+
+static qboolean G_NdmFlagOf( gentity_t *player, gitem_t *item, qboolean enemy ) {		// func_0x3b22 (enemy) / 0x3b5c (own)
+	int team = player->client->sess.sessionTeam;
+
+	if ( item->giType != IT_TEAM ) {
+		return qfalse;
+	}
+	if ( item->giTag == PW_REDFLAG ) {
+		return team == ( enemy ? TEAM_BLUE : TEAM_RED );
+	}
+	if ( item->giTag == PW_BLUEFLAG ) {
+		return team == ( enemy ? TEAM_RED : TEAM_BLUE );
+	}
+	return qfalse;
+}
+
+// func_0x3b96: runs on every item touch, after the pickup function and before the "was it picked up" test
+void G_NdmItemHook( gentity_t *player, gentity_t *ent ) {
+	gitem_t		*item = ent->item;
+	raceTimer_t	*t;
+
+	if ( !item || !player->client ) {
+		return;
+	}
+	t = G_GetTimerRecord( player->client );
+	if ( g_ndmTimer[0].mode == 2 && G_NdmFlagOf( player, item, qtrue ) ) {
+		G_StartRace( player );
+	} else if ( g_ndmTimer[2].mode == 2 && G_NdmFlagOf( player, item, qfalse ) ) {
+		G_StopRace( player );
+	} else if ( g_ndmTimer[0].mode == 4 && item == g_ndmTimer[0].item ) {
+		if ( !t->initialized ) {		// the start item only starts a timer that is not running yet
+			G_StartRace( player );
+		}
+	} else if ( g_ndmTimer[1].mode == 4 && item == g_ndmTimer[1].item ) {
+		G_Checkpoint( player, 1 );
+	} else if ( g_ndmTimer[2].mode == 4 && item == g_ndmTimer[2].item ) {
+		if ( g_ndmTimer[1].mode != 4 || t->checkpointCount ) {		// with a checkpoint item set, the stop item counts after it
+			G_StopRace( player );
+		}
+	}
+}
+
+void G_NdmClearTimerCvars( void ) {
+	trap_Cvar_Set( "df_ndm_timer_start",      "" );
+	trap_Cvar_Set( "df_ndm_timer_checkpoint", "" );
+	trap_Cvar_Set( "df_ndm_timer_stop",       "" );
+	trap_Cvar_Set( "defrag_route",            "" );
+}
+
+// defrag_route for the tricks mode (func_0x1e60 tail): "<start>-<checkpoint>-<stop>" ("df" = the map's entity, "resp", or the item alias)
+void G_NdmBuildRoute( void ) {
+	const char	*name[3];
+	int			i;
+
+	for ( i = 0; i < 3; i++ ) {
+		qboolean ready = i == 0 ? g_startTimerReady : ( i == 1 ? g_checkpointReady : g_stopTimerReady );
+
+		name[i] = g_ndmTimer[i].mode ? g_ndmTimer[i].name : ( ready ? "df" : "" );
+	}
+	if ( !name[0][0] ) {
+		return;
+	}
+	trap_Cvar_Set( "defrag_route", va( "%s-%s%s%s", name[0], name[1], name[1][0] ? "-" : "", name[2] ) );
 }
 
 // ─── timer state transitions (called from USE callbacks in g_trigger.c) ──────

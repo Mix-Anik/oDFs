@@ -601,6 +601,7 @@ void CG_DF_AddGhostMissile( centity_t *cent ) {
 	}
 	keep = cg_weapons[w].missileSound;
 	cg_weapons[w].missileSound = 0;
+	cent->trailTime = cg.time;		// the callers pass a fresh entity: no smoke puffs for the whole time since time 0 (the trail functions step from trailTime)
 	CG_Missile( cent );
 	cg_weapons[w].missileSound = keep;
 }

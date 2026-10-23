@@ -209,7 +209,7 @@ void AimAtTarget( gentity_t *self ) {
 	}
 
 	height = ent->s.origin[2] - origin[2];
-	gravity = g_gravity.value;
+	gravity = G_PhysGravity();
 	time = sqrt( height / ( .5 * gravity ) );
 	if ( !time ) {
 		G_FreeEntity( self );
@@ -568,20 +568,30 @@ void SP_func_timer( gentity_t *self ) {
 // Each entity only needs a USE callback; no model or bbox is needed.
 // The g_raceTimers state machine lives in g_defrag.c.
 
+// the map has this timer entity: advertise it in the (SERVERINFO) cvar unless the player already chose something else
+static void G_NdmAdvertise( const char *cvar ) {
+	char buf[8];
+
+	trap_Cvar_VariableStringBuffer( cvar, buf, sizeof( buf ) );
+	if ( !buf[0] ) {
+		trap_Cvar_Set( cvar, "df" );
+	}
+}
+
 static void use_startTimer( gentity_t *self, gentity_t *other, gentity_t *activator ) {
-	if ( !g_startTimerReady ) return;
+	if ( !g_startTimerReady || g_ndmTimer[0].mode ) return;
 	if ( !activator || !activator->client ) return;
 	G_StartRace( activator );
 }
 
 static void use_stopTimer( gentity_t *self, gentity_t *other, gentity_t *activator ) {
-	if ( !g_stopTimerReady ) return;
+	if ( !g_stopTimerReady || g_ndmTimer[2].mode ) return;
 	if ( !activator || !activator->client ) return;
 	G_StopRace( activator );
 }
 
 static void use_checkpoint( gentity_t *self, gentity_t *other, gentity_t *activator ) {
-	if ( !g_checkpointReady ) return;
+	if ( !g_checkpointReady || g_ndmTimer[1].mode ) return;
 	if ( !activator || !activator->client ) return;
 	G_Checkpoint( activator, self->count );
 }
@@ -595,7 +605,7 @@ void SP_target_startTimer( gentity_t *ent ) {
 	g_startTimerReady = qtrue;
 	// Signal to DeFRaG cgame that a start timer exists — cgame reads this
 	// SERVERINFO cvar via trap_CvarVariableStringBuffer; "df" prefix = active.
-	trap_Cvar_Set( "df_ndm_timer_start", "df" );
+	G_NdmAdvertise( "df_ndm_timer_start" );
 }
 
 /*QUAKED target_stopTimer (0.5 0 0) (-8 -8 -8) (8 8 8)
@@ -605,7 +615,7 @@ When fired, stops the player's timer and broadcasts the result.
 void SP_target_stopTimer( gentity_t *ent ) {
 	ent->use         = use_stopTimer;
 	g_stopTimerReady = qtrue;
-	trap_Cvar_Set( "df_ndm_timer_stop", "df" );
+	G_NdmAdvertise( "df_ndm_timer_stop" );
 }
 
 /*QUAKED target_checkpoint (0 0 0.5) (-8 -8 -8) (8 8 8)
@@ -616,7 +626,7 @@ void SP_target_checkpoint( gentity_t *ent ) {
 	ent->use          = use_checkpoint;
 	ent->count        = g_checkpointCount++;
 	g_checkpointReady = qtrue;
-	trap_Cvar_Set( "df_ndm_timer_checkpoint", "df" );
+	G_NdmAdvertise( "df_ndm_timer_checkpoint" );
 }
 
 

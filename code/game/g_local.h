@@ -60,6 +60,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define FL_NOT_DF				0x00100000	// "notdf"  (mode 1)
 #define FL_NOT_TM				0x00200000	// "nottm"  (mode 2)
 #define FL_NOT_FC				0x00400000	// "notfc"/"notteam" (mode 3)
+#define FL_NDM_KEEP				0x01000000	// dropped items: always spawned and active (func_0x3c43 / 0x3c8b test 0x1000000)
 #define FL_MOVER				0x00800000	// set by func_plat/func_bobbing/func_train; removed in mode 3 when df_ndm_nomover is set
 
 // movers are things like doors, plats, buttons, etc
@@ -779,6 +780,8 @@ extern	vmCvar_t	g_password;
 extern	vmCvar_t	g_needpass;
 extern	vmCvar_t	g_gravity;
 extern	vmCvar_t	g_speed;
+float	G_PhysSpeed( void );
+float	G_PhysGravity( void );
 extern	vmCvar_t	g_knockback;
 extern	vmCvar_t	g_quadfactor;
 extern	vmCvar_t	g_forcerespawn;
@@ -829,12 +832,32 @@ extern	vmCvar_t	df_mode_fastcaps;
 typedef struct {
 	int			damage;			// 0x131820: != 0 -> health maxHealth+25, armor 0
 	int			weaponsSet;		// 0x131824: starting weapon bitmask
-	int			flags;			// 0x13182c: 0x6 weapons pickup rules, 0x18 damage, 0x60 powerups
+	int			flags;			// 0x13182c: pickup EFFECT mask by giType (0x6 weapon+ammo, 0x18 armor+health, 0x60 powerup+holdable, 0x100 team items)
+	int			itemMask;		// 0x131828: items of these giTypes are spawned at all (FinishSpawningItem), same bit layout as flags
 	int			nopad;			// 0x131830
 	int			noteleport;		// 0x131834
 	qboolean	nomover;		// (0x131838 == 0)
 } ndmSettings_t;
 extern ndmSettings_t g_ndm;
+
+// DeFRaG timer-on-item rules of the non-defrag-map modes (func_0x1de9 / 0x3b96 / 0x3c23): start, checkpoint and stop of the race timer can be bound
+// to the pickup of an item (df_ndm_timer_start / _checkpoint / _stop = an item alias such as "rl", "mh", "quad"), to the respawn ("resp", start only),
+// or, in fastcaps, to the enemy / own team flag. mode 0 = not set here (the target_* entities of the map drive that timer event).
+typedef struct {
+	int			mode;			// 0 entities, 2 team flag (fastcaps), 3 respawn, 4 item
+	gitem_t		*item;
+	char		name[16];		// the alias as typed ("df", "resp", "rl"), for the defrag_route string
+} ndmTimer_t;
+extern ndmTimer_t g_ndmTimer[3];	// 0 start, 1 checkpoint, 2 stop
+extern vmCvar_t df_ndm_itemsSpawn, df_ndmItemPolicy;
+qboolean G_ItemAllowed( gentity_t *ent );		// func_0x3c43: the item is spawned in this mode
+qboolean G_ItemActive( gentity_t *ent );		// func_0x3c8b: picking it up has its normal effect
+qboolean G_IsTimerItem( gitem_t *item );		// func_0x3c23
+void G_NdmItemHook( gentity_t *player, gentity_t *itemEnt );		// func_0x3b96, called by Touch_Item
+void G_NdmTimerInit( void );
+void G_NdmClearTimerCvars( void );
+void G_NdmBuildRoute( void );
+gitem_t *G_NdmItemByClassname( const char *classname );
 void G_ResolveNdm( void );
 extern	vmCvar_t	df_dbg_speed;
 extern	vmCvar_t	df_dbg_respawn;

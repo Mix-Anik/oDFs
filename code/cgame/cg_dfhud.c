@@ -76,7 +76,7 @@ typedef struct {
 	int				px, py;		// +0x44 / +0x48 position resolved by the last draw
 } dfWidget_t;
 
-static dfWidget_t	wBest, wLast, wSpeed, wPower[3], wFlag, wHealth, wArmor, wAmmo, wFrags, wCkpt;
+static dfWidget_t	wBest, wLast, wSpeed, wPower[3], wFlag, wHoldable, wHealth, wArmor, wAmmo, wFrags, wCkpt;
 vmCvar_t			df_hud_3DIcons;					// 0x11aef0: flag carrier icon as 3D model (1) or 16x16 sprite (0)
 static int			powerList[3] = { -1, -1, -1 };	// 0x11cca8
 static int			powerCount;						// 0x11cca4
@@ -169,6 +169,7 @@ void CG_DF_HudInit( void ) {
 		CG_DF_InitWidget( &wPower[i], 5, 438, 2, 6, SH_78_B, SH_78_I );
 	}
 	CG_DF_InitWidget( &wFlag, 5, 438, 0, 0, SH_36_B, SH_36_I );		// W4 0x11cdec
+	CG_DF_InitWidget( &wHoldable, 5, 438, 0, 0, SH_36_B, SH_36_I );		// W5 0x11ce40
 	CG_DF_InitWidget( &wHealth, 93, 438, 3, 25, SH_94_B, SH_94_I );
 	wHealth.icon = &dfSh[SH_ICON_NULL];
 	wHealth.visible = 1;
@@ -736,8 +737,7 @@ void CG_DF_DrawHUD( void ) {
 		CG_DF_DrawWidget( w );
 	}
 
-	// flag carrier box W4 (0x2c16): below the power-up list, red flag (powerups[7]) -> TEAM_RED else TEAM_BLUE. DeFRaG's holdable box W5
-	// (0x2c91, x = 46 beside the flag box) takes its icon from an unresolved table quirk (see hud_widget_system.md) and is not ported.
+	// flag carrier box W4 (0x2c16): below the power-up list, red flag (powerups[7]) -> TEAM_RED else TEAM_BLUE
 	if ( ps->powerups[PW_REDFLAG] || ps->powerups[PW_BLUEFLAG] ) {
 		int team = ps->powerups[PW_REDFLAG] ? TEAM_RED : TEAM_BLUE;
 
@@ -749,6 +749,29 @@ void CG_DF_DrawHUD( void ) {
 		} else {
 			CG_DrawFlagModel( wFlag.x + 10, wFlag.y + 8, 16, 16, team, qtrue );
 		}
+		wHoldable.x = 46;
+	} else {
+		wHoldable.x = 5;
+	}
+
+	// holdable item box W5 (0x2c91): same row as the flag box, x = 46 beside it. The icon pointer is `0x11d100 + 4 * stats[HOLDABLE_ITEM]`,
+	// which for the 1.32 item list (teleporter 26, medkit 27) lands on the icon_teleport / icon_medkit shader globals; no other
+	// holdable exists there, so any other item (Team Arena ones in oDFs) gets the bare box.
+	if ( ps->stats[STAT_HOLDABLE_ITEM] > 0 && ps->stats[STAT_HOLDABLE_ITEM] < bg_numItems ) {
+		wHoldable.y = 438 - 42 * powerCount;
+		wHoldable.visible = 1;
+		switch ( bg_itemlist[ps->stats[STAT_HOLDABLE_ITEM]].giTag ) {
+		case HI_TELEPORTER:
+			wHoldable.icon = &dfSh[SH_ICON_TELEPORT];
+			break;
+		case HI_MEDKIT:
+			wHoldable.icon = &dfSh[SH_ICON_MEDKIT];
+			break;
+		default:
+			wHoldable.icon = NULL;
+			break;
+		}
+		CG_DF_DrawWidget( &wHoldable );
 	}
 
 	// health, armor, ammo, frags

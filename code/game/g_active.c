@@ -944,10 +944,10 @@ void ClientThink_real( gentity_t *ent ) {
 		client->ps.pm_type = PM_NORMAL;
 	}
 
-	client->ps.gravity = g_gravity.value;
+	client->ps.gravity = G_PhysGravity();
 
 	// set speed
-	client->ps.speed = g_speed.value;
+	client->ps.speed = G_PhysSpeed();
 
 #ifdef MISSIONPACK
 	if( bg_itemlist[client->ps.stats[STAT_PERSISTANT_POWERUP]].giTag == PW_SCOUT ) {

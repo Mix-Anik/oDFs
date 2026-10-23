@@ -46,10 +46,58 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 //======================================================================
 
+// --- DeFRaG item rules of the tricks / fastcaps modes (func_0x3c43 / 0x3c8b) --------------------------------------------------
+// g_ndm.itemMask: the giTypes that are spawned at all, g_ndm.flags: the giTypes whose pickup has an effect. The items chosen as timer
+// start / checkpoint / stop (df_ndm_timer_*) are always spawned; dropped items always work. df_ndmItemPolicy 0 switches the rules off.
+
+gitem_t *G_NdmItemByClassname( const char *classname ) {
+	gitem_t *it;
+
+	for ( it = bg_itemlist + 1; it->classname; it++ ) {
+		if ( !Q_stricmp( it->classname, classname ) ) {
+			return it;
+		}
+	}
+	return NULL;
+}
+
+qboolean G_ItemAllowed( gentity_t *ent ) {		// func_0x3c43
+	if ( !df_ndmItemPolicy.integer ) {
+		return qtrue;
+	}
+	if ( !ent->item ) {
+		return qfalse;
+	}
+	if ( ent->flags & FL_NDM_KEEP ) {
+		return qtrue;
+	}
+	return G_IsTimerItem( ent->item ) || ( g_ndm.itemMask & ( 1 << ent->item->giType ) ) ? qtrue : qfalse;
+}
+
+qboolean G_ItemActive( gentity_t *ent ) {		// func_0x3c8b
+	if ( !df_ndmItemPolicy.integer ) {
+		return qtrue;
+	}
+	if ( !ent->item ) {
+		return qfalse;
+	}
+	if ( ent->flags & FL_NDM_KEEP ) {
+		return qtrue;
+	}
+	if ( ent->item->giType == IT_HOLDABLE && ent->item->giTag == HI_TELEPORTER ) {
+		return qfalse;		// the holdable teleporter never gives anything
+	}
+	return ( g_ndm.flags & ( 1 << ent->item->giType ) ) ? qtrue : qfalse;
+}
+
 int Pickup_Powerup( gentity_t *ent, gentity_t *other ) {
 	int			quantity;
 	int			i;
 	gclient_t	*client;
+
+	if ( !G_ItemActive( ent ) ) {
+		return RESPAWN_POWERUP;		// func_0x20afa: taken, but nothing is given
+	}
 
 	if ( !other->client->ps.powerups[ent->item->giTag] ) {
 		// round timing to seconds to make multiple powerup timers
@@ -194,6 +242,9 @@ int Pickup_PersistantPowerup( gentity_t *ent, gentity_t *other ) {
 
 int Pickup_Holdable( gentity_t *ent, gentity_t *other ) {
 
+	if ( !G_ItemActive( ent ) ) {
+		return RESPAWN_HOLDABLE;
+	}
 	other->client->ps.stats[STAT_HOLDABLE_ITEM] = ent->item - bg_itemlist;
 
 	if( ent->item->giTag == HI_KAMIKAZE ) {
@@ -218,6 +269,10 @@ int Pickup_Ammo (gentity_t *ent, gentity_t *other)
 {
 	int		quantity;
 
+	if ( !G_ItemActive( ent ) ) {
+		return RESPAWN_AMMO;
+	}
+
 	if ( ent->count ) {
 		quantity = ent->count;
 	} else {
@@ -234,6 +289,10 @@ int Pickup_Ammo (gentity_t *ent, gentity_t *other)
 
 int Pickup_Weapon (gentity_t *ent, gentity_t *other) {
 	int		quantity;
+
+	if ( !G_ItemActive( ent ) ) {
+		return 5;		// func_0x20d2d: the constant 5 s (not g_weaponRespawn)
+	}
 
 	if ( ent->count < 0 ) {
 		quantity = 0; // None for you, sir!
@@ -278,6 +337,10 @@ int Pickup_Weapon (gentity_t *ent, gentity_t *other) {
 int Pickup_Health (gentity_t *ent, gentity_t *other) {
 	int			max;
 	int			quantity;
+
+	if ( !G_ItemActive( ent ) ) {
+		return RESPAWN_HEALTH;
+	}
 
 	// small and mega healths will go over the max
 #ifdef MISSIONPACK
@@ -525,8 +588,8 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 		return;
 	}
 
-	// the same pickup rules are used for client side and server side
-	if ( !BG_CanItemBeGrabbed( g_gametype.integer, &ent->s, &other->client->ps ) ) {
+	// the same pickup rules are used for client side and server side; the items chosen as timer items are always grabbed (func_0x20f11)
+	if ( !G_IsTimerItem( ent->item ) && !BG_CanItemBeGrabbed( g_gametype.integer, &ent->s, &other->client->ps ) ) {
 		return;
 	}
 
@@ -567,6 +630,12 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 		break;
 	default:
 		return;
+	}
+
+	// DeFRaG (func_0x3b96): timer start / checkpoint / stop on the pickup, then a timer item always counts as picked up (3 s)
+	G_NdmItemHook( other, ent );
+	if ( G_IsTimerItem( ent->item ) ) {
+		respawn = 3;
 	}
 
 	if ( !respawn ) {
@@ -683,7 +752,7 @@ gentity_t *LaunchItem( gitem_t *item, vec3_t origin, vec3_t velocity ) {
 		dropped->nextthink = level.time + 30000;
 	}
 
-	dropped->flags = FL_DROPPED_ITEM;
+	dropped->flags = FL_DROPPED_ITEM | FL_NDM_KEEP;
 
 	trap_LinkEntity (dropped);
 
@@ -774,11 +843,21 @@ void FinishSpawningItem( gentity_t *ent ) {
 		G_SetOrigin( ent, tr.endpos );
 	}
 
+	// DeFRaG (func_0x212a7): the tricks / fastcaps modes only keep the item types selected by df_ndm_itemsSpawn / the preset
+	if ( !G_ItemAllowed( ent ) ) {
+		G_FreeEntity( ent );
+		return;
+	}
+
 	// team members and targeted items aren't present at start
 	if ( ( ent->flags & FL_TEAMMEMBER ) || ent->targetname ) {
 		ent->s.eFlags |= EF_NODRAW;
 		ent->r.contents = 0;
 		return;
+	}
+
+	if ( g_ndmTimer[0].mode == 4 && ent->item == g_ndmTimer[0].item ) {
+		ent->s.eFlags |= 0x00000002;		// the start item carries bit 2 of eFlags (marks it for the client)
 	}
 
 	trap_LinkEntity (ent);

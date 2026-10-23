@@ -1065,6 +1065,7 @@ UI_Shutdown
 =================
 */
 void UI_Shutdown( void ) {
+	UI_DF_Shutdown();
 }
 
 /*

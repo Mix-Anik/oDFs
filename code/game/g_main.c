@@ -98,6 +98,8 @@ vmCvar_t	df_dbg_speed;
 vmCvar_t	df_dbg_respawn;
 vmCvar_t	df_ndm_weaponsSet;
 vmCvar_t	df_ndm_weaponsPickup;
+vmCvar_t	df_ndm_itemsSpawn;
+vmCvar_t	df_ndmItemPolicy;
 vmCvar_t	df_ndm_nopad;
 vmCvar_t	df_ndm_noteleport;
 vmCvar_t	df_ndm_nomover;
@@ -245,6 +247,8 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &df_mode_fastcaps,     "df_mode_fastcaps",     "2",    CVAR_LATCH, 0, qfalse },
 	{ &df_ndm_weaponsSet,    "df_ndm_weaponsSet",    "1022", CVAR_SERVERINFO, 0, qfalse },
 	{ &df_ndm_weaponsPickup, "df_ndm_weaponsPickup", "0",    CVAR_SERVERINFO, 0, qfalse },
+	{ &df_ndm_itemsSpawn,    "df_ndm_itemsSpawn",    "1",    CVAR_SERVERINFO, 0, qfalse },
+	{ &df_ndmItemPolicy,     "df_ndmItemPolicy",     "1",    CVAR_ARCHIVE, 0, qfalse },		// not a DeFRaG cvar: 0 = ignore the item spawn / pickup-effect rules of the tricks / fastcaps modes
 	{ &df_ndm_nopad,         "df_ndm_nopad",         "0",    CVAR_SERVERINFO, 0, qfalse },
 	{ &df_ndm_nomover,       "df_ndm_nomover",       "0",    CVAR_SERVERINFO, 0, qfalse },
 	{ &g_killWallbug,        "g_killWallbug",        "1",    CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
@@ -459,6 +463,17 @@ void G_RegisterCvars( void ) {
 G_UpdateCvars
 =================
 */
+// DeFRaG reads g_speed / g_gravity through func_0x3e10 / func_0x3e88: the cvar is only honoured when sv_cheats is on, otherwise 320 / 800 are
+// used (like g_knockback, func_0x3ec7, in G_Damage). It overrides operator config, so it is opt-in together with the forced map-load cvars
+// (df_forceCvars 1).
+float G_PhysSpeed( void ) {
+	return ( df_forceCvars.integer && !g_cheats.integer ) ? 320.0f : g_speed.value;
+}
+
+float G_PhysGravity( void ) {
+	return ( df_forceCvars.integer && !g_cheats.integer ) ? 800.0f : g_gravity.value;
+}
+
 void G_UpdateCvars( void ) {
 	int			i;
 	cvarTable_t	*cv;
@@ -605,9 +620,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	// "<start>-<checkpoint>-<stop>" (format "%s-%s%s%s"), on the default path = tricks mode (2).
 	// It ends up in demo names (autorecord $route), record file names and the 'Time performed ... on route' message.
 	if ( g_dfMode == 2 && g_startTimerReady ) {
-		trap_Cvar_Set( "defrag_route", va( "df%s%s",
-		    g_stopTimerReady   ? "-df" : "",
-		    g_checkpointReady  ? "-df" : "" ) );
+		G_NdmBuildRoute();
 	}
 
 	// general initialization
@@ -648,6 +661,10 @@ G_ShutdownGame
 */
 void G_ShutdownGame( int restart ) {
 	G_Printf ("==== ShutdownGame ====\n");
+
+	if ( !restart ) {
+		G_NdmClearTimerCvars();		// DeFRaG (G_WriteSessionData, restart == 0): the timer choices belong to one map
+	}
 
 	if ( level.logFile ) {
 		G_LogPrintf("ShutdownGame:\n" );

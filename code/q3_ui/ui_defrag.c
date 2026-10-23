@@ -240,6 +240,65 @@ static const uiDfDefault_t uiDfDefaults[] = {
 	{ "df_ob_KillOBs", "0", 0 },
 	{ "df_hook_Type", "0", 1 },
 	{ "df_lg_Knockback", "0", 1 },
+	// ui 0x8e0 (called before 0x3936 from the cvar registration): the settings the DeFRaG menu pages edit
+	{ "df_autorecord", "3", 0 },
+	{ "df_ar_stopdelay", "3000", 0 },
+	{ "df_ar_format", "$map.$-route[$gt.$phys.$-mode]$m.$-s.$-ms($pl.$plc)", 0 },
+	{ "df_ar_speedcapture_format", "0", 0 },
+	{ "df_checkpoints", "2", 0 },
+	{ "df_country", "CountryHere", 0 },
+	{ "df_demos_validation", "0", 0 },
+	{ "df_demos_exitAfterPlayback", "0", 0 },
+	{ "df_drawBesttime", "1", 0 },
+	{ "df_drawJumpmeters", "0", 0 },
+	{ "df_drawSpeed", "1", 0 },
+	{ "df_drawCheckpointStats", "1", 0 },
+	{ "df_drawCheckpointEvents", "1", 0 },
+	{ "df_hud", "1", 0 },
+	{ "df_hud_3DIcons", "1", 0 },
+	{ "df_hud_color", "4", 0 },
+	{ "df_hud_colorRGB", "", 0 },
+	{ "df_hud_colorwarning", "1", 0 },
+	{ "df_hud_drawStatus", "1", 0 },
+	{ "df_hud_drawSpectFollow", "2", 0 },
+	{ "df_hud_forceteamcolors", "1", 0 },
+	{ "df_hud_fontcolor", "7", 0 },
+	{ "df_hud_fontcolorRGB", "", 0 },
+	{ "df_hud_fontshadow", "1", 0 },
+	{ "df_hud_transparency", "0.25", 0 },
+	{ "df_hud_videocapture_enable", "0", 0 },
+	{ "df_hud_videocapture_x", "320", 0 },
+	{ "df_hud_videocapture_y", "240", 0 },
+	{ "df_hud_videocapture_fontsize", "16", 0 },
+	{ "df_hud_videocapture_fontcolor", "7", 0 },
+	{ "df_hud_videocapture_fontshadow", "1", 0 },
+	{ "df_hud_videocapture_fontjustify", "0", 0 },
+	{ "df_recfiles_keepLatest", "0", 0 },
+	{ "df_recfiles_session", "", 0 },
+	{ "df_name", "", 0 },
+	{ "df_script_onMapLoad", "0", 0 },
+	{ "df_script_onRespawn", "0", 0 },
+	{ "df_sound_flagGrabbing", "0", 0 },
+	{ "df_unit", "0", 0 },
+	{ "df_hud_cgaz", "0", 0 },
+	{ "df_gametype", "0", 1 },
+	{ "df_promode", "0", 1 },
+	{ "df_competition", "", 1 },
+	{ "df_ndm_timer_start", "", 1 },
+	{ "df_ndm_timer_checkpoint", "", 1 },
+	{ "df_ndm_timer_stop", "", 1 },
+	{ "df_mode_tricksmode", "2", 1 },
+	{ "df_mode_fastcaps", "2", 1 },
+	{ "df_ndm_damage", "0", 1 },
+	{ "df_ndm_powerups", "0", 1 },
+	{ "df_ndm_weaponsSet", "1022", 1 },
+	{ "df_ndm_weaponsPickup", "0", 1 },
+	{ "df_ndm_itemsSpawn", "1", 1 },
+	{ "df_ndm_nopad", "0", 1 },
+	{ "df_ndm_noteleport", "0", 1 },
+	{ "df_ndm_nomover", "0", 1 },
+	{ "df_ar_verbose", "0", 0 },
+	{ "s_ambient", "1", 0 },
 };
 
 static vmCvar_t	df_ui_seedServerCvars;
@@ -248,6 +307,10 @@ static void UI_DF_RegisterDefaults( void ) {
 	int i;
 
 	trap_Cvar_Register( &df_ui_seedServerCvars, "df_ui_seedServerCvars", "0", CVAR_ARCHIVE );
+	trap_Cvar_Register( NULL, "df_ui_browserDefragOnly", "1", CVAR_ARCHIVE );		// not a DeFRaG cvar: switch for the "game defrag" server list filter
+	if ( df_ui_seedServerCvars.integer ) {
+		trap_Cvar_Set( "sv_pure", "0" );		// ui 0x8e0 sets it on every start (it overrides the local server's setting)
+	}
 	for ( i = 0; i < ARRAY_LEN( uiDfDefaults ); i++ ) {
 		if ( uiDfDefaults[i].server && !df_ui_seedServerCvars.integer ) {
 			continue;
@@ -320,6 +383,31 @@ void UI_DF_RegisterCvars( void ) {
 	}
 	UI_DF_RegisterDefaults();
 	UI_DF_ApplyTheme();
+}
+
+// ui 0x4106 (called by UI_Shutdown): a demo seek that is still running (cgame's df_demos_Seek with the fast-forward timescale of 100 / 1000)
+// is aborted - timescale back to 1, df_demos_Seek cleared, the volumes saved by the seek restored
+void UI_DF_Shutdown( void ) {
+	char	buf[32];
+	float	ts;
+
+	if ( trap_Cvar_VariableValue( "df_demos_Seek" ) == 0 ) {
+		return;
+	}
+	ts = trap_Cvar_VariableValue( "timescale" );
+	if ( ts != 100 && ts != 1000 ) {
+		return;
+	}
+	trap_Cvar_Set( "timescale", "1" );
+	trap_Cvar_Set( "df_demos_Seek", "0.00" );
+	trap_Cvar_VariableStringBuffer( "df_user_s_volume", buf, sizeof( buf ) );
+	if ( atof( buf ) != 0 ) {
+		trap_Cvar_Set( "s_volume", buf );
+	}
+	trap_Cvar_VariableStringBuffer( "df_user_s_musicvolume", buf, sizeof( buf ) );
+	if ( atof( buf ) != 0 ) {
+		trap_Cvar_Set( "s_musicvolume", buf );
+	}
 }
 
 void UI_DF_UpdateCvars( void ) {

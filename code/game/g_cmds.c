@@ -1729,6 +1729,14 @@ void Cmd_Vote_f( gentity_t *ent ) {
 		trap_SendServerCommand( ent-g_entities, "print \"Vote already cast.\n\"" );
 		return;
 	}
+	if ( G_DFVotesActive() ) {
+		// DeFRaG's vote command (func_0x335d): no spectator restriction, no "Vote cast." message, and no counting here -
+		// CheckDFVote recounts the votes (client+640) every frame
+		ent->client->ps.eFlags |= EF_VOTED;
+		trap_Argv( 1, msg, sizeof( msg ) );
+		ent->client->pers.dfVote = ( msg[0] == 'y' || msg[0] == 'Y' || msg[0] == '1' ) ? 1 : 2;
+		return;
+	}
 	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		trap_SendServerCommand( ent-g_entities, "print \"Not allowed to vote as spectator.\n\"" );
 		return;

@@ -472,6 +472,7 @@ void G_ResolveDfMode( void ) {
 	}
 	g_dfMode = mode;
 	G_ResolveNdm();
+	G_NdmTimerInit();
 	trap_Cvar_Set( "defrag_gametype", va( "%i", g_dfVariant ? mode + 4 : mode ) );
 }
 
@@ -498,8 +499,13 @@ void G_ResolveNdm( void ) {
 		g_ndm.damage = 1;
 		g_ndm.weaponsSet = 6;
 		g_ndm.flags = 0x7e;
+		g_ndm.itemMask = 0x7e;
 		trap_Cvar_Set( "defrag_mode", "-1" );
 		return;
+	}
+	if ( g_dfMode == 3 ) {
+		g_ndm.flags |= 0x100;		// fastcaps: the team items (flags) spawn and work
+		g_ndm.itemMask |= 0x100;
 	}
 
 	v = trap_Cvar_VariableIntegerValue( g_dfMode == 3 ? "df_mode_fastcaps" : "df_mode_tricksmode" );
@@ -516,7 +522,7 @@ void G_ResolveNdm( void ) {
 	case 4:	g_ndm.weaponsSet = 0x1fe; g_ndm.nopad = 2; g_ndm.noteleport = 2; g_ndm.nomover = qtrue;  break;
 	case 5:
 	case 6:	g_ndm.weaponsSet = 0x404;                                                              break;
-	case 7:	g_ndm.damage = 1; g_ndm.weaponsSet = 6; g_ndm.flags = 0x7e;                           break;
+	case 7:	g_ndm.damage = 1; g_ndm.weaponsSet = 6; g_ndm.flags |= 0x7e; g_ndm.itemMask |= 0x7e;  break;
 	default:
 		// custom: the df_ndm_* cvars
 		g_ndm.damage = df_ndm_damage.integer;
@@ -532,6 +538,14 @@ void G_ResolveNdm( void ) {
 		}
 		if ( df_ndm_weaponsPickup.integer ) {
 			g_ndm.flags |= 0x6;
+		}
+		// df_ndm_itemsSpawn: 0 = no items, 2 = all item types, otherwise the types whose pickup works (flags)
+		if ( df_ndm_itemsSpawn.integer == 0 ) {
+			g_ndm.itemMask = 0;
+		} else if ( df_ndm_itemsSpawn.integer == 2 ) {
+			g_ndm.itemMask |= 0x7e;
+		} else {
+			g_ndm.itemMask |= g_ndm.flags;
 		}
 		break;
 	}
