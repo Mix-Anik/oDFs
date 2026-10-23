@@ -118,8 +118,10 @@ static void G_RaceFinished( gentity_t *ent ) {
 	}
 
 	// best finish time of this connection (client+0x2b0); ranks the scoreboard (SortRanks)
-	if ( t->bestTime > 0 && ( !ent->client->pers.bestFinishTime || ent->client->pers.bestFinishTime > t->bestTime ) ) {
-		ent->client->pers.bestFinishTime = t->bestTime;
+	// (0x36b0-0x36c7 stores rec[0], the whole-millisecond time, not the "est." value; the original does this in the
+	// dedicated / variant branch only, oDFs keeps it for every server so the scoreboard column works on listen servers too)
+	if ( level.time - t->startTime > 0 && ( !ent->client->pers.bestFinishTime || ent->client->pers.bestFinishTime > level.time - t->startTime ) ) {
+		ent->client->pers.bestFinishTime = level.time - t->startTime;
 		CalculateRanks();
 		ClientUserinfoChanged( clientNum );		// 0x36d3: republishes the configstring (dfscore)
 	}
@@ -128,8 +130,23 @@ static void G_RaceFinished( gentity_t *ent ) {
 	G_FormatTime( t->bestTime, estBuf, sizeof(estBuf) );
 
 	if ( g_dfVariant ) {
-		trap_SendServerCommand( -1, va( "print \"%s^7 reached the finish line in ^2%s^7 (est. %s)\n\"",
-		                                ent->client->pers.netname, timeBuf, estBuf ) );
+		{
+			char	msg[256], *s, *d;
+
+			Com_sprintf( msg, sizeof( msg ), "%s^7 reached the finish line in ^2%s^7 (est. %s)\n",
+			             ent->client->pers.netname, timeBuf, estBuf );
+			trap_SendServerCommand( -1, va( "print \"%s\"", msg ) );
+			// DeFRaG 0x363a-0x363f: the same line, without colour codes, goes to the server log
+			for ( s = d = msg; *s; s++ ) {
+				if ( *s == '^' && s[1] && s[1] != '^' ) {
+					s++;
+				} else {
+					*d++ = *s;
+				}
+			}
+			*d = '\0';
+			G_LogPrintf( "%s", msg );
+		}
 		// DeFRaG 0x3662: "ClientTimerStop" log line (server log parsed by external tools)
 		{
 			char		mapname[MAX_QPATH];
@@ -154,17 +171,18 @@ static void G_RaceFinished( gentity_t *ent ) {
 		trap_SendServerCommand( clientNum, va( "print \"Date: %02i-%02i-%02i %02i:%02i\n\"", qt.tm_mon + 1, qt.tm_mday, qt.tm_year % 100,
 		                                qt.tm_hour, qt.tm_min ) );
 		trap_Cvar_VariableStringBuffer( "df_competition", comp, sizeof( comp ) );
-		trap_SendServerCommand( clientNum, va( "print \"Competition: %s\n\"", comp ) );
+		if ( comp[0] ) {		// 0x3712: only when a competition is set
+			trap_SendServerCommand( clientNum, va( "print \"Competition: %s\n\"", comp ) );
+		}
 		trap_Cvar_VariableStringBuffer( "defrag_route", route, sizeof( route ) );
 		if ( route[0] ) {
 			trap_SendServerCommand( clientNum, va( "print \"Time performed by ^2%s^7 on route ^2%s^7 : ^3%s^7 (v1.91.31 beta) (est. %s)\n\"",
-			                                ent->client->pers.netname, route, timeBuf, estBuf ) );
+			                                ent->client->demoName, route, timeBuf, estBuf ) );		// client+0x268: the sanitised df_name, not the netname
 		} else {
 			trap_SendServerCommand( clientNum, va( "print \"Time performed by ^2%s^7 : ^3%s^7 (v1.91.31 beta) (est. %s)\n\"",
-			                                ent->client->pers.netname, timeBuf, estBuf ) );
+			                                ent->client->demoName, timeBuf, estBuf ) );
 		}
 	}
-	trap_SendServerCommand( clientNum, va( "cp \"^2Finished: %s\"", estBuf ) );
 }
 
 

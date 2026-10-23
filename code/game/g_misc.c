@@ -107,6 +107,10 @@ void TeleportPlayer( gentity_t *player, vec3_t origin, vec3_t angles ) {
 	}
 	// toggle the teleport bit so the client knows to not lerp
 	player->client->ps.eFlags ^= EF_TELEPORT_BIT;
+	// DeFRaG (0x2194b): a teleport releases the grappling hook
+	if ( player->client->hook ) {
+		Weapon_HookFree( player->client->hook );
+	}
 	// kill anything at the destination
 	if ( player->client->sess.sessionTeam != TEAM_SPECTATOR && !( df_mp_InterferenceOff.integer & 1 ) ) {
 		G_KillBox (player);
@@ -250,6 +254,7 @@ void Use_Shooter( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
 	float		deg;
 	vec3_t		up, right;
 	qboolean	aimAtActivator = qfalse;
+	gentity_t	*missile = NULL;
 
 	// see if we have a target
 	if ( ent->enemy ) {
@@ -325,17 +330,30 @@ void Use_Shooter( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
 
 	switch ( ent->s.weapon ) {
 	case WP_GRENADE_LAUNCHER:
-		fire_grenade( ent, ent->s.origin, dir );
+		missile = fire_grenade( ent, ent->s.origin, dir );
 		break;
 	case WP_ROCKET_LAUNCHER:
-		fire_rocket( ent, ent->s.origin, dir );
+		missile = fire_rocket( ent, ent->s.origin, dir );
 		break;
 	case WP_PLASMAGUN:
-		fire_plasma( ent, ent->s.origin, dir );
+		missile = fire_plasma( ent, ent->s.origin, dir );
 		break;
 	case WP_BFG:
-		fire_bfg( ent, ent->s.origin, dir );
+		missile = fire_bfg( ent, ent->s.origin, dir );
 		break;
+	}
+
+	// DeFRaG (0x21da6-0x21e63): the missile belongs to whoever triggered the shooter (activator +772, s.clientNum +168), and
+	// spawnflag 8 triples its damage and splash damage
+	if ( missile ) {
+		missile->activator = activator;
+		if ( activator ) {
+			missile->s.clientNum = activator - g_entities;
+		}
+		if ( ent->spawnflags & 8 ) {
+			missile->damage = (int)( 3.0f * (float)missile->damage );
+			missile->splashDamage = (int)( 3.0f * (float)missile->splashDamage );
+		}
 	}
 
 	G_AddEvent( ent, EV_FIRE_WEAPON, 0 );

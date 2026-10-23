@@ -2019,10 +2019,14 @@ static void PM_DropTimers( void ) {
 	}
 
 	// count down double jump window — promode only, matching Defrag (0x85c3-0x85ce)
-	if ( pm->promode && pm->ps->stats[STAT_DOUBLEJUMP_WINDOW] > 0 ) {
-		pm->ps->stats[STAT_DOUBLEJUMP_WINDOW] -= pml.msec;
-		if ( pm->ps->stats[STAT_DOUBLEJUMP_WINDOW] < 0 )
-			pm->ps->stats[STAT_DOUBLEJUMP_WINDOW] = 0;
+	// (0x85c6-0x85ef: the window counts down unclamped; once it is over, the "double jump used" marker stats[11], which
+	// PM_StepSlideMove reads, is cleared)
+	if ( pm->promode ) {
+		if ( pm->ps->stats[STAT_DOUBLEJUMP_WINDOW] > 0 ) {
+			pm->ps->stats[STAT_DOUBLEJUMP_WINDOW] -= pml.msec;
+		} else if ( pm->ps->stats[STAT_DOUBLEJUMP_USED] ) {
+			pm->ps->stats[STAT_DOUBLEJUMP_USED] = 0;
+		}
 	}
 
 	// drop animation counter

@@ -635,6 +635,18 @@ static menulist_s *DFS_PSpin( dfPanel_t *p, const char *label, int x, int y, con
 	return s;
 }
 
+// ui 0x32b9 (statusbar of the Game Mode spinner, table at data 0xc6c): while the spinner has focus its meaning is written at y 362
+static const char *dfsModeCaptions[8] = {
+	"(custom settings)", "(no weapon / no map object)", "(weapons / map objects)", "(no weapon / map objects)",
+	"(weapons / no map object)", "(swinging hook)", "(quake3 hook)", "(original quake 3)"
+};
+
+static void DFS_ModeStatus( void *ptr ) {
+	menulist_s *s = (menulist_s *)ptr;
+
+	UI_DrawString( s->generic.x, 362, dfsModeCaptions[s->curvalue & 7], UI_CENTER|UI_SMALLFONT, color_white );
+}
+
 static void DFS_BuildMapInfo( int x, int y, int w ) {		// 0x30e9 / 0x34cd / 0x330d
 	dfPanel_t *p = DFS_NewPanel( PK_MAPINFO, "Map Info" );
 	int sx = x + w / 2 + 25;
@@ -654,7 +666,8 @@ static void DFS_BuildMapInfo( int x, int y, int w ) {		// 0x30e9 / 0x34cd / 0x33
 		DFS_PSpin( p, "Movements:", sx, y, dfsListMove, DFS_ClampCvar( "df_promode", 1 ) ); y += 20;
 		DFS_PSpin( p, "Overbounces:", sx, y, dfsListOffOn, trap_Cvar_VariableValue( "df_ob_KillOBs" ) == 0 ? 1 : 0 ); y += 20;
 	} else {
-		DFS_PSpin( p, "Game Mode:", sx, y, dfsListNum8, DFS_ClampCvar( s_ds.gameType == 3 ? "df_mode_fastcaps" : "df_mode_tricksmode", 7 ) ); y += 20;
+		DFS_PSpin( p, "Game Mode:", sx, y, dfsListNum8, DFS_ClampCvar( s_ds.gameType == 3 ? "df_mode_fastcaps" : "df_mode_tricksmode", 7 ) )->generic.statusbar = DFS_ModeStatus;
+		y += 20;
 		DFS_PSpin( p, "Movements:", sx, y, dfsListMove, trap_Cvar_VariableValue( "df_promode" ) != 0 ? 1 : 0 ); y += 20;
 	}
 	DFS_PSpin( p, "Server Cheats:", sx, y, dfsListOffOn, s_ds.cheats ? 1 : 0 ); y += 20;

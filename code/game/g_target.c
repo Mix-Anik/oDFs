@@ -633,7 +633,7 @@ void SP_target_multimanager( gentity_t *ent ) {
 
 	ent->mmRemaining = 0;
 	ent->mmTargetLen = 0;
-	buf[0] = '\0';
+	memset( buf, 0, sizeof( buf ) );	// the records are appended with strcat, so the whole buffer must start empty
 	n = 0;
 	total = 0;
 	next = buf;
@@ -745,6 +745,7 @@ void Use_Target_Speed( gentity_t *ent, gentity_t *other, gentity_t *activator ) 
 			} else {
 				V[i] = V[i] + A[i] * ent->speed;
 			}
+			continue;	// 0x25d08 / 0x25d28 jump to the loop end: add mode skips the "* B" and the |vel| step below
 		} else {
 			if ( ent->speed < 0 ) {
 				ent->speed = 0;
@@ -903,10 +904,10 @@ void G_FragsFilterInit( void ) {
 	g_fragsMinTime = 0;
 }
 
-/*QUAKED target_fragsFilter (1 0 0) (-8 -8 -8) (8 8 8) SUBTRACT ? SHOW_NEEDED CLEAR EXACT
+/*QUAKED target_fragsFilter (1 0 0) (-8 -8 -8) (8 8 8) SUBTRACT ? HIDE_NEEDED CLEAR EXACT
 Fires its targets once the activator's score reaches "frags". Entities without a targetname are polled
-every frame for every player. spawnflags: 1 subtract "frags" from the score when fired, 4 show a
-"N more frags needed" small print while below the threshold, 8 reset the score to 0 when fired,
+every frame for every player. spawnflags: 1 subtract "frags" from the score when fired, 4 do NOT show the
+"N more frags needed" small print while below the threshold (it is shown by default), 8 reset the score to 0 when fired,
 16 only fire on an exact score match. Feeds the smallest "frags" of filters that target a target_stopTimer
 into the fraglimit cvar.
 */
@@ -922,7 +923,8 @@ void Use_Target_FragsFilter( gentity_t *ent, gentity_t *other, gentity_t *activa
 		return;
 	}
 	if ( score < ent->count ) {
-		if ( !( ent->spawnflags & 4 ) ) {
+		// 0x299c: spawnflag 4 silences the message (the polarity was inverted in the first port)
+		if ( ent->spawnflags & 4 ) {
 			return;
 		}
 		if ( ent->count - score == 1 ) {
@@ -970,7 +972,7 @@ void SP_target_fragsFilter( gentity_t *ent ) {
 	qboolean found;
 
 	ent->use = Use_Target_FragsFilter;
-	G_SpawnInt( "frags", "0", &ent->count );
+	G_SpawnInt( "frags", "1", &ent->count );	// 0x2a69: the default is the pooled string "1" (0x3ff2)
 	found = G_SpawnString( "targetname", "decoy", &s );
 	if ( !found && g_numFragsFilters < MAX_FRAGSFILTERS ) {
 		g_fragsFilters[g_numFragsFilters++] = ent;

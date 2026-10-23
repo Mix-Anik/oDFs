@@ -2,14 +2,29 @@
 
 Each item: the question, the evidence for each reading, and the test that settles it in the ORIGINAL DeFRaG. Added by the audit loop; nothing here is guessed into code.
 
-## Q1. Does the original stop an autorecord demo when the map changes?
+## Q1. Does the original stop an autorecord demo when the map changes?  -- RESOLVED (user: yes, it does; matches the port)
 - Evidence: cgame `CG_Shutdown` (`0xf36` -> `0x3a44` -> `0x19d4`) sends `stoprecord` when the autorecord state (`0x1189b0`/1149360) is non-zero. Ported in audit iter 1 (`CG_DF_AutorecShutdown`). The decode is solid; the open part is only whether the engine ever tears the cgame down on a `map` change while recording (ioq3 keeps one demo across level changes on a local server).
 - Test (original DeFRaG): `df_autorecord 1`, start a run (leave the start zone), type `map <other map>`. Expected: console prints the engine's "stopped demo" line right at the map change if the original behaves like the port now; no such line if the demo keeps recording.
 
-## Q2. `com_maxfps` clamp notices (`0x758f` / `0x75c7`)
+## Q2. `com_maxfps` clamp notices (`0x758f` / `0x75c7`) -- RESOLVED (user: yes, force it; ported as client cvar `df_enforceMaxFps`, default 1)
 - Evidence: cgame per-frame driver `0x1bd3` clamps `com_maxfps` to 60..140 and prints `^1com_maxfps lowest value restricted to 60.^7` / `highest value restricted to 140`. Overrides client config, so NOT ported (loop rule).
 - Decision needed from the user: port behind a cvar (default off)? Test in the original: `com_maxfps 30` then `com_maxfps` (expected: value 60 + notice) and `com_maxfps 250`.
 
-## Q3. Armor Used in the end-of-run Stats
+## Q3. Armor Used in the end-of-run Stats -- ACCEPTED (user: leave it, always 0 like the decode)
 - Evidence: the original accumulator adds (current - current) = 0 (`0x4714..0x472e`), so the line always shows 0; the port reproduces that. If a DeFRaG build printed non-zero values there, the decode of that build differs.
 - Test (original): pick up/lose armor during a run (`Stats` appear at the finish or via `stats`): `Armor Used` should be 0.
+
+## Q4. Defaults of `g_synchronousClients` and `pmove_fixed` (1 in DeFRaG, 0 in oDFs) -- RESOLVED (user: same as original; both now default 1; dedicated servers still get g_synchronousClients 0 once via df_enforceSvFps)
+- Evidence: the decoded qagame cvar table (`G_UTILS/cvar_table.md`) registers `g_synchronousClients` = 1 (SYSTEMINFO) and `pmove_fixed` = 1 (SYSTEMINFO); oDFs registers 0 / 0 (`g_main.c`). The DeFRaG cgame only lists both as information (`Cvar: g_synchronousClients %i`, `pmove_fixed %i`), it does not require them. Changing the default only matters for a server whose config does not set them; it switches pmove to fixed 8 ms steps and synchronous client handling, i.e. it changes timing / physics feel.
+- Not changed because the effect on timer accuracy and demos cannot be judged without a run.
+- Test (original DeFRaG, fresh config): start a dedicated or listen server without setting either cvar and type `g_synchronousClients` and `pmove_fixed` in the server console (expected: `1` and `1` if the decode is right), then run the same map in oDFs and compare the `Cvar:` lines printed by the cgame on connect.
+
+## Q5. CPM `PM_StepSlideMove` tail after a double jump (ported from the decode, audit iter 25) -- ACCEPTED (user: feels fine)
+- Evidence: qagame `0x8c68`-`0x8cad` clips only x / y (`0x1a0b`) and skips the step events when `pm_flags & PMF_PROMODE` and `stats[11]` (double-jump-used marker, cleared in PmoveSingle `0x85e8` once `stats[10] <= 0`) is set; otherwise the stock clip + step events. The decode is solid; what is not known is how visible it is.
+- Test (original DeFRaG, `cpm`): double-jump (two jumps within 400 ms) so that you land the push-down trace on a step / ramp edge while moving over it; watch `velocity z` (e.g. `df_hud` speed Z item or `cg_drawSpeed`-like display) in the next frames: with the marker set the z velocity should stay unchanged by the step push-down, and no step sound (`EV_STEP_*`) should play; without a double jump the step sound plays as in VQ3.
+
+## Q6 -- mode 3 forces g_gametype 4 (CTF), other modes g_gametype 0 (qagame `0x21fc`, `0x22ac-0x22d4`) -- RESOLVED (user: force it; cvar `df_forceGametype`, default 1)
+Original: after the mode is resolved it does `Cvar_Set("g_gametype", mode==3 ? "4" : "0")` and sets the cached gametype the same way, so a fastcaps map always runs as GT_CTF and every other mode as GT_FFA, whatever `g_gametype` the operator set. oDFs does NOT force it (operator config override); `g_gametype` stays as configured and the mode only selects the entity sweep / ndm presets. **Decision needed:** port it behind `df_forceCvars`? **Test in the original DeFRaG:** `devmap <fastcaps map>` with `g_gametype 0` typed first, then `g_gametype` -> expected `4`; load a run map with `g_gametype 4` -> expected `0`.
+
+## Q7 -- ACCEPTED (user: shooting at the triggering player is fine) -- which client's velocity does a lead-aiming shooter use (qagame `Use_Shooter` `0x21b5e`, `0x21bf2`)
+Original: with spawnflags 1 and 2/4 the target velocity is `g_entities[ *( activator + 376 ) ].client->ps.velocity`. Offset 376 of a gentity is inside `r.s` (the first member of `entityShared_t`, at +208; +168 of it = `clientNum`), a copy of the entity state that vanilla game code never fills. Reading A: DeFRaG fills `r.s.clientNum` somewhere (then it is the activator's own client number and oDFs's `activator->client` is equivalent). Reading B: it stays 0, so the original always leads the velocity of client 0. oDFs uses `activator->client` (reading A). **Test in the original DeFRaG:** two players on a map with `shooter_rocket` spawnflags 3 triggered by a trigger_multiple; let player 2 (not client 0) trigger it while running sideways, watch whether the rocket leads player 2 (A) or is aimed as if the target were standing / following player 1 (B).

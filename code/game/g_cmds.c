@@ -1319,19 +1319,25 @@ typedef struct {
 } dfVoteCmd_t;
 
 static const dfVoteCmd_t dfVoteCmds[] = {
+	// order and usage texts as in the data table at 0x94c (the order is also the order of the "Available vote commands" list)
 	{ "map",          "",                  "df_vote_allow_map",          1, "usage: map <map name> - changes the map.\n" },
-	{ "devmap",       "",                  "df_vote_allow_devmap",       1, "usage: devmap <map name> - changes the map with cheats enabled.\n" },
-	{ "map_restart",  "map_restart 3",     "df_vote_allow_map_restart",  0, "" },
-	{ "nextmap",      "vstr nextmap",      "df_vote_allow_nextmap",      0, "" },
-	{ "promode",      "",                  "df_vote_allow_promode",      1, "usage: promode <n> - 0: vq3, 1: cpm.\n" },
-	{ "gametype",     "",                  "df_vote_allow_gametype",     1, "usage: gametype <n> - 1: Defrag, 2: Tricks Mode, 3: Fast Caps.\n" },
-	{ "kill_OBs",    "",                  "df_vote_allow_killobs",      1, "usage: kill_OBs <0|1> - 1 disables overbounces.\n" },
-	{ "mode",         "",                  "df_vote_allow_mode",         1, "usage: mode <n> - changes the game mode.\n" },
+	{ "devmap",       "",                  "df_vote_allow_devmap",       1, "usage: devmap <mapname> - changes the map and enables cheats\n" },
+	{ "map_restart",  "map_restart 3",     "df_vote_allow_map_restart",  0, "usage: map_restart - restarts the map.\n" },
+	{ "nextmap",      "vstr nextmap",      "df_vote_allow_nextmap",      0, "usage: nextmap - calls the next map if the server supports maps cycling.\n" },
+	{ "gametype",     "",                  "df_vote_allow_gametype",     1,
+	  "usage: gametype <n> - changes the gametype:\n  1: Defrag\n  2: Tricks Mode\n  3: Fast Caps\n" },
+	{ "promode",      "",                  "df_vote_allow_promode",      1, "usage: promode <n> - toggles the CPM physics\n  0: Off\n  1: On\n" },
+	{ "mode",         "",                  "df_vote_allow_mode",         1,
+	  "usage: mode <n> - changes the game mode in the Tricks Mode and Fast Caps gametypes.\n  1: Disable weapons, Disable jump-pads/teleporters/movers\n"
+	  "  2: Enable weapons, Enable jump-pads/teleporters/movers\n  3: Disable weapons, Enable jump-pads/teleporters/movers\n"
+	  "  4: Enable weapons, Disable jump-pads/teleporters/movers\n  5: Swinging hook\n  6: Quake3 hook\n  7: Vanilla Quake3\n" },
 	{ "kick",         "",                  "df_vote_allow_kick",         1, "usage: kick <player name> - kicks the specified player.\n" },
 	{ "clientkick",   "",                  "df_vote_allow_clientkick",   1, "usage: clientkick <client num> - kicks the specified client.\n" },
 	{ "interference", "",                  "df_vote_allow_interference", 1,
 	  "usage: interference <n> - changes how players interact with one another.\n  0: full interaction\n  1: interaction only with missiles\n  2: interaction except for missiles\n  3: no interaction\n" },
+	{ "kill_OBs",     "",                  "df_vote_allow_killobs",      1, "usage: kill_OBs <n> - toggles the ability to overbounce\n  0: Enable overbounces\n  1: Disable overbounces\n" },
 };
+
 #define NUM_DFVOTECMDS ( sizeof( dfVoteCmds ) / sizeof( dfVoteCmds[0] ) )
 
 // data table 0x8c0 (indices 0..7; 8.. are the short names df/tm/fc/mp..)
@@ -1355,12 +1361,19 @@ void G_RegisterVoteCvars( void ) {
 	}
 }
 
+static qboolean dfVoteInvalid;		// set by a validator that failed without printing a message of its own (0x130958 still empty)
+
 static qboolean G_DFVoteDigit( const char *arg, int lo, int hi, int *out ) {
 	if ( arg[0] < '0' || arg[0] > '9' ) {
+		dfVoteInvalid = qtrue;
 		return qfalse;
 	}
 	*out = atoi( arg );
-	return ( *out >= lo && *out <= hi ) ? qtrue : qfalse;
+	if ( *out < lo || *out > hi ) {
+		dfVoteInvalid = qtrue;
+		return qfalse;
+	}
+	return qtrue;
 }
 
 // validators: on success they fill level.voteString (executed) and level.voteDisplayString (shown)
@@ -1424,7 +1437,7 @@ static qboolean G_DFVoteValidate( gentity_t *ent, const dfVoteCmd_t *cmd, const 
 		} else if ( g_dfMode == 3 ) {
 			Com_sprintf( level.voteString, sizeof( level.voteString ), "df_mode_fastcaps %i; map_restart 3", v );
 		} else {
-			trap_SendServerCommand( ent - g_entities, "print \"Game modes don't apply to the current gametype.\n\"" );
+			trap_SendServerCommand( ent - g_entities, va( "print \"Game modes don't apply to the %s gametype.\n\"", dfGametypeNames[g_dfMode >= 0 && g_dfMode < 8 ? g_dfMode : 0] ) );
 			return qfalse;
 		}
 		return qtrue;
@@ -1450,6 +1463,7 @@ static qboolean G_DFVoteValidate( gentity_t *ent, const dfVoteCmd_t *cmd, const 
 				return qfalse;
 			}
 		} else if ( !G_DFVoteDigit( arg, 0, 63, &num ) ) {
+			dfVoteInvalid = qfalse;
 			trap_SendServerCommand( ent - g_entities, "print \"Client num out of range.\n\"" );
 			return qfalse;
 		}
@@ -1507,7 +1521,7 @@ void Cmd_DFCallVote_f( gentity_t *ent ) {
 			if ( !trap_Cvar_VariableIntegerValue( dfVoteCmds[i].allowCvar ) ) {
 				continue;
 			}
-			Q_strcat( list, sizeof( list ), va( col % 3 ? " %-15.15s" : "\n%-15.15s", dfVoteCmds[i].name ) );
+			Q_strcat( list, sizeof( list ), va( col % 3 ? "%-15.15s" : "\n%-15.15s ", dfVoteCmds[i].name ) );
 			col++;
 		}
 		Q_strcat( list, sizeof( list ), "^7\n\"" );
@@ -1548,7 +1562,11 @@ void Cmd_DFCallVote_f( gentity_t *ent ) {
 		trap_SendServerCommand( clientNum, va( "print \"Missing argument.\n%s\"", cmd->usage ) );
 		return;
 	}
+	dfVoteInvalid = qfalse;
 	if ( !G_DFVoteValidate( ent, cmd, arg2 ) ) {
+		if ( dfVoteInvalid ) {
+			trap_SendServerCommand( clientNum, va( "print \"Invalid argument.\n%s\"", cmd->usage ) );
+		}
 		return;
 	}
 
@@ -1628,7 +1646,7 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 	} else if ( !Q_stricmp( arg1, "fraglimit" ) ) {
 	} else {
 		trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string.\n\"" );
-		trap_SendServerCommand( ent-g_entities, "print \"Vote commands are: map_restart, nextmap, map <mapname>, g_gametype <n>, kick <player>, clientkick <clientnum>, g_doWarmup, timelimit <time>, fraglimit <frags>.\n\"" );
+		trap_SendServerCommand( ent-g_entities, "print \"Vote commands are: map_restart, nextmap, map <mapname>, kick <player>, clientkick <clientnum>, timelimit <time> .\n\"" );
 		return;
 	}
 
@@ -1995,11 +2013,13 @@ void Cmd_PlacePlayer_f( gentity_t *ent ) {
 	char		buffer[MAX_TOKEN_CHARS];
 	int			i;
 
-	if ( !CheatsOk( ent ) ) {
+	// qagame 0x468e: only the cheat flag is tested here (no "must be alive")
+	if ( !g_cheats.integer ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Cheats are not enabled on this server.\n\"");
 		return;
 	}
 	if ( trap_Argc() != 10 ) {
-		trap_SendServerCommand( ent-g_entities, "print \"usage: placeplayer x y z p y r v0 v1 v2\n\"");
+		trap_SendServerCommand( ent-g_entities, "print \"Usage: placeplayer x y z p y r v0 v1 v2\n\"");
 		return;
 	}
 
@@ -2011,22 +2031,37 @@ void Cmd_PlacePlayer_f( gentity_t *ent ) {
 		trap_Argv( i + 4, buffer, sizeof( buffer ) );
 		angles[i] = atof( buffer );
 	}
+	angles[ROLL] = 0;		// the original zeroes the roll inside the parse loop
 	for ( i = 0 ; i < 3 ; i++ ) {
 		trap_Argv( i + 7, buffer, sizeof( buffer ) );
 		velocity[i] = atof( buffer );
 	}
 
-	// unlink to make sure it can't possibly interfere with G_KillBox
+	// 0x45f0
 	trap_UnlinkEntity( ent );
 
 	VectorCopy( origin, ent->client->ps.origin );
 	VectorCopy( velocity, ent->client->ps.velocity );
-	SetClientViewAngle( ent, angles );
 
 	// toggle the teleport bit so the client knows to not lerp
 	ent->client->ps.eFlags ^= EF_TELEPORT_BIT;
 
-	trap_LinkEntity( ent );
+	SetClientViewAngle( ent, angles );
+
+	// kill anything at the destination (unless players do not interact)
+	if ( ent->client->sess.sessionTeam != TEAM_SPECTATOR && !( df_mp_InterferenceOff.integer & 1 ) ) {
+		G_KillBox( ent );
+	}
+
+	BG_PlayerStateToEntityState( &ent->client->ps, &ent->s, qtrue );
+	VectorCopy( ent->client->ps.origin, ent->r.currentOrigin );
+
+	if ( ent->client->sess.sessionTeam != TEAM_SPECTATOR ) {
+		trap_LinkEntity( ent );
+	}
+
+	trap_SendServerCommand( ent-g_entities, va( "print \"^3Restored:^7 ( %.3f %.3f %.3f ) %.3f %.3f ( %i %i %i )\n\"",
+		origin[0], origin[1], origin[2], angles[PITCH], angles[YAW], (int)velocity[0], (int)velocity[1], (int)velocity[2] ) );
 }
 
 
@@ -2148,7 +2183,9 @@ void Cmd_FireMissile_f( gentity_t *ent ) {
 	int			weapon, i, savedNumber;
 	qboolean	selfStyle;
 
-	if ( !CheatsOk( ent ) ) {
+	// qagame 0x489b: only the cheat flag is tested (no "must be alive"), so the ghost LiveAmmo shots also work for a dead / spectating viewer
+	if ( !g_cheats.integer ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Cheats are not enabled on this server.\n\"");
 		return;
 	}
 	if ( trap_Argc() != 10 ) {

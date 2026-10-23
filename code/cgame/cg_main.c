@@ -109,6 +109,7 @@ vmCvar_t	cg_gibs;
 vmCvar_t	cg_drawTimer;
 vmCvar_t	cg_drawFPS;
 vmCvar_t	df_noTargetPrint;
+vmCvar_t	df_enforceMaxFps;
 vmCvar_t	cg_drawSnapshot;
 vmCvar_t	cg_draw3dIcons;
 vmCvar_t	cg_drawIcons;
@@ -244,9 +245,10 @@ static cvarTable_t cvarTable[] = {
 	{ &cg_drawTimer, "cg_drawTimer", "0", CVAR_ARCHIVE  },
 	{ &cg_drawFPS, "cg_drawFPS", "0", CVAR_ARCHIVE  },
 	{ &df_noTargetPrint, "df_noTargetPrint", "0", CVAR_ARCHIVE },
+	{ &df_enforceMaxFps, "df_enforceMaxFps", "1", CVAR_ARCHIVE },
 	{ &df_checkpoints, "df_checkpoints", "2", CVAR_ARCHIVE },
 	{ &df_hud, "df_hud", "1", CVAR_ARCHIVE },
-	{ &df_hud_drawStatus, "df_hud_drawStatus", "1", CVAR_ARCHIVE },
+	{ &df_hud_drawStatus, "df_hud_drawStatus", "1", 0 },
 	{ &df_hud_cgaz, "df_hud_cgaz", "0", CVAR_ARCHIVE },
 	{ &df_hud_cgaz_opacity, "df_hud_cgaz_opacity", "0.5", CVAR_ARCHIVE },
 	{ &df_hud_cgaz_ypos, "df_hud_cgaz_ypos", "256", CVAR_ARCHIVE },
@@ -320,7 +322,7 @@ static cvarTable_t cvarTable[] = {
 	{ &cg_nochatbeep, "cg_nochatbeep", "0", CVAR_ARCHIVE },
 	{ &cg_muzzleFlash, "cg_muzzleFlash", "0", CVAR_ARCHIVE },
 	{ &cg_drawDamage, "cg_drawDamage", "1", CVAR_ARCHIVE },
-	{ &cg_drawBBox, "cg_drawBBox", "0", CVAR_ARCHIVE },
+	{ &cg_drawBBox, "cg_drawBBox", "0", CVAR_TEMP },
 	{ &df_demos_CamSeqPosition, "df_demos_CamSeqPosition", "", CVAR_TEMP },
 	{ &df_demos_CamSeqSpeed, "df_demos_CamSeqSpeed", "", CVAR_TEMP },
 	{ &df_demos_CamSeqMode, "df_demos_CamSeqMode", "", CVAR_TEMP },
@@ -337,8 +339,8 @@ static cvarTable_t cvarTable[] = {
 	{ &df_keymaps_dir[5], "df_keymaps_movedown", "", CVAR_TEMP },
 	{ &df_ob_Fast, "df_ob_Fast", "1", CVAR_ARCHIVE },
 	{ &df_ob_AllSlopes, "df_ob_AllSlopes", "0", CVAR_ARCHIVE },
-	{ &df_ob_OffsetStartPosZ, "df_ob_OffsetStartPosZ", "0.00", CVAR_ARCHIVE },
-	{ &df_ob_OffsetStopPosZ, "df_ob_OffsetStopPosZ", "0.00", CVAR_ARCHIVE },
+	{ &df_ob_OffsetStartPosZ, "df_ob_OffsetStartPosZ", "0.00", CVAR_TEMP },
+	{ &df_ob_OffsetStopPosZ, "df_ob_OffsetStopPosZ", "0.00", CVAR_TEMP },
 	{ &df_drawJumpmeters, "df_drawJumpmeters", "0", CVAR_ARCHIVE },
 	{ &df_hud_drawSpectFollow, "df_hud_drawSpectFollow", "1", CVAR_ARCHIVE },
 	{ &df_hud_color, "df_hud_color", "4", CVAR_ARCHIVE },
@@ -413,13 +415,13 @@ static cvarTable_t cvarTable[] = {
 	{ &cg_lagometer_x, "cg_lagometer_x", "1", CVAR_ARCHIVE },
 	{ &cg_lagometer_y, "cg_lagometer_y", "1", CVAR_ARCHIVE },
 	{ &cg_railTrailTime, "cg_railTrailTime", "400", CVAR_ARCHIVE  },
-	{ &cg_gun_x, "cg_gunX", "0", CVAR_CHEAT },
-	{ &cg_gun_y, "cg_gunY", "0", CVAR_CHEAT },
-	{ &cg_gun_z, "cg_gunZ", "0", CVAR_CHEAT },
-	{ &cg_centertime, "cg_centertime", "3", CVAR_CHEAT },
+	{ &cg_gun_x, "cg_gunX", "0", 0 },
+	{ &cg_gun_y, "cg_gunY", "0", 0 },
+	{ &cg_gun_z, "cg_gunZ", "0", 0 },
+	{ &cg_centertime, "cg_centertime", "3", 0 },
 	{ &cg_runpitch, "cg_runpitch", "0.002", CVAR_ARCHIVE},
 	{ &cg_runroll, "cg_runroll", "0.005", CVAR_ARCHIVE },
-	{ &cg_bobup , "cg_bobup", "0.005", CVAR_CHEAT },
+	{ &cg_bobup , "cg_bobup", "0.005", CVAR_ARCHIVE },
 	{ &cg_bobpitch, "cg_bobpitch", "0.002", CVAR_ARCHIVE },
 	{ &cg_bobroll, "cg_bobroll", "0.002", CVAR_ARCHIVE },
 	{ &cg_swingSpeed, "cg_swingSpeed", "0.3", CVAR_CHEAT },
@@ -431,7 +433,7 @@ static cvarTable_t cvarTable[] = {
 	{ &cg_nopredict, "cg_nopredict", "0", 0 },
 	{ &cg_noPlayerAnims, "cg_noplayeranims", "0", CVAR_CHEAT },
 	{ &cg_showmiss, "cg_showmiss", "0", 0 },
-	{ &cg_footsteps, "cg_footsteps", "1", CVAR_CHEAT },
+	{ &cg_footsteps, "cg_footsteps", "1", CVAR_ARCHIVE },
 	{ &cg_tracerChance, "cg_tracerchance", "0.4", CVAR_CHEAT },
 	{ &cg_tracerWidth, "cg_tracerwidth", "1", CVAR_CHEAT },
 	{ &cg_tracerLength, "cg_tracerlength", "100", CVAR_CHEAT },
@@ -481,7 +483,7 @@ static cvarTable_t cvarTable[] = {
 	{ &cg_timescaleFadeEnd, "cg_timescaleFadeEnd", "1", 0},
 	{ &cg_timescaleFadeSpeed, "cg_timescaleFadeSpeed", "0", 0},
 	{ &cg_timescale, "timescale", "1", 0},
-	{ &cg_scorePlum, "cg_scorePlums", "1", CVAR_USERINFO | CVAR_ARCHIVE},
+	{ &cg_scorePlum, "cg_scorePlums", "1", CVAR_ARCHIVE },
 	{ &cg_smoothClients, "cg_smoothClients", "0", CVAR_USERINFO | CVAR_ARCHIVE},
 	{ &cg_cameraMode, "com_cameraMode", "0", CVAR_CHEAT},
 
@@ -1001,12 +1003,12 @@ static void CG_RegisterGraphics( void ) {
 	memset( &cg.refdef, 0, sizeof( cg.refdef ) );
 	trap_R_ClearScene();
 
-	CG_LoadingString( cgs.mapname );
+	CG_LoadingString( "Loading world map" );
 
 	trap_R_LoadWorldMap( cgs.mapname );
 
 	// precache status bar pics
-	CG_LoadingString( "game media" );
+	CG_LoadingString( "Registering game media" );
 
 	for ( i=0 ; i<11 ; i++) {
 		cgs.media.numberShaders[i] = trap_R_RegisterShader( sb_nums[i] );
@@ -2078,9 +2080,10 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 
 	CG_ParseServerinfo();
 	CG_DF_InitCvars();
+	CG_DF_LoadingInit();
 
 	// load the new map
-	CG_LoadingString( "collision map" );
+	CG_LoadingString( "Loading BSP" );
 
 	trap_CM_LoadMap( cgs.mapname );
 
@@ -2090,15 +2093,15 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 
 	cg.loading = qtrue;		// force players to load instead of defer
 
-	CG_LoadingString( "sounds" );
+	CG_LoadingString( "Registering sounds" );
 
 	CG_RegisterSounds();
 
-	CG_LoadingString( "graphics" );
+	CG_LoadingString( "Registering graphics" );
 
 	CG_RegisterGraphics();
 
-	CG_LoadingString( "clients" );
+	CG_LoadingString( "Registering clients" );
 
 	CG_RegisterClients();		// if low on memory, some clients will be deferred
 
@@ -2121,7 +2124,7 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 
 	CG_StartMusic();
 
-	CG_LoadingString( "" );
+	CG_DF_LoadingLine( "Awaiting snapshot..." );		// 0x3425: no count, no screen update
 
 #ifdef MISSIONPACK
 	CG_InitTeamChat();

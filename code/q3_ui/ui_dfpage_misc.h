@@ -12,8 +12,8 @@ static const char *uiDfMiscList_5684[] = { "0: custom settings", "1: no weapon /
 static const char *uiDfMiscList_5720[] = { "VQ3", "CPM", 0 };
 static const int uiDfMiscShow[3] = { 4, 2, 1 };
 static const uiDfModItem_t uiDfMiscItems[] = {
-	{ 0, 2, 201, 350, 50, "Map Load Script:", "df_script_onMapLoad", 3, 0, 1, 0, 0, 0, uiDfMiscList_3288, NULL, NULL },
-	{ 0, 2, 202, 350, 70, "Respawn Script:", "df_script_onRespawn", 3, 0, 1, 0, 0, 0, uiDfMiscList_3288, NULL, NULL },
+	{ 0, 2, 201, 350, 50, "Map Load Script:", "df_script_onMapLoad", 3, 0, 1, 0, 0, 0, uiDfMiscList_3288, "Execute ^2<mapname>.cfg^7 script when map is loaded ^1(default = Off)", "df_script_onMapLoad" },
+	{ 0, 2, 202, 350, 70, "Respawn Script:", "df_script_onRespawn", 3, 0, 1, 0, 0, 0, uiDfMiscList_3288, "Execute ^2respawn.cfg^7 script each time player respawns ^1(default = Off)", "df_script_onRespawn" },
 	{ 0, 2, 101, 350, 110, "CHS Use Predicted Data:", "df_chs_UsePredicted", 3, 0, 1, 0, 0, 0, uiDfMiscList_3288, "Use predicted player data for input into CHS/AccelMeter items ^1(default = Off)", "df_chs_UsePredicted" },
 	{ 0, 2, 102, 350, 150, "OB Fast Predict:", "df_ob_Fast", 3, 0, 1, 0, 0, 0, uiDfMiscList_3288, "Overbounce fast prediction algorithm ^1(default = On)", "df_ob_Fast" },
 	{ 0, 2, 103, 350, 170, "OB Predict All Slopes:", "df_ob_AllSlopes", 3, 0, 1, 0, 0, 0, uiDfMiscList_3288, "Overbounce prediction for non-horizontal floors ^1(default = Off)", "df_ob_AllSlopes" },
@@ -38,9 +38,9 @@ static const uiDfModItem_t uiDfMiscItems[] = {
 	{ 2, 2, 602, 350, 70, "TricksMode Game Mode:", "df_mode_tricksmode", 3, 0, 7, 24, 0, 0, uiDfMiscList_5684, "Game Mode ^3(requires map restart)^7 ^1(default = 0)", "df_mode_tricksmode" },
 	{ 2, 2, 603, 350, 90, "Fast Caps  Game Mode:", "df_mode_fastcaps", 3, 0, 7, 24, 0, 0, uiDfMiscList_5684, "Game Mode ^3(requires map restart)^7 ^1(default = 0)", "df_mode_fastcaps" },
 	{ 2, 2, 604, 350, 110, "Physics:", "df_promode", 3, 0, 1, 24, 0, 0, uiDfMiscList_5720, "Physics movement type ^3(requires map restart)^7 ^1(default = VQ3)", "df_promode" },
-	{ 2, 2, 501, 350, 150, "Overbounces:", "df_ob_KillOBs", 3, 0, 1, 24, 0, 0, uiDfMiscList_3300, NULL, NULL },
-	{ 2, 2, 502, 350, 190, "Grappling Hook Type:", "df_hook_Type", 3, 0, 3, 24, 0, 0, uiDfMiscList_5628, NULL, NULL },
-	{ 2, 2, 503, 350, 230, "Lightning Gun Knockback:", "df_lg_Knockback", 3, 0, 1, 24, 0, 0, uiDfMiscList_3288, NULL, NULL },
+	{ 2, 2, 501, 350, 150, "Overbounces:", "df_ob_KillOBs", 3, 0, 1, 24, 0, 0, uiDfMiscList_3300, "Overbounces on/off ^3(requires map restart)^7 ^1(default = On)", "df_ob_KillOBs" },
+	{ 2, 2, 502, 350, 190, "Grappling Hook Type:", "df_hook_Type", 3, 0, 3, 24, 0, 0, uiDfMiscList_5628, "Grappling Hook Type ^3(requires map restart)^7 ^1(default = Quake3)", "df_hook_Type" },
+	{ 2, 2, 503, 350, 230, "Lightning Gun Knockback:", "df_lg_Knockback", 3, 0, 1, 24, 0, 0, uiDfMiscList_3288, "Lightning Gun Knockback on/off ^3(requires map restart)^7 ^1(default = Off)", "df_lg_Knockback" },
 };
 static const char *uiDfMiscPageNames[] = { "Game Settings", "Non Defrag Maps", "Misc", 0 };
 #define UIDF_MISC_SPINLABEL "> Misc:"

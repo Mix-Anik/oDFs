@@ -604,6 +604,16 @@ void CG_InitConsoleCommands( void ) {
 	trap_AddCommand ("respawnpoint");
 	trap_AddCommand ("firemissile");
 	trap_AddCommand ("arena");
+	// handled by the ui module / the engine (ui 0xb84), registered by cgame 0x1adc7 for tab completion
+	trap_AddCommand ("vq3");
+	trap_AddCommand ("cpm");
+	trap_AddCommand ("devvq3");
+	trap_AddCommand ("devcpm");
+	trap_AddCommand ("silent");
+	trap_AddCommand ("dmq_add");
+	trap_AddCommand ("dmq_clear");
+	trap_AddCommand ("dmq_play");
+	trap_AddCommand ("dmq_stop");
 	trap_AddCommand ("varMath");
 	trap_AddCommand ("svinfo_summary");
 	trap_AddCommand ("replay");

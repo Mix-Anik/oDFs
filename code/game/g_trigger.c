@@ -487,7 +487,10 @@ void SP_trigger_hurt( gentity_t *self ) {
 		self->damage = 5;
 	}
 
-	self->use = hurt_use;
+	// 0x27e28: only the TOGGLE flag (2) makes a trigger_hurt usable
+	if ( self->spawnflags & 2 ) {
+		self->use = hurt_use;
+	}
 
 	// link in to the world if starting active
 	if ( self->spawnflags & 1 ) {

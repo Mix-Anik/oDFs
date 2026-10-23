@@ -1195,6 +1195,27 @@ static qboolean CG_DF_IsDefragServer( void ) {
 	return ( atoi( Info_ValueForKey( si, "o3j_version" ) ) || atoi( Info_ValueForKey( si, "defrag_vers" ) ) || Info_ValueForKey( si, "defrag_vers" )[0] ) ? qtrue : qfalse;
 }
 
+// DeFRaG 0x1c0b-0x1c50 (per-frame driver 0x1bd3): while sv_cheats is off com_maxfps is kept inside 60..140 (0 = unlimited counts as
+// too high), with the red notice; the original sends the notice to the server ("Notify") which echoes it, here it is printed directly.
+// Only on DeFRaG servers and not in demos; opt-out df_enforceMaxFps 0.
+void CG_DF_EnforceMaxFps( void ) {
+	char	buf[32];
+	int		v;
+
+	if ( !df_enforceMaxFps.integer || cg.demoPlayback || !cg.snap || CG_DF_Cheats() || !CG_DF_IsDefragServer() ) {
+		return;
+	}
+	trap_Cvar_VariableStringBuffer( "com_maxfps", buf, sizeof( buf ) );
+	v = atoi( buf );
+	if ( v == 0 || v > 140 ) {
+		trap_Cvar_Set( "com_maxfps", "140" );
+		CG_Printf( S_COLOR_RED "com_maxfps highest value restricted to 140." S_COLOR_WHITE "\n" );
+	} else if ( v < 60 ) {
+		trap_Cvar_Set( "com_maxfps", "60" );
+		CG_Printf( S_COLOR_RED "com_maxfps lowest value restricted to 60." S_COLOR_WHITE "\n" );
+	}
+}
+
 // 0xa1a6, run after cg.clientFrame++ in CG_DrawActiveFrame: on a non-DeFRaG demo clear the stats the race code would misread
 void CG_DF_ModSupportSnapshot( void ) {
 	int i;

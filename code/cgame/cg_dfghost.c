@@ -269,7 +269,7 @@ static void DG_VarsStart( int slot ) {
 	}
 	for ( i = 0; i < n; i++ ) {
 		s->var[i].orig = DG_CvarValue( s->var[i].name );
-		s->var[i].last = -10000.0f;			// (float)0xffffd8f1: differs from any real value, so the first sample writes every variable
+		s->var[i].last = -9999.0f;			// (float)data word 0x20b0 = 0xffffd8f1 = -9999 (0x11046): differs from any real value, so the first sample writes every variable
 		s->var[i].cur = s->var[i].orig;
 	}
 	DG_VarsSpecial( slot );
@@ -857,14 +857,15 @@ static void DG_LiveFire( int slot, const dgFrame_t *fr, const dgMissile_t *r, qb
 	if ( r->weapon == WP_GRAPPLING_HOOK ) {
 		return;
 	}
-	if ( !matched && dgLastFire[slot] < bIdx ) {
-		AngleVectors( fr->angles, fwd, NULL, NULL );
-		trap_SendConsoleCommand( va( "firemissile %f %f %f %f %f %f %i %i %i\n", fr->origin[0], fr->origin[1], fr->origin[2] + 24.0f,
-			fwd[0], fwd[1], fwd[2], r->weapon, ( live == 2 || live == 4 ) ? 1 : 0, ( live == 3 || live == 4 ) ? 1 : 0 ) );
-		dgLastFire[slot] = bIdx;
-	}
-	if ( bIdx < dgLastFire[slot] ) {
-		dgLastFire[slot] = 0;
+	if ( !matched ) {
+		if ( dgLastFire[slot] < bIdx ) {
+			AngleVectors( fr->angles, fwd, NULL, NULL );
+			trap_SendConsoleCommand( va( "firemissile %f %f %f %f %f %f %i %i %i\n", fr->origin[0], fr->origin[1], fr->origin[2] + 24.0f,
+				fwd[0], fwd[1], fwd[2], r->weapon, ( live == 2 || live == 4 ) ? 1 : 0, ( live == 3 || live == 4 ) ? 1 : 0 ) );
+		}
+		dgLastFire[slot] = bIdx;		// 0x123a8: stored whether it fired or not (also when the ring wrapped and the old value was higher)
+	} else if ( bIdx < dgLastFire[slot] ) {
+		dgLastFire[slot] = 0;		// 0x123b2: a counterpart exists and the ring index went back: forget the last shot
 	}
 }
 
@@ -1822,6 +1823,7 @@ void CG_DF_GhostFrame( void ) {
 	DG_CommandCvar();
 	CG_DF_SmokeTrails();
 	CG_DF_AutoRecFrame();
+	CG_DF_EnforceMaxFps();
 }
 
 // ---- `ghost` command (0x13e09 -> parser 0x13a4a -> executor 0x13b9a) ----

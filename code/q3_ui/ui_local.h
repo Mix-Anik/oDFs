@@ -106,7 +106,7 @@ extern vmCvar_t	ui_ioq3;
 #define	MAX_EDIT_LINE			256
 
 #define MAX_MENUDEPTH			8
-#define MAX_MENUITEMS			64
+#define MAX_MENUITEMS			256		// the DeFRaG setup pages (CHS, Q3 extras) hold well over 64 widgets
 
 #define MTYPE_NULL				0
 #define MTYPE_SLIDER			1	

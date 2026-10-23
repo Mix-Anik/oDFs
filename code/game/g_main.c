@@ -110,6 +110,7 @@ vmCvar_t	df_auth;
 vmCvar_t	df_vote_system;
 vmCvar_t	df_forceCvars;
 vmCvar_t	df_enforceSvFps;
+vmCvar_t	df_forceGametype;
 vmCvar_t	df_lockPromode;
 vmCvar_t	df_sv_script_idleCfg;
 vmCvar_t	df_sv_script_idleDelay;
@@ -150,7 +151,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_timelimit, "timelimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
 	{ &g_capturelimit, "capturelimit", "8", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
 
-	{ &g_synchronousClients, "g_synchronousClients", "0", CVAR_SYSTEMINFO, 0, qfalse  },
+	{ &g_synchronousClients, "g_synchronousClients", "1", CVAR_SYSTEMINFO, 0, qfalse  },
 
 	{ &g_friendlyFire, "g_friendlyFire", "0", CVAR_ARCHIVE, 0, qtrue  },
 
@@ -160,7 +161,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_warmup, "g_warmup", "20", CVAR_ARCHIVE, 0, qtrue  },
 	{ &g_doWarmup, "g_doWarmup", "0", CVAR_ARCHIVE, 0, qtrue  },
 	{ &g_logfile, "g_log", "games.log", CVAR_ARCHIVE, 0, qfalse  },
-	{ &g_logfileSync, "g_logsync", "0", CVAR_ARCHIVE, 0, qfalse  },
+	{ &g_logfileSync, "g_logSync", "0", CVAR_ARCHIVE, 0, qfalse  },
 
 	{ &g_password, "g_password", "", CVAR_USERINFO, 0, qfalse  },
 
@@ -207,7 +208,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_proxMineTimeout, "g_proxMineTimeout", "20000", 0, 0, qfalse },
 #endif
 	{ &g_smoothClients, "g_smoothClients", "1", 0, 0, qfalse},
-	{ &pmove_fixed, "pmove_fixed", "0", CVAR_SYSTEMINFO, 0, qfalse},
+	{ &pmove_fixed, "pmove_fixed", "1", CVAR_SYSTEMINFO, 0, qfalse},
 	{ &pmove_msec, "pmove_msec", "8", CVAR_SYSTEMINFO, 0, qfalse},
 
 	{ &g_rankings, "g_rankings", "0", 0, 0, qfalse},
@@ -218,13 +219,13 @@ static cvarTable_t		gameCvarTable[] = {
 	// DeFRaG cgame parses atoi(defrag_vers) (cgame 0x3c33) and below 18100 uses a legacy time-decoding path -> must be numeric, DeFRaG itself publishes 19131 (=1.91.31)
 	{ NULL, 			"defrag_vers",     	"19131",	CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
 	{ &df_promode,    	"df_promode",    	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
-	{ &df_ob_killobs, 	"df_ob_killobs", 	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
+	{ &df_ob_killobs, 	"df_ob_KillOBs", 	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_mode,       	"df_mode",       	"1",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_gametype,   	"df_gametype",   	"0",			CVAR_LATCH, 0, qfalse },
 	{ &df_hook_type,  	"df_hook_Type",  	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_lg_knockback,	"df_lg_Knockback",	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ NULL, 			"defrag_mode",     		"-1",   	CVAR_SERVERINFO, 0, qfalse },
-	{ NULL, 			"defrag_flags",    		"2",    	CVAR_SERVERINFO, 0, qfalse },
+	{ NULL, 			"defrag_flags",    		"0",    	CVAR_SERVERINFO, 0, qfalse },
 	{ NULL, 			"defrag_gametype", 		"1",    	CVAR_SERVERINFO, 0, qfalse },
 	// DeFRaG race entity cvars — read by the cgame to enable the timer HUD.
 	// The cgame checks if these start with "df" to decide which entities exist.
@@ -253,7 +254,8 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &df_ndm_nomover,       "df_ndm_nomover",       "0",    CVAR_SERVERINFO, 0, qfalse },
 	{ &g_killWallbug,        "g_killWallbug",        "1",    CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
 	{ &df_dbg_1mstimer,      "df_dbg_1mstimer",      "0",    0, 0, qfalse },
-	{ &df_enforceSvFps,      "df_enforceSvFps",      "0",    CVAR_ARCHIVE, 0, qfalse },
+	{ &df_enforceSvFps,      "df_enforceSvFps",      "1",    CVAR_ARCHIVE, 0, qfalse },
+	{ &df_forceGametype,     "df_forceGametype",     "1",    CVAR_ARCHIVE, 0, qfalse },
 	// info-key cvars from the DeFRaG table (G_UTILS/cvar_table.md), flags as decoded; consumers: df_competition has none in qagame
 	{ NULL,                  "df_competition",       "",     CVAR_SERVERINFO | CVAR_LATCH, 0, qfalse },
 	{ NULL,                  "o3j_version",          "1016", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ROM | CVAR_CHEAT, 0, qfalse },
@@ -472,6 +474,10 @@ float G_PhysSpeed( void ) {
 
 float G_PhysGravity( void ) {
 	return ( df_forceCvars.integer && !g_cheats.integer ) ? 800.0f : g_gravity.value;
+}
+
+float G_PhysKnockback( void ) {		// func_0x3ec7
+	return ( df_forceCvars.integer && !g_cheats.integer ) ? 1000.0f : g_knockback.value;
 }
 
 void G_UpdateCvars( void ) {

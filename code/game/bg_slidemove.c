@@ -237,6 +237,28 @@ qboolean	PM_SlideMove( qboolean gravity ) {
 
 /*
 ==================
+PM_ClipVelocity2D
+
+DeFRaG func_0x1a0b: PM_ClipVelocity whose result keeps the z component of `in` (backoff uses all three, only x / y are changed)
+==================
+*/
+static void PM_ClipVelocity2D( vec3_t in, vec3_t normal, vec3_t out, float overbounce ) {
+	float	backoff;
+	int		i;
+
+	backoff = DotProduct( in, normal );
+	if ( backoff < 0 ) {
+		backoff *= overbounce;
+	} else {
+		backoff /= overbounce;
+	}
+	for ( i = 0 ; i < 2 ; i++ ) {
+		out[i] = in[i] - normal[i] * backoff;
+	}
+}
+
+/*
+==================
 PM_StepSlideMove
 
 ==================
@@ -300,10 +322,13 @@ void PM_StepSlideMove( qboolean gravity ) {
 		VectorCopy (trace.endpos, pm->ps->origin);
 	}
 	if ( trace.fraction < 1.0 ) {
-		PM_ClipVelocity( pm->ps->velocity, trace.plane.normal, pm->ps->velocity, OVERCLIP );
-		if ( pm->promode ) {
-			return;  // CPM: skip step sounds after push-down clip
+		// DeFRaG (0x8c68-0x8cab): after a double jump (promode + stats[11] set) only x / y are clipped (func_0x1a0b: the z
+		// velocity is kept) and the step events are skipped; otherwise the normal clip is followed by the step events
+		if ( ( pm->ps->pm_flags & PMF_PROMODE ) && pm->ps->stats[STAT_DOUBLEJUMP_USED] ) {
+			PM_ClipVelocity2D( pm->ps->velocity, trace.plane.normal, pm->ps->velocity, OVERCLIP );
+			return;
 		}
+		PM_ClipVelocity( pm->ps->velocity, trace.plane.normal, pm->ps->velocity, OVERCLIP );
 	}
 
 #if 0

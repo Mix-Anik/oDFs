@@ -1102,6 +1102,7 @@ extern	vmCvar_t		cg_gibs;
 extern	vmCvar_t		cg_drawTimer;
 extern	vmCvar_t		cg_drawFPS;
 extern	vmCvar_t		df_noTargetPrint;
+extern	vmCvar_t		df_enforceMaxFps;
 extern	vmCvar_t		df_checkpoints;
 extern	vmCvar_t		df_drawSpeed;
 extern	vmCvar_t		df_drawBesttime;
@@ -1215,6 +1216,7 @@ extern	int				dfFollowStamp;
 extern	vmCvar_t		df_hud;
 qboolean CG_DF_HudOn( void );
 qboolean CG_DF_Cheats( void );
+void CG_DF_EnforceMaxFps( void );
 void CG_DF_RecTrack( int ms );
 const char *CG_DF_FormatDelta( int v );
 void CG_DF_RecRunStopped( void );
@@ -1652,6 +1654,8 @@ void CG_ProcessSnapshots( void );
 // cg_info.c
 //
 void CG_LoadingString( const char *s );
+void CG_DF_LoadingLine( const char *s );
+void CG_DF_LoadingInit( void );
 void CG_LoadingItem( int itemNum );
 void CG_LoadingClient( int clientNum );
 void CG_DrawInformation( void );

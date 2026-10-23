@@ -61,7 +61,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define FL_NOT_TM				0x00200000	// "nottm"  (mode 2)
 #define FL_NOT_FC				0x00400000	// "notfc"/"notteam" (mode 3)
 #define FL_NDM_KEEP				0x01000000	// dropped items: always spawned and active (func_0x3c43 / 0x3c8b test 0x1000000)
-#define FL_MOVER				0x00800000	// set by func_plat/func_bobbing/func_train; removed in mode 3 when df_ndm_nomover is set
+#define FL_MOVER				0x00800000	// set by func_plat/func_bobbing/func_train; removed in any mode when g_ndm.nomover is set (func_0x20e0 0x2188)
 
 // movers are things like doors, plats, buttons, etc
 typedef enum {
@@ -488,6 +488,7 @@ qboolean	G_SpawnVector( const char *key, const char *defaultString, float *out )
 void		G_SpawnEntitiesFromString( void );
 qboolean	G_ParseModeKeys( gentity_t *ent );
 void		G_ApplyModeExclusion( void );
+extern qboolean	g_disableScore;
 char *G_NewString( const char *string );
 
 //
@@ -782,6 +783,7 @@ extern	vmCvar_t	g_gravity;
 extern	vmCvar_t	g_speed;
 float	G_PhysSpeed( void );
 float	G_PhysGravity( void );
+float	G_PhysKnockback( void );
 extern	vmCvar_t	g_knockback;
 extern	vmCvar_t	g_quadfactor;
 extern	vmCvar_t	g_forcerespawn;

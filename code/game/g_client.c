@@ -665,6 +665,37 @@ static void ForceClientSkin( gclient_t *client, char *model, const char *skin ) 
 
 /*
 ===========
+G_CleanFileName
+
+qagame 0x12e3: colour codes (^ and the next character, unless that is ^ or the end) are dropped and so is every
+character that can't be part of a file name (<= 32, >= 126 and : * ? " < > | \ / . ( ) [ ]); nothing left = UnnamedPlayer
+============
+*/
+static void G_CleanFileName( const char *in, char *out, int outSize ) {
+	char	buf[1024];
+	char	*d = buf;
+	const char	*p;
+
+	Q_strncpyz( buf, in, sizeof( buf ) );
+	for ( p = buf; *p; p++ ) {
+		if ( *p == '^' && p[1] && p[1] != '^' ) {
+			p++;
+			continue;
+		}
+		if ( *p <= 32 || *p >= 126 || strchr( ":*?\"<>|\\/.()[]", *p ) ) {
+			continue;
+		}
+		*d++ = *p;
+	}
+	*d = 0;
+	if ( !buf[0] ) {
+		Q_strncpyz( buf, "UnnamedPlayer", sizeof( buf ) );
+	}
+	Q_strncpyz( out, buf, outSize );
+}
+
+/*
+===========
 ClientCleanName
 ============
 */
@@ -797,14 +828,23 @@ void ClientUserinfoChanged( int clientNum ) {
 
 	// DeFRaG: per-client "demo name", distinct from netname. Confirmed
 	// from qagame.qvm disassembly; see disasm/G_CLIENT/README.md
-	s = Info_ValueForKey( userinfo, "df_name" );
-	ClientCleanName( s, client->demoName, sizeof( client->demoName ) );
-
 	if ( client->pers.connected == CON_CONNECTED ) {
 		if ( strcmp( oldname, client->pers.netname ) ) {
-			trap_SendServerCommand( -1, va("print \"%s" S_COLOR_WHITE " renamed to %s\n\"", oldname, 
+			trap_SendServerCommand( -1, va("print \"%s" S_COLOR_WHITE " renamed to %s\n\"", oldname,
 				client->pers.netname) );
 		}
+	}
+
+	// 0x1ce06: the demo name is cleaned as a file name (0x12e3), kept to 19 characters, and a change is reported to that client only
+	Q_strncpyz( oldname, client->demoName, sizeof( oldname ) );
+	{
+		char fileName[1024];
+
+		G_CleanFileName( Info_ValueForKey( userinfo, "df_name" ), fileName, sizeof( fileName ) );
+		Q_strncpyz( client->demoName, fileName, 20 );
+	}
+	if ( client->pers.connected == CON_CONNECTED && strcmp( oldname, client->demoName ) ) {
+		trap_SendServerCommand( clientNum, va( "print \"Your demo name changed to %s" S_COLOR_WHITE "\n\"", client->demoName ) );
 	}
 
 	// set max health

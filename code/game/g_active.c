@@ -1348,6 +1348,12 @@ void ClientEndFrame( gentity_t *ent ) {
 	// DeFRaG target_fragsFilter per-frame score poll
 	G_FragsFilterCheck( ent );
 
+	// DeFRaG 0x263b-0x2663: while weapon pickups are switched off (df_ndm_weaponsPickup 0) the held weapon's ammo is topped up to 200
+	// every frame (gauntlet and grappling hook excluded)
+	if ( !( g_ndm.flags & 0x6 ) && ent->client->ps.weapon != WP_GAUNTLET && ent->client->ps.weapon != WP_GRAPPLING_HOOK ) {
+		ent->client->ps.ammo[ent->client->ps.weapon] = 200;
+	}
+
 	// set the bit for the reachability area the client is currently in
 //	i = trap_AAS_PointReachabilityAreaIndex( ent->client->ps.origin );
 //	ent->client->areabits[i >> 3] |= 1 << (i & 7);

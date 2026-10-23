@@ -35,7 +35,7 @@ static const uiDfModItem_t uiDfDemosItems[] = {
 	{ 1, 1, 310, 350, 270, "+Movedown Keymap:", "df_keymaps_movedown", 4, 0, 0, 0, 30, 63, NULL, "Binds a 2nd command to the +movedown bound key ^1(default = empty)", "df_keymaps_movedown" },
 	{ 1, 1, 311, 350, 310, "VarTransitions List:", "df_transitions", 4, 0, 0, 0, 30, 63, NULL, "VarTransitions Vstr List ^2t1 t2 ... ^1(default = empty)", "df_transitions" },
 	{ 2, 2, 401, 350, 50, "Camera Mode:", "df_demos_CameraMode", 3, 0, 11, 0, 0, 0, uiDfDemosList_4956, "Demos Camera Mode ^1(default = 0: Off)", "df_demos_CameraMode" },
-	{ 2, 1, 500, 350, 70, "Player To Track:", "df_mp_TrackPlayerNum", 1, -1, 63, 0, 6, 6, NULL, NULL, NULL },
+	{ 2, 1, 500, 350, 70, "Player To Track:", "df_mp_TrackPlayerNum", 1, -1, 63, 0, 6, 6, NULL, "Player Number for DemoCam to track ^1(default = -1: Main Player)", "df_mp_TrackPlayerNum" },
 	{ 2, 1, 402, 350, 90, "Transition Speed:", "df_demos_CameraTransitionSpeed", 1, -10000, 10000, 0, 6, 6, NULL, "BASE: Negative = Speed, Positive = Time ^1(-10000 to 10000 default = 50)", "df_demos_CameraTransitionSpeed" },
 	{ 2, 1, 403, 350, 130, "Position Sequence:", "df_demos_CamSeqPosition", 4, 0, 0, 0, 30, 63, NULL, "SavePosition Sequence Vstr List ^2pos1 pos2 ... ^1(default = empty)", "df_demos_CamSeqPosition" },
 	{ 2, 1, 404, 350, 150, "Speed Sequence:", "df_demos_CamSeqSpeed", 4, 0, 0, 0, 30, 63, NULL, "Transition Speed Sequence Vstr List ^2s1 s2 ... ^1(default = empty)", "df_demos_CamSeqSpeed" },

@@ -453,8 +453,14 @@ server type (dedicated) and DeFRaG mode (df_gametype 1 = run, 2 = tricks, 3 = fa
 Mode auto-detection of the original is not implemented. FL_MOVER (0x800000) is set by func_plat/bobbing/train.
 ===================
 */
+qboolean g_disableScore;	// worldspawn "disableScore"
+
+extern vmCvar_t df_enforceSvFps;
+extern vmCvar_t df_forceGametype;
+
 void G_ResolveDfMode( void ) {
 	int mode = df_gametype.integer;
+	int dfFlags;
 
 	g_dfVariant = g_dedicated.integer ? qtrue : qfalse;
 	if ( mode <= 0 || mode >= 8 || mode == 4 ) {
@@ -471,9 +477,50 @@ void G_ResolveDfMode( void ) {
 		g_dfVariant = qtrue;
 	}
 	g_dfMode = mode;
+	// 0x22ac-0x22d4: fastcaps (mode 3) runs as CTF (4), every other mode as free for all (0), whatever g_gametype the server had; the
+	// cached value is updated at once (opt-out: df_forceGametype 0)
+	if ( df_forceGametype.integer ) {
+		trap_Cvar_Set( "g_gametype", mode == 3 ? "4" : "0" );
+		trap_Cvar_Update( &g_gametype );
+	}
 	G_ResolveNdm();
 	G_NdmTimerInit();
 	trap_Cvar_Set( "defrag_gametype", va( "%i", g_dfVariant ? mode + 4 : mode ) );
+
+	// defrag_flags (0x2318-0x2353): 1 = worldspawn "disableScore", 2 = a checkpoint timer exists (run mode always has one),
+	// 0x10 = df_ndm_nopad in effect, 0x20 = df_ndm_noteleport in effect
+	dfFlags = g_disableScore ? 1 : 0;
+	if ( mode == 1 || g_checkpointReady ) {
+		dfFlags |= 2;
+	}
+	if ( g_ndm.nopad ) {
+		dfFlags |= 0x10;
+	}
+	if ( g_ndm.noteleport ) {
+		dfFlags |= 0x20;
+	}
+	trap_Cvar_Set( "defrag_flags", va( "%i", dfFlags ) );
+	// defrag_obs (0x2359-0x2376): 1 = overbounces on, i.e. df_ob_KillOBs is 0
+	trap_Cvar_Set( "defrag_obs", df_ob_killobs.integer ? "0" : "1" );
+
+	// 0x2381-0x23ed (non-dedicated path): a sv_fps outside 60..140 is set to 125 at map load; G_FrameRules then keeps it inside the
+	// bounds every frame. Opt-out with df_enforceSvFps 0 (the stock default of 20 would otherwise be raised to 125).
+	if ( df_enforceSvFps.integer ) {
+		if ( !g_dfVariant ) {
+			int svFps = trap_Cvar_VariableIntegerValue( "sv_fps" );
+
+			if ( !trap_Cvar_VariableIntegerValue( "sv_cheats" ) && svFps != 0 && ( svFps < 60 || svFps > 140 ) ) {
+				trap_Cvar_Set( "sv_fps", "125" );
+			}
+			// 0x23d5: no time limit on every map load (a race must not be cut off by the map timer)
+			trap_Cvar_Set( "timelimit", "0" );
+		} else if ( !trap_Cvar_VariableIntegerValue( "defrag_svfpsInitialized" ) ) {
+			// 0x238a-0x23ac (dedicated / variant servers): one-time defaults, remembered in defrag_svfpsInitialized
+			trap_Cvar_Set( "defrag_svfpsInitialized", "1" );
+			trap_Cvar_Set( "sv_fps", "125" );
+			trap_Cvar_Set( "g_synchronousClients", "0" );
+		}
+	}
 }
 
 ndmSettings_t g_ndm;
@@ -573,15 +620,15 @@ void G_ApplyModeExclusion( void ) {
 			if ( ent->flags & FL_NOT_SP ) { G_FreeEntity( ent ); continue; }
 		}
 		if ( mode == 1 ) {
-			if ( ent->flags & FL_NOT_DF ) G_FreeEntity( ent );
+			if ( ent->flags & FL_NOT_DF ) { G_FreeEntity( ent ); continue; }
 		} else if ( mode == 2 ) {
-			if ( ent->flags & FL_NOT_TM ) G_FreeEntity( ent );
+			if ( ent->flags & FL_NOT_TM ) { G_FreeEntity( ent ); continue; }
 		} else if ( mode == 3 ) {
-			if ( ent->flags & FL_NOT_FC ) {
-				G_FreeEntity( ent );
-			} else if ( g_ndm.nomover && ( ent->flags & FL_MOVER ) ) {
-				G_FreeEntity( ent );
-			}
+			if ( ent->flags & FL_NOT_FC ) { G_FreeEntity( ent ); continue; }
+		}
+		// 0x2188-0x219e: reached in every mode by the entities that survived the mode keys (not only in fastcaps)
+		if ( g_ndm.nomover && ( ent->flags & FL_MOVER ) ) {
+			G_FreeEntity( ent );
 		}
 	}
 }
@@ -759,14 +806,17 @@ void SP_worldspawn( void ) {
 
 	trap_SetConfigstring( CS_MOTD, g_motd.string );		// message of the day
 
-	G_SpawnString( "gravity", "800", &s );
-	trap_Cvar_Set( "g_gravity", s );
+	// DeFRaG (0x24c8c) does not read the map's "gravity" key: g_gravity stays what the server has (only honoured with cheats)
 
 	G_SpawnString( "enableDust", "0", &s );
 	trap_Cvar_Set( "g_enableDust", s );
 
 	G_SpawnString( "enableBreath", "0", &s );
 	trap_Cvar_Set( "g_enableBreath", s );
+
+	// DeFRaG: "disableScore" hides the score / fraglimit display (defrag_flags bit 1, see G_ResolveDfMode)
+	G_SpawnString( "disableScore", "0", &s );
+	g_disableScore = atoi( s ) ? qtrue : qfalse;
 
 	g_entities[ENTITYNUM_WORLD].s.number = ENTITYNUM_WORLD;
 	g_entities[ENTITYNUM_WORLD].r.ownerNum = ENTITYNUM_NONE;

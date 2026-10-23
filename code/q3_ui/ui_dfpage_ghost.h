@@ -47,7 +47,7 @@ static const uiDfModItem_t uiDfGhostItems[] = {
 	{ 3, 1, 406, 350, 170, "Offset Y:", "df_ghosts_MiniviewOffsetY", 1, -400, 400, 0, 4, 4, NULL, "Vertical pos. relative to screen center ^1(-400 to 400 default = -155)", "df_ghosts_MiniviewOffsetY" },
 	{ 3, 1, 407, 350, 190, "Border Size:", "df_ghosts_MiniviewBorderSize", 1, 0, 25, 0, 4, 4, NULL, "Bordersize ^1(0 to 25 default = 4)", "df_ghosts_MiniviewBorderSize" },
 	{ 3, 1, 408, 350, 230, "Field Of View:", "df_ghosts_MiniviewFOV", 1, 5, 250, 0, 3, 3, NULL, "Field-of-view ^1(5 to 250 default = 90)", "df_ghosts_MiniviewFOV" },
-	{ 3, 1, 500, 350, 270, "Player To Track:", "df_mp_TrackPlayerNum", 1, -1, 63, 0, 6, 6, NULL, NULL, NULL },
+	{ 3, 1, 500, 350, 270, "Player To Track:", "df_mp_TrackPlayerNum", 1, -1, 63, 0, 6, 6, NULL, "Player Number to track for PIP tracking modes ^1(default = -1: Main Player)", "df_mp_TrackPlayerNum" },
 };
 static const char *uiDfGhostPageNames[] = { "Global", "Ghost 1/Ghost 2", "Miniview (PIP)", 0 };
 #define UIDF_GHOST_SPINLABEL "> Ghosts:"

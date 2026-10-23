@@ -916,10 +916,9 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 			dir[1] *= 1.2f;
 		}
 
-		// DeFRaG: g_knockback's live cvar value is only honored when sv_cheats
-		// is non-zero; otherwise it's ignored and a hardcoded 1000.0 is used
-		// instead. Confirmed from qagame.qvm disassembly (func_0x3ec7).
-		VectorScale (dir, ( g_cheats.integer ? g_knockback.value : 1000.0f ) * (float)knockback / mass, kvel);
+		// DeFRaG (func_0x3ec7): g_knockback's live cvar value is only honored when sv_cheats
+		// is non-zero; otherwise a hardcoded 1000.0 is used. Opt-in (df_forceCvars 1), see G_PhysKnockback.
+		VectorScale (dir, G_PhysKnockback() * (float)knockback / mass, kvel);
 		VectorAdd (targ->client->ps.velocity, kvel, targ->client->ps.velocity);
 
 		// set the timer so that the other client can't cancel
