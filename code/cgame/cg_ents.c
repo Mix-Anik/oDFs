@@ -244,7 +244,7 @@ static qboolean CG_DF_ItemAvailable( const entityState_t *es, int clientNum ) {
 /*
 ==================
 DeFRaG "multiplayer" gate (cgame global 0x11d2ac): server version >= 18100
-and defrag_gametype < 5. Cached once per frame.
+and defrag_gametype >= 5 (CG_DF_Multiplayer). Cached once per frame.
 ==================
 */
 static qboolean CG_DF_ItemMultiplayerServer( void ) {
@@ -252,16 +252,8 @@ static qboolean CG_DF_ItemMultiplayerServer( void ) {
 	static qboolean	mp;
 
 	if ( lastTime != cg.time ) {
-		char	si[MAX_INFO_STRING];
-		int		v;
-
 		lastTime = cg.time;
-		Q_strncpyz( si, CG_ConfigString( CS_SERVERINFO ), sizeof( si ) );
-		v = atoi( Info_ValueForKey( si, "defrag_vers" ) );
-		if ( v > 0 && v < 1000 ) {
-			v *= 100;
-		}
-		mp = ( v >= 18100 && atoi( Info_ValueForKey( si, "defrag_gametype" ) ) < 5 ) ? qtrue : qfalse;
+		mp = CG_DF_Multiplayer();
 	}
 	return mp;
 }

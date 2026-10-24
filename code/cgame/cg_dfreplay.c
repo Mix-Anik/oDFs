@@ -1517,10 +1517,21 @@ static void DR_CameraView( void ) {
 }
 
 // 0x15246: the df_demos_CamOffset* position / angle / radius offsets applied to a camera (used by the demo camera)
-void CG_DF_CamOffsets( vec3_t pos, vec3_t ang ) {
-	DR_AddCvars3( pos, "df_demos_CamOffsetPositionX", "df_demos_CamOffsetPositionY", "df_demos_CamOffsetPositionZ" );
+// Returns whether the position or radius offsets moved the camera (the angle offsets do not count, as in 0x15246).
+qboolean CG_DF_CamOffsets( vec3_t pos, vec3_t ang ) {
+	qboolean moved;
+
+	moved = DR_AddCvars3( pos, "df_demos_CamOffsetPositionX", "df_demos_CamOffsetPositionY", "df_demos_CamOffsetPositionZ" );
 	DR_AddCvars3( ang, "df_demos_CamOffsetAngleX", "df_demos_CamOffsetAngleY", "df_demos_CamOffsetAngleZ" );
-	DR_AddRadius( pos, ang );
+	if ( DR_AddRadius( pos, ang ) ) {
+		moved = qtrue;
+	}
+	return moved;
+}
+
+// 0x14b8b alone: only the angle offsets (the demo camera applies them a second time after re-aiming)
+void CG_DF_CamAngleOffsets( vec3_t ang ) {
+	DR_AddCvars3( ang, "df_demos_CamOffsetAngleX", "df_demos_CamOffsetAngleY", "df_demos_CamOffsetAngleZ" );
 }
 
 // ---- ReplayMode 1: spectator key state machine (0x1a323 / 0x1a2bf) and the cleanup (0x1a3a6 / 0x1a3c3 / 0x1a3ec / 0x194bf) ----

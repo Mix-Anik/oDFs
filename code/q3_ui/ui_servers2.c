@@ -42,6 +42,7 @@ MULTIPLAYER MENU (SERVER BROWSER)
 #define MAX_STATUSLENGTH		64
 #define MAX_LEAGUELENGTH		28
 #define MAX_LISTBOXWIDTH		68
+#define DF_LISTBOXWIDTH			61		// DeFRaG list width (ui 0x15c3b) and row size limit
 
 #define ART_BACK0				"menu/art/back_0"
 #define ART_BACK1				"menu/art/back_1"
@@ -95,9 +96,9 @@ MULTIPLAYER MENU (SERVER BROWSER)
 #define SORT_HOST			0
 #define SORT_MAP			1
 #define SORT_CLIENTS		2
-#define SORT_GAME			3
-#define SORT_PING			4
-#define SORT_NUM_SORTS		5
+// DeFRaG (ui 0x14f65 / 0x15b60): four sort keys, there is no "Game Type" sort
+#define UISORT_PING			3
+#define SORT_NUM_SORTS		4
 
 #define GAMES_ALL			0
 #define GAMES_FFA			1
@@ -131,7 +132,6 @@ static const char *sortkey_items[] = {
 	"Server Name",
 	"Map Name",
 	"Open Player Spots",
-	"Game Type",
 	"Ping Time",
 	NULL
 };
@@ -153,10 +153,10 @@ static char* gamenames[] = {
 	NULL
 };
 
-static char* netnames[] = {
-	"??? ",
-	"UDP ",
-	"UDP6",
+static char* netnames[] = {		// DeFRaG table at data 0x2c54
+	"???",
+	"UDP",
+	"IPX",
 	NULL
 };
 
@@ -318,16 +318,7 @@ static int QDECL ArenaServers_Compare( const void *arg1, const void *arg2 ) {
 		}
 		return -1;
 
-	case SORT_GAME:
-		if( t1->gametype < t2->gametype ) {
-			return -1;
-		}
-		if( t1->gametype == t2->gametype ) {
-			return 0;
-		}
-		return 1;
-
-	case SORT_PING:
+	case UISORT_PING:
 		if( t1->pingtime < t2->pingtime ) {
 			return -1;
 		}
@@ -517,34 +508,7 @@ static void ArenaServers_UpdateMenu( void ) {
 			continue;
 		}
 
-		switch( g_gametype ) {
-		case GAMES_ALL:
-			break;
-
-		case GAMES_FFA:
-			if( servernodeptr->gametype != GT_FFA ) {
-				continue;
-			}
-			break;
-
-		case GAMES_TEAMPLAY:
-			if( servernodeptr->gametype != GT_TEAM ) {
-				continue;
-			}
-			break;
-
-		case GAMES_TOURNEY:
-			if( servernodeptr->gametype != GT_TOURNAMENT ) {
-				continue;
-			}
-			break;
-
-		case GAMES_CTF:
-			if( servernodeptr->gametype != GT_CTF ) {
-				continue;
-			}
-			break;
-		}
+		// DeFRaG (ui 0x15088): the "Game Type" spinner is still there but UpdateMenu has no game type culling
 
 		if( servernodeptr->pingtime < servernodeptr->minPing ) {
 			pingColor = S_COLOR_BLUE;
@@ -562,10 +526,11 @@ static void ArenaServers_UpdateMenu( void ) {
 			pingColor = S_COLOR_RED;
 		}
 
-		Com_sprintf( buff, MAX_LISTBOXWIDTH, "%-20.20s %-12.12s %2d/%2d %-8.8s %4s%s%3d " S_COLOR_YELLOW "%s", 
+		// DeFRaG row (0xe800): wider name / map columns, net type, no game name and no punkbuster column
+		Com_sprintf( buff, DF_LISTBOXWIDTH, "%-23.23s %-18.18s %2d/%2d %3s %s%3d",
 			servernodeptr->hostname, servernodeptr->mapname, servernodeptr->numclients,
- 			servernodeptr->maxclients, servernodeptr->gamename,
-			netnames[servernodeptr->nettype], pingColor, servernodeptr->pingtime, servernodeptr->bPB ? "Yes" : "No" );
+ 			servernodeptr->maxclients, netnames[servernodeptr->nettype],
+			pingColor, servernodeptr->pingtime );
 		j++;
 	}
 
@@ -687,6 +652,14 @@ static void ArenaServers_Insert( char* adrstr, char* info, int pingtime )
 	servernodeptr->minPing    = atoi( Info_ValueForKey( info, "minPing") );
 	servernodeptr->maxPing    = atoi( Info_ValueForKey( info, "maxPing") );
 	servernodeptr->bPB = atoi( Info_ValueForKey( info, "punkbuster") );
+
+	// DeFRaG (0x154e9): servers that allow anonymous clients are marked "(A)"
+	if ( atoi( Info_ValueForKey( info, "sv_allowAnonymous") ) ) {
+		char	marked[MAX_HOSTNAMELENGTH+3];
+
+		Com_sprintf( marked, MAX_HOSTNAMELENGTH, "(A)%s", servernodeptr->hostname );
+		Q_strncpyz( servernodeptr->hostname, marked, MAX_HOSTNAMELENGTH );
+	}
 
 	/*
 	s = Info_ValueForKey( info, "nettype" );
@@ -1362,7 +1335,7 @@ static void ArenaServers_MenuInit( void ) {
 	g_arenaservers.banner.generic.flags = QMF_CENTER_JUSTIFY;
 	g_arenaservers.banner.generic.x	    = 320;
 	g_arenaservers.banner.generic.y	    = 16;
-	g_arenaservers.banner.string  		= "ARENA SERVERS";
+	g_arenaservers.banner.string  		= "DEFRAG SERVERS";		// string at 0xe693
 	g_arenaservers.banner.style  	    = UI_CENTER;
 	g_arenaservers.banner.color  	    = color_white;
 
@@ -1421,7 +1394,7 @@ static void ArenaServers_MenuInit( void ) {
 	g_arenaservers.list.generic.callback		= ArenaServers_Event;
 	g_arenaservers.list.generic.x				= 72;
 	g_arenaservers.list.generic.y				= y;
-	g_arenaservers.list.width					= MAX_LISTBOXWIDTH;
+	g_arenaservers.list.width					= DF_LISTBOXWIDTH;
 	g_arenaservers.list.height					= 11;
 	g_arenaservers.list.itemnames				= (const char **)g_arenaservers.items;
 	for( i = 0; i < MAX_LISTBOXITEMS; i++ ) {

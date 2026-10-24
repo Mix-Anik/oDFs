@@ -129,6 +129,7 @@ static const creditLine_t creditLines[] = {
 	{ "http://planetquake.com/defrag", 0x11, uiDfCreditHead },
 	{ "#defrag on irc.quakenet.org", 0x11, uiDfCreditHead },
 	{ "", 0x11, uiDfCreditBlank },
+	{ NULL, 0, NULL },		// terminator: the roll ends (UI_CreditMenu_Exit) once it has scrolled past y = -16
 };
 
 #define CREDIT_LINES	( sizeof( creditLines ) / sizeof( creditLines[0] ) )

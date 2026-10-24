@@ -69,30 +69,51 @@ static void CG_ParseScores( void ) {
 
 	// DeFRaG format (cgame 0x3fb7, disasm/G_CLIENT/scoreboard.md):
 	// scores <n> <speedAwardUps> <speedAwardClient> "<speedAwardName>" { <client> <bestTimeMs> <ping> <followClient> } * n
+	// Validation order and the early returns follow the original (a failed check empties the table).
+	int		ups;
+
+	memset( cg.scores, 0, sizeof( cg.scores ) );
+	cg.speedAwardUps = 0;
 	cg.numScores = atoi( CG_Argv( 1 ) );
 	if ( cg.numScores < 0 || cg.numScores > MAX_CLIENTS ) {
 		CG_Printf( "DF_SVCmd_ParseScores() failed: number of clients out of range.\n" );
 		cg.numScores = 0;
+		return;
 	}
 
-	cg.speedAwardUps = atoi( CG_Argv( 2 ) );
+	ups = atoi( CG_Argv( 2 ) );
 	cg.speedAwardClient = atoi( CG_Argv( 3 ) );
-	if ( cg.speedAwardClient < -1 || cg.speedAwardClient >= MAX_CLIENTS ) {
-		CG_Printf( "DF_SVCmd_ParseScores() failed: client number out of range.\n" );
-		cg.speedAwardClient = -1;
-	}
 	Q_strncpyz( cg.speedAwardName, CG_Argv( 4 ), sizeof( cg.speedAwardName ) );
 
-	memset( cg.scores, 0, sizeof( cg.scores ) );
 	for ( i = 0 ; i < cg.numScores ; i++ ) {
 		cg.scores[i].client = atoi( CG_Argv( 5 + i * 4 ) );
 		cg.scores[i].score = atoi( CG_Argv( 6 + i * 4 ) );		// best finish time (ms), 0 = none
 		cg.scores[i].ping = atoi( CG_Argv( 7 + i * 4 ) );
 		cg.scores[i].scoreFlags = atoi( CG_Argv( 8 + i * 4 ) );	// follow client or -1
+	}
+	if ( ups != 0 && ( cg.speedAwardClient < -1 || cg.speedAwardClient >= MAX_CLIENTS ) ) {
+		CG_Printf( "DF_SVCmd_ParseScores() failed: client number out of range.\n" );
+		cg.numScores = 0;
+		return;
+	}
+	cg.speedAwardUps = ups;
 
+	for ( i = 0 ; i < cg.numScores ; i++ ) {
 		if ( cg.scores[i].client < 0 || cg.scores[i].client >= MAX_CLIENTS ) {
 			CG_Printf( "DF_SVCmd_ParseScores() failed: client number out of range.\n" );
-			cg.scores[i].client = 0;
+			cg.numScores = 0;
+			return;
+		}
+		if ( cg.scores[i].ping > 999 ) {
+			cg.scores[i].ping = 999;
+		}
+		if ( cg.scores[i].score < 0 ) {
+			cg.scores[i].score = 0;
+		}
+		if ( cg.scores[i].scoreFlags != -1 && ( cg.scores[i].scoreFlags < 0 || cg.scores[i].scoreFlags >= MAX_CLIENTS ) ) {
+			CG_Printf( "DF_SVCmd_ParseScores() failed: client number out of range.\n" );
+			cg.numScores = 0;
+			return;
 		}
 		cgs.clientinfo[ cg.scores[i].client ].score = cg.scores[i].score;
 		cg.scores[i].team = cgs.clientinfo[cg.scores[i].client].team;

@@ -37,6 +37,7 @@ typedef struct {
 } dcTrack_t;
 
 static dcCam_t	dcDemoCam, dcReplayCam, *dcCur = &dcDemoCam;
+static int		dcLastClient;		// 2790068: the tracked client of the last demo-camera frame
 #define dc ( *dcCur )
 
 static float DC_Clamp01( float x ) {
@@ -50,12 +51,12 @@ static float DC_Clamp01( float x ) {
 static void DC_Track( dcTrack_t *t ) {
 	int c = df_mp_TrackPlayerNum.integer;
 
-	t->client = cg.clientNum;
+	t->client = cg.predictedPlayerState.clientNum;		// 0x7c81 compares with *(958920) = predictedPlayerState.clientNum
 	t->weapon = cg.predictedPlayerState.weapon;
 	VectorCopy( cg.refdef.vieworg, t->pos );
 	VectorCopy( cg.refdefViewAngles, t->ang );
 	VectorCopy( cg.predictedPlayerState.origin, t->pos2 );
-	if ( c == cg.clientNum || c < 0 || c >= MAX_CLIENTS || !cgs.clientinfo[c].infoValid || cgs.clientinfo[c].team >= TEAM_SPECTATOR ) {
+	if ( c == cg.predictedPlayerState.clientNum || c < 0 || c >= MAX_CLIENTS || !cgs.clientinfo[c].infoValid || cgs.clientinfo[c].team >= TEAM_SPECTATOR ) {
 		return;
 	}
 	if ( !trap_R_inPVS( cg_entities[c].lerpOrigin, cg.refdef.vieworg ) ) {		// 0x7ce2
@@ -92,6 +93,9 @@ static void DC_ThirdPerson( vec3_t pos, vec3_t ang, float yawOffset, float range
 
 	VectorCopy( pos, eye );
 	eye[2] += cg.predictedPlayerState.viewheight;
+	if ( cg.predictedPlayerState.stats[STAT_HEALTH] <= 0 ) {		// 0x14761: dead -> look along the death yaw
+		ang[1] = cg.predictedPlayerState.stats[STAT_DEAD_YAW];
+	}
 	VectorCopy( ang, a );
 	if ( !df_demos_UnlockThirdPersonPitch.integer && a[0] > 45 ) {
 		a[0] = 45;
@@ -108,12 +112,14 @@ static void DC_ThirdPerson( vec3_t pos, vec3_t ang, float yawOffset, float range
 	c = cos( yawOffset * M_PI / 180 );
 	VectorMA( cam, -range * c, fwd, cam );
 	VectorMA( cam, -range * s, right, cam );
-	CG_Trace( &tr, eye, mins, maxs, cam, cg.clientNum, MASK_SOLID );
-	if ( tr.fraction != 1.0f ) {
-		VectorCopy( tr.endpos, cam );
-		cam[2] += 32 * ( 1.0f - tr.fraction );
-		CG_Trace( &tr, eye, mins, maxs, cam, cg.clientNum, MASK_SOLID );
-		VectorCopy( tr.endpos, cam );
+	if ( !cg_cameraMode.integer ) {		// 0x1484f: the wall trace is skipped with com_cameraMode
+		CG_Trace( &tr, eye, mins, maxs, cam, cg.predictedPlayerState.clientNum, MASK_SOLID );
+		if ( tr.fraction != 1.0f ) {
+			VectorCopy( tr.endpos, cam );
+			cam[2] += 32 * ( 1.0f - tr.fraction );
+			CG_Trace( &tr, eye, mins, maxs, cam, cg.predictedPlayerState.clientNum, MASK_SOLID );
+			VectorCopy( tr.endpos, cam );
+		}
 	}
 	VectorCopy( cam, pos );
 	VectorSubtract( look, cam, tmp );
@@ -127,14 +133,14 @@ static void DC_ThirdPerson( vec3_t pos, vec3_t ang, float yawOffset, float range
 }
 
 // savepos string "placeplayer x y z p y r ..." from the cvar named by saveposname (cgame 0x7d59)
-static qboolean DC_SavedPos( vec3_t pos, vec3_t ang ) {
+static qboolean DC_PosFromCvar( const char *nameCvar, qboolean eye, vec3_t pos, vec3_t ang ) {
 	char name[128], val[512];
 	const char *p;
 	const char *tok;
 	float v[6];
 	int i;
 
-	trap_Cvar_VariableStringBuffer( "saveposname", name, sizeof( name ) );
+	trap_Cvar_VariableStringBuffer( nameCvar, name, sizeof( name ) );
 	if ( !name[0] ) {
 		return qfalse;
 	}
@@ -147,10 +153,18 @@ static qboolean DC_SavedPos( vec3_t pos, vec3_t ang ) {
 	for ( i = 0; i < 6; i++ ) {
 		v[i] = atof( COM_Parse( &p ) );
 	}
-	v[2] += 26;
+	if ( eye ) {
+		v[2] += 26;
+	}
 	VectorSet( pos, v[0], v[1], v[2] );
-	VectorSet( ang, v[3], v[4], v[5] );
+	if ( ang ) {
+		VectorSet( ang, v[3], v[4], v[5] );
+	}
 	return qtrue;
+}
+
+static qboolean DC_SavedPos( vec3_t pos, vec3_t ang ) {
+	return DC_PosFromCvar( "saveposname", qtrue, pos, ang );
 }
 
 // 0x14d30: camera "sequences". df_demos_CamSeqPosition / Speed / Mode hold space separated lists; whenever the camera is idle
@@ -185,6 +199,8 @@ static void DC_CamSeq( void ) {
 	DC_SeqPop( &df_demos_CamSeqMode, "df_demos_CameraMode" );
 }
 
+static void DC_SetPose( const vec3_t pos, const vec3_t ang );
+
 // 0x15040: where the camera should be for this mode; returns qfalse when the camera was set immediately (no transition)
 static qboolean DC_Target( const dcTrack_t *t, vec3_t pos, vec3_t ang ) {
 	float range = cg_thirdPersonRange.value;
@@ -198,8 +214,7 @@ static qboolean DC_Target( const dcTrack_t *t, vec3_t pos, vec3_t ang ) {
 			VectorCopy( t->pos2, pos );
 			VectorCopy( t->ang, ang );
 			DC_ThirdPerson( pos, ang, 0, range );
-			VectorCopy( pos, dc.posA ); VectorCopy( pos, dc.posB ); VectorCopy( pos, dc.posCur ); VectorCopy( pos, dc.posOut );
-			VectorCopy( ang, dc.angA ); VectorCopy( ang, dc.angB ); VectorCopy( ang, dc.angCur ); VectorCopy( ang, dc.angOut );
+			DC_SetPose( pos, ang );
 			return qfalse;
 		}
 		break;
@@ -261,18 +276,34 @@ static void DC_Transition( void ) {
 	}
 }
 
-// 0x14f18: camera angles for the aim modes
-static void DC_Aim( const vec3_t dir, const vec3_t keep, vec3_t out ) {
-	vec3_t a;
+// 0x14f18 (jump table at data 9052): 4 keeps the angles, 5 aims yaw + pitch (roll kept), 6 aims yaw only, 7 aims pitch only, 9..11 aim fully, 8 keeps.
+// 0x151f4 first copies the angles to a scratch ("keep"), so `out` may alias the angles that are being replaced.
+static void DC_Aim( const vec3_t dir, vec3_t out ) {
+	vec3_t a, keep;
 
+	VectorCopy( out, keep );
 	switch ( dc.mode ) {
-	case 4: VectorCopy( keep, out ); break;
 	case 5: vectoangles( dir, out ); out[2] = keep[2]; break;
 	case 6: vectoangles( dir, a ); a[0] = keep[0]; a[2] = keep[2]; VectorCopy( a, out ); break;
 	case 7: vectoangles( dir, a ); a[1] = keep[1]; a[2] = keep[2]; VectorCopy( a, out ); break;
-	case 8: vectoangles( dir, out ); break;
-	default: VectorCopy( keep, out ); break;
+	case 9: case 10: case 11: vectoangles( dir, out ); break;
+	default: break;		// 4, 8: the angles stay
 	}
+}
+
+// 0x151f4: aim at `target` from `from`
+static void DC_AimAt( const vec3_t target, const vec3_t from, vec3_t ang ) {
+	vec3_t dir;
+
+	VectorSubtract( target, from, dir );
+	VectorNormalize( dir );
+	DC_Aim( dir, ang );
+}
+
+// 0x14f96 / 0x14fb5: set all four position / angle slots of the camera object
+static void DC_SetPose( const vec3_t pos, const vec3_t ang ) {
+	VectorCopy( pos, dc.posA ); VectorCopy( pos, dc.posB ); VectorCopy( pos, dc.posCur ); VectorCopy( pos, dc.posOut );
+	VectorCopy( ang, dc.angA ); VectorCopy( ang, dc.angB ); VectorCopy( ang, dc.angCur ); VectorCopy( ang, dc.angOut );
 }
 
 // view setup (0x14fd4)
@@ -286,11 +317,12 @@ static void DC_Apply( const vec3_t pos, const vec3_t ang ) {
 }
 
 // the df_demos_CamOffset* position / angle / radius offsets (same cvars as the replay camera)
-extern void CG_DF_CamOffsets( vec3_t pos, vec3_t ang );
 
 qboolean CG_DF_HideTrackedBody( int clientNum ) {		// 0x14633: modes 2 and 8 hide the tracked client's body
-	return cg.demoPlayback && df_demos_CameraMode.integer && ( df_demos_CameraMode.integer == 2 || df_demos_CameraMode.integer == 8 )
-		&& clientNum == ( df_mp_TrackPlayerNum.integer >= 0 ? df_mp_TrackPlayerNum.integer : cg.clientNum ) && clientNum != cg.clientNum;
+	if ( !cg.demoPlayback || !df_demos_CameraMode.integer || dcLastClient == cg.predictedPlayerState.clientNum || dcLastClient != clientNum ) {
+		return qfalse;
+	}
+	return df_demos_CameraMode.integer == 2 || df_demos_CameraMode.integer == 8;
 }
 
 // ---- key-driven free camera (modes 1..3; cgame 0x14921 / 0x148f0 / 0x8523) ----
@@ -340,7 +372,6 @@ static void DC_FreeUpdate( float dt ) {
 // the engine proper (0x1549d for a camera object); speed < 0 is distance based
 // 0x1469c: the demo camera modes that show the player: the third-person view is forced (decided before the view is built, from the last frame's
 // tracked client)
-static int dcLastClient = -1;
 
 void CG_DF_DemoCamState( vec3_t pos, vec3_t ang ) {		// CHS items 320..324: the demo camera object's current pose (2790364 / 2790376)
 	VectorCopy( dcDemoCam.posCur, pos );
@@ -354,31 +385,38 @@ qboolean CG_DF_DemoCamThirdPerson( void ) {
 	if ( !cg.demoPlayback || mode == 0 ) {
 		return qfalse;
 	}
-	if ( dcLastClient != cg.clientNum ) {
+	if ( dcLastClient != cg.predictedPlayerState.clientNum ) {
 		return qtrue;
 	}
 	return mode >= 0 && mode <= 11 && third[mode];
 }
 
-static void DC_Run( int mode, float speed ) {
-	dcTrack_t	t;
-	vec3_t		pos, ang, dir;
-
-	if ( dc.mode != mode ) {
-		dc.mode = mode;
-		dc.init = 0;
-		VectorCopy( cg.refdef.vieworg, dc.posCur );
-		VectorCopy( cg.refdefViewAngles, dc.angCur );
-		VectorCopy( dc.posCur, dc.posB );
-		VectorCopy( dc.angCur, dc.angB );
-		dc.lastTime = cg.time;
-	}
-	dc.dt = ( cg.time - dc.lastTime ) * 0.001f;		// 0x8e4a
-	dc.lastTime = cg.time;
+// 0x1500e: per-frame setup of a camera object (mode, speed, dt from the cg.time delta via 0x8e4a)
+static void DC_Tick( int mode, float speed ) {
+	dc.mode = mode;
 	dc.speed = speed;
+	dc.dt = ( cg.time - dc.lastTime ) * 0.001f;
+	dc.lastTime = cg.time;
+}
+
+// 0x1549d: the camera engine; DC_Tick has already stored mode, speed and dt
+static void DC_Run( void ) {
+	dcTrack_t	t;
+	vec3_t		pos, ang, tp;
+	int			mode = dc.mode;
+
+	if ( mode == 0 ) {
+		return;
+	}
 	DC_Track( &t );
+	if ( DC_PosFromCvar( "targetposname", qfalse, tp, NULL ) ) {		// 0x7d59(targetposname): replaces the look-at point
+		VectorCopy( tp, t.pos2 );
+	}
 	if ( dcCur == &dcDemoCam ) {
 		dcLastClient = t.client;
+	}
+	if ( mode < 1 || mode > 11 ) {
+		return;
 	}
 	if ( mode >= 1 && mode <= 3 ) {		// 0x152a8 / 0x152e9 / 0x1532a
 		vec3_t p, a;
@@ -395,15 +433,13 @@ static void DC_Run( int mode, float speed ) {
 		if ( mode == 3 ) {
 			DC_ThirdPerson( p, a, 0, cg_thirdPersonRange.value );
 		}
-		VectorCopy( p, dc.posOut );
-		VectorCopy( a, dc.angOut );
+		DC_SetPose( p, a );
 		CG_DF_CamOffsets( dc.posOut, dc.angOut );
 		DC_Apply( dc.posOut, dc.angOut );
 		return;
 	}
 	if ( mode == 8 ) {		// 0x1539f: the tracked client's own view
-		VectorCopy( t.pos, dc.posOut );
-		VectorCopy( t.ang, dc.angOut );
+		DC_SetPose( t.pos, t.ang );
 		CG_DF_CamOffsets( dc.posOut, dc.angOut );
 		DC_Apply( dc.posOut, dc.angOut );
 		if ( t.client != cg.predictedPlayerState.clientNum ) {
@@ -411,6 +447,7 @@ static void DC_Run( int mode, float speed ) {
 		}
 		return;
 	}
+	// 0x153ec
 	if ( !DC_Target( &t, pos, ang ) ) {
 		DC_Apply( dc.posOut, dc.angOut );
 		return;
@@ -420,28 +457,33 @@ static void DC_Run( int mode, float speed ) {
 		trace_t	tr;
 		vec3_t	mins = { -4, -4, -4 }, maxs = { 4, 4, 4 };
 
-		CG_Trace( &tr, dc.posB, mins, maxs, dc.posCur, cg.clientNum, MASK_SOLID );
+		CG_Trace( &tr, dc.posB, mins, maxs, dc.posCur, cg.predictedPlayerState.clientNum, MASK_SOLID );
 		if ( tr.fraction != 1.0f ) {
 			VectorCopy( tr.endpos, dc.posCur );
 		}
 	}
-	VectorSubtract( t.pos2, dc.posCur, dir );
-	VectorNormalize( dir );
-	DC_Aim( dir, dc.angCur, dc.angOut );
-	VectorCopy( dc.posCur, dc.posOut );
-	CG_DF_CamOffsets( dc.posOut, dc.angOut );
+	DC_AimAt( t.pos2, dc.posCur, dc.angCur );		// 0x151f4 replaces angCur in place
+	VectorCopy( dc.posCur, dc.posOut );			// 0x14ff1
+	VectorCopy( dc.angCur, dc.angOut );
+	if ( CG_DF_CamOffsets( dc.posOut, dc.angOut ) ) {		// 0x15246: the camera moved, aim again from the new position and add the angle offsets once more
+		DC_AimAt( t.pos2, dc.posOut, dc.angOut );
+		CG_DF_CamAngleOffsets( dc.angOut );
+	}
 	DC_Apply( dc.posOut, dc.angOut );
 }
 
 // replay camera modes 9..11 (cgame 0x15550): the same engine with its own camera object; mode 9 always uses speed 200
 void CG_DF_ReplayFreeCamera( int mode, float speed ) {
 	dcCur = &dcReplayCam;
-	DC_Run( mode, mode == 9 ? 200.0f : speed );
+	DC_Tick( mode, mode == 9 ? 200.0f : speed );
+	DC_Run();
 }
 
-void CG_DF_DemoCamera( void ) {		// 0x1549d (after CG_CalcViewValues)
+// 0x15536: per-frame wrapper of the demo camera (after CG_CalcViewValues)
+void CG_DF_DemoCamera( void ) {
 	int			mode = df_demos_CameraMode.integer;
 	char		buf[32];
+	float		speed;
 
 	if ( mode < 0 || mode > 11 ) {		// 0x14ed5
 		trap_Cvar_Set( "df_demos_CameraMode", va( "%i", mode < 0 ? 0 : 11 ) );
@@ -451,11 +493,15 @@ void CG_DF_DemoCamera( void ) {		// 0x1549d (after CG_CalcViewValues)
 		trap_Cvar_Set( "df_mp_TrackPlayerNum", va( "%i", df_mp_TrackPlayerNum.integer < -1 ? -1 : 63 ) );
 	}
 	dcCur = &dcDemoCam;
-	if ( !cg.demoPlayback || mode < 1 ) {
-		dc.mode = 0;
-		dcFree.init = qfalse;
+	trap_Cvar_VariableStringBuffer( "df_demos_CameraTransitionSpeed", buf, sizeof( buf ) );
+	speed = atof( buf );
+	if ( mode == 9 ) {
+		speed = 200.0f;		// 0x15027
+	}
+	DC_Tick( mode, speed );		// runs every frame, also outside demos, so dt is always one frame
+	if ( !cg.demoPlayback ) {
+		dcFree.init = qfalse;		// 0x14929
 		return;
 	}
-	trap_Cvar_VariableStringBuffer( "df_demos_CameraTransitionSpeed", buf, sizeof( buf ) );
-	DC_Run( mode, atof( buf ) );
+	DC_Run();
 }

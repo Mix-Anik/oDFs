@@ -812,7 +812,7 @@ static void DG_Label( int slot, const vec3_t origin ) {
 	ent.reType = RT_SPRITE;
 	ent.radius = size / 2;
 	{
-		const float *c = g_color_table[( ( col - '0' ) & 15 ) % 10];
+		const float *c = chsPalette[( ( col - '0' ) & 15 ) % 10];
 
 		ent.shaderRGBA[0] = (byte)( 255 * c[0] );
 		ent.shaderRGBA[1] = (byte)( 255 * c[1] );
@@ -1879,14 +1879,10 @@ static qboolean DG_BestWrite( int slot, const char *timeStr ) {		// 0x141f4
 
 static qboolean DG_AutoGate( int *mode ) {		// common prologue of 0x143f0 / 0x14474
 	char si[BIG_INFO_STRING];
-	int v, mp;
+	int mp;
 
-	Q_strncpyz( si, CG_ConfigString( CS_SERVERINFO ), sizeof( si ) );
-	v = atoi( Info_ValueForKey( si, "defrag_vers" ) );
-	if ( v > 0 && v < 1000 ) {
-		v *= 100;
-	}
-	mp = ( v >= 18100 && atoi( Info_ValueForKey( si, "defrag_gametype" ) ) < 5 );		// 0x11d2ac (CHS item 225 "multiplayer")
+	mp = CG_DF_Multiplayer();		// 0x11d2ac (CHS item 225 "multiplayer")
+	(void)si;
 	if ( mp && !(int)DG_CvarF( "df_ghosts_AutoModeMP", 0 ) ) {
 		return qfalse;
 	}

@@ -533,7 +533,7 @@ static void UI_DF_DmqAddDir( const char *dir ) {		// 0x18f2
 	p = buf;
 	for ( i = 0; i < count && n < 512 - 1; i++ ) {
 		// insertion sort by name (0x64a)
-		for ( j = n; j > 0 && strcmp( p, list[j - 1] ) < 0; j-- ) {
+		for ( j = n; j > 0 && Q_stricmp( p, list[j - 1] ) < 0; j-- ) {
 			list[j] = list[j - 1];
 		}
 		list[j] = p;
@@ -567,7 +567,7 @@ static qboolean UI_DF_DmqIsDir( const char *dirPath, const char *name ) {		// 0x
 	count = trap_FS_GetFileList( dirPath, "/", list, sizeof( list ) );
 	p = list;
 	for ( i = 0; i < count; i++ ) {
-		if ( !strcmp( name, p ) ) {
+		if ( !Q_stricmp( name, p ) ) {
 			return qtrue;
 		}
 		p += strlen( p ) + 1;
@@ -774,7 +774,6 @@ qboolean UI_DF_ConsoleCommand( const char *cmd ) {
 		n = 0;
 		line[0] = 0;
 		for ( i = 1; i < argc; i++ ) {
-			trap_Argv( i, arg, sizeof( arg ) );
 			if ( i > 1 ) {
 				if ( n + 4 > (int)sizeof( line ) ) {
 					Com_Printf( "buffer overflow.\n" );
@@ -783,7 +782,7 @@ qboolean UI_DF_ConsoleCommand( const char *cmd ) {
 				line[n++] = ' ';
 				line[n++] = '"';
 			}
-			Q_strncpyz( line + n, arg, sizeof( line ) - n );
+			trap_Argv( i, line + n, sizeof( line ) - n );		// straight into the line buffer like 0xbee
 			n += strlen( line + n );
 			if ( n >= (int)sizeof( line ) - 1 ) {
 				Com_Printf( "buffer overflow.\n" );

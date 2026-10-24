@@ -36,8 +36,7 @@ DeFRaG main menu (ui 0x1e6f build, 0x1d97 event, 0x1e2a draw): a plain left-alig
 buttons (no 3D banner model, no Single Player / Cinematics / Team Arena), drawn in the light blue 0.53 0.77 1.00 1.00 and
 turning white while focused (UI_FOCUSCOLOR).  "Exit" quits at once.  The right bottom corner shows the DeFRaG client version.
 
-oDFs differences: the four game type buttons (Defrag VQ3 / CPM / Tricks Mode / Fast Caps) open DeFRaG's own start-map menu
-(ui 0x3825), which is not ported yet; they open the stock Start Server menu instead (VQ3 / CPM also set df_promode).
+The four game type buttons (Defrag VQ3 / CPM / Tricks Mode / Fast Caps) open DeFRaG's start-map menu (ui 0x3825, ui_startmap.c).
 */
 
 #define ID_DF_VQ3				1

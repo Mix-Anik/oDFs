@@ -223,16 +223,21 @@ static int dfReported;		// 0x11d73c: bitmask of violation codes already printed
 static char dfViolationLog[32][128];	// 0x11d7a0: printed violations, listed by svinfo_report
 static int  dfViolationCount;		// 0x11e7a0
 
-// Each code is printed the first time it is seen (DeFRaG additionally keeps a log of repeats; not ported).
+// 0x59b4: the first time a code is seen it is LOGGED (the log is what svinfo_report / svinfo_summary list, up to 32 lines) and not printed;
+// printing happens only when the log is full or not used.  A repeat is logged only for the cvar codes 12 / 13 / 14 (their callers pass arg1 = 1),
+// and the speed / gravity / cvar-invalid / latched codes (0, 1, 13, 14, 15) are printed on every occurrence.
 static void CG_DF_Violation( int code, const char *text ) {
-	if ( dfReported & ( 1 << code ) ) {
-		return;
-	}
+	qboolean first = !( dfReported & ( 1 << code ) );
+	qboolean forced = ( code == 0 || code == 1 || ( code >= 13 && code <= 15 ) ) ? qtrue : qfalse;
+	qboolean logIt = ( first || code == 12 || code == 13 || code == 14 ) ? qtrue : qfalse;
+	qboolean printIt = ( first || forced ) ? qtrue : qfalse;
+
 	dfReported |= 1 << code;
-	if ( dfViolationCount < 32 ) {
+	if ( logIt && dfViolationCount < 32 ) {
 		Com_sprintf( dfViolationLog[dfViolationCount++], sizeof( dfViolationLog[0] ), "%s: %s", dfViolations[code].category, text );
+	} else if ( printIt ) {
+		CG_Printf( "^2%s: ^3%s\n", dfViolations[code].category, text );
 	}
-	CG_Printf( "^2%s: ^3%s\n", dfViolations[code].category, text );
 }
 
 static float	dfCvarCache[16];			// 0x11d744.. / 0x11d76c..: last value looked at, per cvar
@@ -262,10 +267,41 @@ static void CG_DF_CheckCvar( const char *info, const char *name, const char *exp
 	}
 }
 
-// the server settings DeFRaG requires (cgame 0x5b89 systeminfo / 0x5dd5 serverinfo validators; the sv_fps / com_maxfps / sv_maxclients
-// lines are only checked for defrag_gametype >= 5 and so never apply here)
+// 0x5c8c..0x5d07: defrag_svfps / defrag_clfps must lie in 60..140 (reported under the cvar names sv_fps / com_maxfps)
+static void CG_DF_CheckRange( const char *sys, const char *key, const char *shown, int slot ) {
+	const char *v = Info_ValueForKey( sys, key );
+	int			val;
+
+	if ( !v[0] ) {
+		CG_DF_Violation( 12, va( dfViolations[12].format, key ) );
+		return;
+	}
+	val = atoi( v );
+	if ( dfSysPassed && (float)val == dfCvarCache[slot] ) {
+		return;
+	}
+	dfCvarCache[slot] = (float)val;
+	if ( val < 60 || val > 140 ) {
+		CG_DF_Violation( 13, va( dfViolations[13].format, shown, val ) );
+	} else {
+		CG_Printf( "^2Cvar: ^3%s %i\n", shown, val );
+	}
+}
+
+// cached server version (0x11d29c): defrag_vers, x100 below 1000
+static int CG_DF_ServerVersionNumber( void ) {
+	int v = atoi( CG_DF_Serverinfo( "defrag_vers" ) );
+
+	return v < 1000 ? v * 100 : v;
+}
+
+// the server settings DeFRaG requires (cgame 0x5b89 systeminfo / 0x5dd5 serverinfo validators).  The speed / gravity / knockback / fps lines
+// need a server version >= 18100; sv_fps / com_maxfps are checked on the non-multiplayer gametypes, sv_maxclients on those with
+// 18100 <= version < 19114.
 static void CG_DF_CheckServerSettings( void ) {
 	char	sys[BIG_INFO_STRING], srv[MAX_INFO_STRING];
+	int		ver = CG_DF_ServerVersionNumber();
+	qboolean mp = CG_DF_Multiplayer();
 
 	Q_strncpyz( sys, CG_ConfigString( CS_SYSTEMINFO ), sizeof( sys ) );
 	Q_strncpyz( srv, CG_ConfigString( CS_SERVERINFO ), sizeof( srv ) );
@@ -274,18 +310,37 @@ static void CG_DF_CheckServerSettings( void ) {
 	CG_DF_CheckCvar( sys, "g_synchronousClients", NULL, qfalse, 2, dfSysPassed );
 	CG_DF_CheckCvar( sys, "pmove_fixed", NULL, qfalse, 3, dfSysPassed );
 	CG_DF_CheckCvar( sys, "pmove_msec", NULL, qfalse, 4, dfSysPassed );
-	CG_DF_CheckCvar( sys, "g_speed", "320", qfalse, 5, dfSysPassed );
-	CG_DF_CheckCvar( sys, "g_gravity", "800", qfalse, 6, dfSysPassed );
-	CG_DF_CheckCvar( sys, "g_knockback", "1000", qfalse, 7, dfSysPassed );
+	if ( ver >= 18100 ) {
+		if ( !mp ) {
+			CG_DF_CheckRange( sys, "defrag_svfps", "sv_fps", 10 );
+			CG_DF_CheckRange( sys, "defrag_clfps", "com_maxfps", 11 );
+		}
+		CG_DF_CheckCvar( sys, "g_speed", "320", qfalse, 5, dfSysPassed );
+		CG_DF_CheckCvar( sys, "g_gravity", "800", qfalse, 6, dfSysPassed );
+		CG_DF_CheckCvar( sys, "g_knockback", "1000", qfalse, 7, dfSysPassed );
+	}
 	dfSysPassed = qtrue;
-	CG_DF_CheckCvar( srv, "df_promode", NULL, qfalse, 8, dfSrvPassed );
+	if ( CG_DF_Serverinfo( "defrag_vers" )[0] || CG_DF_Serverinfo( "defrag_version" )[0] ) {
+		CG_DF_CheckCvar( srv, "df_promode", NULL, qfalse, 8, dfSrvPassed );
+	}
 	CG_DF_CheckCvar( srv, "dmflags", "0", qfalse, 9, dfSrvPassed );
+	if ( ver >= 18100 && ver < 19114 && !mp ) {
+		CG_DF_CheckCvar( srv, "sv_maxclients", "1", qfalse, 12, dfSrvPassed );
+	}
+	if ( CG_DF_DefragFlags() & 8 ) {
+		CG_DF_Violation( 8, va( dfViolations[8].format, va( "%i.%02i.%02i", ver / 10000, ( ver / 100 ) % 100, ver % 100 ) ) );
+	}
 	dfSrvPassed = qtrue;
 }
 
+static int	dfValStartSeen, dfValLastGravity, dfValLastSpeed, dfValHasteMemo;		// 0x11d790 / 0x11d784 / 0x11d780 / 0x11d788
+static int	dfSnapDelta;			// serverTime of the new snapshot minus the previous one (set by CG_DF_ScriptEvents)
+
+// 0x6237: the per-snapshot checker.  The event bits are the toggles derived by 0x1c8b, which are not produced in a snapshot carrying a
+// respawn (team / spawn count change).
 static void CG_DF_Validate( const playerState_t *ops, const playerState_t *ps ) {
-	static int	startSeen, lastGravity, lastSpeed, hasteMemo;
-	int			changed = ops->stats[STAT_DEFRAG_FLAGS] ^ ps->stats[STAT_DEFRAG_FLAGS];
+	qboolean	respawn = ( ps->persistant[PERS_SPAWN_COUNT] != ops->persistant[PERS_SPAWN_COUNT] || ps->persistant[PERS_TEAM] != ops->persistant[PERS_TEAM] ) ? qtrue : qfalse;
+	int			changed = respawn ? 0 : ( ops->stats[STAT_DEFRAG_FLAGS] ^ ps->stats[STAT_DEFRAG_FLAGS] );
 	int			expected;
 	char		info[MAX_INFO_STRING];
 
@@ -294,44 +349,49 @@ static void CG_DF_Validate( const playerState_t *ops, const playerState_t *ps ) 
 	}
 	CG_DF_CheckServerSettings();
 
-	if ( ps->stats[STAT_DEFRAG_FLAGS] & 0x20 ) {
-		CG_DF_Violation( 10, dfViolations[10].format );
-	}
-	if ( ps->stats[STAT_DEFRAG_FLAGS] & 0x40 ) {
-		CG_DF_Violation( 11, dfViolations[11].format );
-	}
-	// a finish without ever having seen the start (joined mid-run)
-	if ( changed & 4 ) {
-		startSeen = 1;
-	} else if ( ( changed & 8 ) && !startSeen ) {
-		CG_DF_Violation( 4, dfViolations[4].format );
+	if ( !CG_DF_Multiplayer() ) {
+		if ( dfSnapDelta != 0 && dfSnapDelta < 7 ) {		// 0x6262: snapshots closer than 7 ms
+			CG_DF_Violation( 9, va( dfViolations[9].format, 1000 / dfSnapDelta ) );
+		}
+		if ( ps->stats[STAT_DEFRAG_FLAGS] & 0x20 ) {
+			CG_DF_Violation( 10, dfViolations[10].format );
+		}
+		if ( ps->stats[STAT_DEFRAG_FLAGS] & 0x40 ) {
+			CG_DF_Violation( 11, dfViolations[11].format );
+		}
+		// a finish without ever having seen the start (joined mid-run)
+		if ( changed & 4 ) {
+			dfValStartSeen = 1;
+		} else if ( ( changed & 8 ) && !dfValStartSeen ) {
+			CG_DF_Violation( 4, dfViolations[4].format );
+		}
 	}
 
-	if ( ps->persistant[PERS_TEAM] == TEAM_SPECTATOR || ps->stats[STAT_HEALTH] <= 0 ) {
-		return;
-	}
-	if ( ps->viewangles[ROLL] != 0 ) {
+	if ( ps->stats[STAT_HEALTH] > 0 && ps->viewangles[ROLL] != 0 ) {
 		CG_DF_Violation( 17, dfViolations[17].format );
+	}
+	if ( cgs.clientinfo[cg.clientNum].team == TEAM_SPECTATOR || ps->persistant[PERS_TEAM] == TEAM_SPECTATOR || ps->stats[STAT_HEALTH] <= 0 ) {
+		return;
 	}
 	if ( !ps->gravity && !ps->speed && !ps->velocity[0] && !ps->velocity[1] && !ps->velocity[2] ) {
 		return;		// frozen player state
 	}
-	if ( !lastGravity ) {
-		lastGravity = 800;
+	if ( !dfValLastGravity ) {
+		dfValLastGravity = 800;
 	}
-	if ( ps->gravity != 800 && ps->gravity != lastGravity ) {
+	if ( ps->gravity != 800 && ps->gravity != dfValLastGravity ) {
 		CG_DF_Violation( 1, va( dfViolations[1].format, ps->gravity, 800 ) );
+		dfValLastGravity = ps->gravity;		// only remembered when it was reported (0x6364)
 	}
-	lastGravity = ps->gravity;
 
 	if ( ps->powerups[PW_HASTE] ) {
-		hasteMemo = ps->powerups[PW_HASTE];
+		dfValHasteMemo = ps->powerups[PW_HASTE];
 	}
-	expected = ( cg.snap && cg.snap->serverTime < hasteMemo + 250 ) ? 416 : 320;
-	if ( ps->speed != 320 && ps->speed != expected && ps->speed != lastSpeed ) {
+	expected = ( cg.snap && cg.snap->serverTime < dfValHasteMemo + 250 ) ? 416 : 320;
+	if ( ps->speed != 320 && ps->speed != expected && ps->speed != dfValLastSpeed ) {
 		CG_DF_Violation( 0, va( dfViolations[0].format, ps->speed, expected ) );
 	}
-	lastSpeed = ps->speed;
+	dfValLastSpeed = ps->speed;
 
 	// pm_flags promode bit must match the reported df_promode
 	Q_strncpyz( info, CG_ConfigString( CS_SERVERINFO ), sizeof( info ) );
@@ -432,18 +492,27 @@ static void CG_DF_TrackJump( const playerState_t *ps ) {
 	}
 }
 
-// per snapshot while a run is active: max horizontal speed, horizontal distance travelled
+// DeFRaG 0x3a4a (called every frame from CG_DrawActiveFrame after the prediction): the horizontal speed of the PREDICTED player state,
+// truncated to an integer (0x11d... 967152), is what the HUD speed widget shows; while a run is active the largest value is the 'Max Speed' statistic
+int		dfSpeedInt;
+
+void CG_DF_SpeedFrame( void ) {
+	vec3_t	v;
+
+	VectorSet( v, cg.predictedPlayerState.velocity[0], cg.predictedPlayerState.velocity[1], 0 );
+	dfSpeedInt = (int)VectorLength( v );
+	if ( runActive && statMaxSpeed < (float)dfSpeedInt ) {
+		statMaxSpeed = (float)dfSpeedInt;
+	}
+}
+
+// per snapshot while a run is active: horizontal distance travelled
 static void CG_DF_TrackStats( const playerState_t *ops, const playerState_t *ps, int changed ) {
 	vec3_t	d;
-	float	speed;
 
 	CG_DF_TrackJump( ps );
 	if ( !runActive ) {
 		return;
-	}
-	speed = CG_DF_HorizontalLength( ps->velocity );
-	if ( speed > statMaxSpeed ) {
-		statMaxSpeed = speed;
 	}
 	if ( ps->stats[STAT_HEALTH] <= 0 || ( changed & 1 ) ) {		// dead, or a target_init event (0x20)
 		return;
@@ -470,37 +539,40 @@ static const char *CG_DF_StatSuffixSpeed( float ups ) {
 	return "";
 }
 
-static int CG_DF_CvarInt( const char *name ) {
-	char buf[MAX_CVAR_VALUE_STRING];
-
-	trap_Cvar_VariableStringBuffer( name, buf, sizeof( buf ) );
-	return atoi( buf );
-}
-
 // prints the "Stats" block; runMs = elapsed run time for the average speed
 void CG_DF_PrintStats( int runMs ) {
 	char	sys[BIG_INFO_STRING];
 	const char *type;
-	int		msec;
+	int		msec, svfps = 0, clfps = 0, ver;
 	float	avg = runMs ? ( statDistance * 1000.0f ) / (float)runMs : 0;
 
 	if ( df_noEndOfRunStats.integer ) {
 		return;
 	}
+	// every value comes from the cache the original fills in 0x3a70 (systeminfo) / 0x3b5e (serverinfo): physics from df_promode, pmove_msec only
+	// while pmove_fixed is set (0 otherwise), sv_fps / com_maxFps from the server mirrors defrag_svfps / defrag_clfps (versions >= 18100 only)
 	Q_strncpyz( sys, CG_ConfigString( CS_SYSTEMINFO ), sizeof( sys ) );
-	msec = atoi( Info_ValueForKey( sys, "pmove_msec" ) );
-	type = ( cg.snap && ( cg.snap->ps.pm_flags & PMF_PROMODE ) ) ? "cpm" : "vq3";
+	msec = atoi( Info_ValueForKey( sys, "pmove_fixed" ) ) ? atoi( Info_ValueForKey( sys, "pmove_msec" ) ) : 0;
+	ver = atoi( CG_DF_Serverinfo( "defrag_vers" ) );
+	if ( ver < 1000 ) {
+		ver *= 100;
+	}
+	if ( ver >= 18100 ) {
+		svfps = atoi( Info_ValueForKey( sys, "defrag_svfps" ) );
+		clfps = atoi( Info_ValueForKey( sys, "defrag_clfps" ) );
+	}
+	type = atoi( CG_DF_Serverinfo( "df_promode" ) ) ? "cpm" : "vq3";
 
 	CG_Printf( "----- ^2Stats^7 -----\nPhysics\n" );
 	CG_Printf( " type           : %s\n", type );
 	CG_Printf( " pmove_fixed    : %i\n", msec != 0 );
-	CG_Printf( " pmove_msec     : %i\n", msec );		// DeFRaG prints one cached value for both lines (see cgame_stats_dump.md caveat)
-	CG_Printf( " sv_fps         : %i\n", atoi( Info_ValueForKey( sys, "sv_fps" ) ) );
+	CG_Printf( " pmove_msec     : %i\n", msec );
+	CG_Printf( " sv_fps         : %i\n", svfps );
 	CG_Printf( " g_synch        : %i\n", atoi( Info_ValueForKey( sys, "g_synchronousClients" ) ) );
-	CG_Printf( " com_maxFps     : %i\n", CG_DF_CvarInt( "com_maxfps" ) );
+	CG_Printf( " com_maxFps     : %i\n", clfps );
 	CG_Printf( "\nPerformance\n" );
 	CG_Printf( " Max Speed      : %i ups%s\n", (int)statMaxSpeed, CG_DF_StatSuffixSpeed( statMaxSpeed ) );
-	CG_Printf( " Average Speed  : %i ups%s\n", (int)avg, CG_DF_StatSuffixSpeed( avg ) );
+	CG_Printf( " Average Speed  : %i ups%s\n", (int)avg, CG_DF_StatSuffixSpeed( (float)(int)avg ) );		// 0x43a0: the km/h and mph values are derived from the truncated integer
 	CG_Printf( " Distance Run   : %i units", (int)statDistance );
 	if ( df_unit.integer == 1 ) {
 		CG_Printf( " (%i meters)", (int)CG_ConvertDistance( statDistance ) );
@@ -799,7 +871,7 @@ void CG_DF_DisplayMessage_f( void ) {
 	CG_CenterPrint( msg, atoi( a1 ), atoi( a2 ) );
 }
 
-// resetjumpmeter: clears the jump maxima (DeFRaG also clears its jump history logger, not ported)
+// resetjumpmeter (0x16282): clears the jump history logger record only; the older jump / distance tracker behind the HUD meters and the stats block is untouched
 void CG_DF_ResetJumpMeter_f( void ) {
 	char	arg[64];
 
@@ -808,7 +880,7 @@ void CG_DF_ResetJumpMeter_f( void ) {
 		CG_Printf( "\n^2resetjumpmeter: ^3Resets jump histories and maximums.\n^5Usage:          ^2resetjumpmeter\n\n" );
 		return;
 	}
-	jumpDist = jumpMaxRise = jumpLongest = jumpHighest = 0;
+	CG_DF_JumpLogReset();
 	CG_Printf( "Jumpmeter histories and maximums stats reset.\n" );
 }
 
@@ -913,6 +985,60 @@ static const char *dfGametypeNames[8] = {
 	"Auto-config mode", "Defrag", "Tricks Mode", "Fast Caps", "Reserved", "MP Defrag", "MP Tricks Mode", "MP Fast Caps"
 };
 
+// 0x11d2ac (set by 0x3b5e): the "multiplayer" variant gametypes, version >= 18100 and defrag_gametype >= 5
+qboolean CG_DF_Multiplayer( void ) {
+	int v = atoi( CG_DF_Serverinfo( "defrag_vers" ) );
+
+	if ( v < 1000 ) {
+		v *= 100;
+	}
+	return ( v >= 18100 && atoi( CG_DF_Serverinfo( "defrag_gametype" ) ) >= 5 ) ? qtrue : qfalse;
+}
+
+// 0x153d: removes "^x" colour pairs (a '^' followed by a non-zero character other than '^'); every other byte, control characters included, is kept
+static void CG_DF_StripColors( char *s ) {
+	const char	*p = s;
+	char		*o = s;
+
+	while ( *p ) {
+		if ( p[0] == '^' && p[1] && p[1] != '^' ) {
+			p += 2;
+			continue;
+		}
+		*o++ = *p++;
+	}
+	*o = 0;
+}
+
+// server facts the original caches in 0x3a70 / 0x3b5e / 0x3c33: detected flag 0x11d298, version 0x11d29c, gametype 0x11d2a4, mode 0x11d2a8
+// (-1 below 18100), overbounces 0x11d2b4 (systeminfo defrag_obs, -1 below 18100), physics 0x11d2b0 (serverinfo df_promode)
+typedef struct {
+	qboolean	detected;
+	int			ver, gt, mode, obs, promode;
+} dfSvFacts_t;
+
+static void CG_DF_SvFacts( const char *si, const char *sys, dfSvFacts_t *o ) {
+	const char *vers = Info_ValueForKey( si, "defrag_vers" ), *legacy = Info_ValueForKey( si, "defrag_version" );
+
+	o->detected = ( vers[0] || legacy[0] ) ? qtrue : qfalse;
+	o->ver = 0;
+	if ( vers[0] ) {
+		o->ver = atoi( vers );
+		if ( o->ver < 1000 ) {
+			o->ver *= 100;
+		}
+	} else if ( legacy[0] ) {
+		o->ver = 100 * atoi( legacy );
+		if ( o->ver != 16100 ) {
+			o->ver = 0;		// 0x3cbb: only 16100 is accepted, anything else is a violation (code 7)
+		}
+	}
+	o->gt = atoi( Info_ValueForKey( si, "defrag_gametype" ) );
+	o->mode = o->ver >= 18100 ? atoi( Info_ValueForKey( si, "defrag_mode" ) ) : -1;
+	o->obs = o->ver >= 18100 ? atoi( Info_ValueForKey( sys, "defrag_obs" ) ) : -1;
+	o->promode = atoi( Info_ValueForKey( si, "df_promode" ) ) != 0;
+}
+
 static void CG_DF_ReportPrintf( fileHandle_t f, const char *fmt, ... ) Q_PRINTF_FUNC(2,3);
 static void CG_DF_ReportPrintf( fileHandle_t f, const char *fmt, ... ) {
 	va_list	argptr;
@@ -921,18 +1047,18 @@ static void CG_DF_ReportPrintf( fileHandle_t f, const char *fmt, ... ) {
 	va_start( argptr, fmt );
 	Q_vsnprintf( text, sizeof( text ), fmt, argptr );
 	va_end( argptr );
+	CG_DF_StripColors( text );		// 0x15ab runs every line through the colour-code filter 0x153d
 	trap_FS_Write( text, strlen( text ), f );
 }
 
 // "\key\value\key\value" -> "%-24s %s" lines
 static void CG_DF_ReportInfo( fileHandle_t f, const char *info ) {
 	char	key[BIG_INFO_KEY], value[BIG_INFO_VALUE];
-	int		n = 0;
 
 	if ( *info == '\\' ) {
 		info++;
 	}
-	while ( *info && n++ < 64 ) {
+	while ( *info ) {
 		char *o = key;
 
 		while ( *info && *info != '\\' && o < key + sizeof( key ) - 1 ) {
@@ -954,43 +1080,73 @@ static void CG_DF_ReportInfo( fileHandle_t f, const char *info ) {
 	}
 }
 
-// pairs up the checksum list and the name list of sv_paks / sv_referencedPaks
-static void CG_DF_ReportPaks( fileHandle_t f, const char *sums, const char *names ) {
+// 0x4a65..0x4b52: "*** <label>" block pairing the checksum list with the name list; the header is only written when both lists are non-empty, and
+// the loop ends as soon as either side runs out.  (The first token is copied: COM_Parse returns a static buffer.)
+static void CG_DF_ReportPaks( fileHandle_t f, const char *label, const char *sums, const char *names ) {
 	const char	*s = sums, *n = names;
-	const char	*cs, *nm;
+	char		cs[256];
+	const char	*nm;
 
+	if ( !sums[0] || !names[0] ) {
+		return;
+	}
+	CG_DF_ReportPrintf( f, "\r\n*** %s\r\n", label );
 	for ( ;; ) {
-		cs = COM_Parse( &s );
+		Q_strncpyz( cs, COM_Parse( &s ), sizeof( cs ) );
 		nm = COM_Parse( &n );
-		if ( !cs[0] && !nm[0] ) {
+		if ( !cs[0] || !nm[0] ) {
 			break;
 		}
 		CG_DF_ReportPrintf( f, "%-24s %s\r\n", cs, nm );
 	}
 }
 
-// 0x153d + 0x31e65: report file name = argument with ^x colour codes removed (path characters are replaced by '_': oDFs keeps the files
-// inside system/reports/, DeFRaG does not filter them)
+// 0x153d + 0x31e65 + 0x31e0b: report file name = argument without ^x colour codes, ".txt" added when it has no extension, directories dropped
+// (oDFs additionally maps '\' and ':' to '_')
 static void CG_DF_ReportFileName( const char *arg, char *out, int size ) {
-	int i;
+	char		tmp[256];
+	const char	*skip, *c;
+	qboolean	hasExt = qfalse;
+	int			i;
 
-	Q_strncpyz( out, arg, size );
-	Q_CleanStr( out );
-	for ( i = 0; out[i]; i++ ) {
-		if ( out[i] == '/' || out[i] == '\\' || out[i] == ':' || out[i] == '.' ) {
-			out[i] = '_';
+	Q_strncpyz( tmp, arg, sizeof( tmp ) - 16 );
+	CG_DF_StripColors( tmp );
+	for ( i = 0; tmp[i]; i++ ) {		// not in DeFRaG: Windows separators / drive letters would escape system/reports/
+		if ( tmp[i] == '\\' || tmp[i] == ':' ) {
+			tmp[i] = '_';
 		}
 	}
+	for ( i = strlen( tmp ) - 1; i >= 0 && tmp[i] != '/'; i-- ) {		// 0x31e65 COM_DefaultExtension
+		if ( tmp[i] == '.' ) {
+			hasExt = qtrue;
+			break;
+		}
+	}
+	if ( !hasExt ) {
+		Q_strcat( tmp, sizeof( tmp ), ".txt" );
+	}
+	skip = tmp;
+	for ( c = tmp; *c; c++ ) {		// 0x31e0b COM_SkipPath: only the last path component is used
+		if ( *c == '/' ) {
+			skip = c + 1;
+		}
+	}
+	Q_strncpyz( out, skip, size );
+}
+
+// the "defrag_servername" client cvar (cvar read by 0xff3, cached in 0x11d390)
+static void CG_DF_ServerNameCvar( char *out, int size ) {
+	trap_Cvar_VariableStringBuffer( "defrag_servername", out, size );
 }
 
 // worker of 0x4795(name, timeMs, usage): timeMs != 0 adds the "time" line (0x4846), usage prints the usage text on an empty name
 static void CG_DF_WriteReport( const char *arg, int runMs, qboolean usage ) {
 	char		name[MAX_QPATH], path[MAX_QPATH + 16], si[BIG_INFO_STRING], sys[BIG_INFO_STRING];
-	char		vers[32], servername[64];
+	char		vers[32], servername[64], comp[64];
 	fileHandle_t f;
 	qtime_t		tm;
-	int			i, v, gt, mode, obs;
-	const char	*physics;
+	dfSvFacts_t	sv;
+	int			i;
 
 	if ( !arg[0] ) {
 		if ( usage ) {
@@ -999,7 +1155,7 @@ static void CG_DF_WriteReport( const char *arg, int runMs, qboolean usage ) {
 		return;
 	}
 	CG_DF_ReportFileName( arg, name, sizeof( name ) );
-	Com_sprintf( path, sizeof( path ), "system/reports/%s.txt", name );
+	Com_sprintf( path, sizeof( path ), "system/reports/%s", name );
 	trap_FS_FOpenFile( path, &f, FS_WRITE );
 	if ( !f ) {
 		CG_Printf( "SVI_WriteReport(): failed to open file for writing.\n" );
@@ -1008,50 +1164,45 @@ static void CG_DF_WriteReport( const char *arg, int runMs, qboolean usage ) {
 
 	Q_strncpyz( si, CG_ConfigString( CS_SERVERINFO ), sizeof( si ) );
 	Q_strncpyz( sys, CG_ConfigString( CS_SYSTEMINFO ), sizeof( sys ) );
-	Q_strncpyz( servername, Info_ValueForKey( si, "defrag_servername" ), sizeof( servername ) );
+	CG_DF_ServerNameCvar( servername, sizeof( servername ) );
+	Q_strncpyz( comp, Info_ValueForKey( si, "df_competition" ), sizeof( comp ) );
 	trap_RealTime( &tm );
-	v = atoi( Info_ValueForKey( si, "defrag_vers" ) );
-	if ( v > 0 && v < 1000 ) {
-		v *= 100;
-	}
-	gt = atoi( Info_ValueForKey( si, "defrag_gametype" ) );
-	mode = Info_ValueForKey( si, "defrag_mode" )[0] ? atoi( Info_ValueForKey( si, "defrag_mode" ) ) : -1;
-	obs = Info_ValueForKey( si, "defrag_obs" )[0] ? atoi( Info_ValueForKey( si, "defrag_obs" ) ) : -1;
-	physics = ( cg.snap && ( cg.snap->ps.pm_flags & PMF_PROMODE ) ) ? "cpm" : "vq3";
+	CG_DF_SvFacts( si, sys, &sv );
 
 	CG_DF_ReportPrintf( f, "=\r\n= Report for %s (%04i-%02i-%02i)\r\n=\r\n\r\n", servername, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday );
 	CG_DF_ReportPrintf( f, "*** Info\r\n" );
-	CG_DF_ReportPrintf( f, "%-24s %s\r\n", "validation", dfViolationCount ? "failed" : "passed" );
-	if ( runMs ) {
-		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "time", CG_DF_FormatTime( runMs ) );
-	}
-	CG_DF_ReportPrintf( f, "%-24s %s\r\n", "map", Info_ValueForKey( si, "mapname" ) );
-	if ( v ) {
-		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "gametype", dfGametypeNames[gt >= 0 && gt < 8 ? gt : 0] );
-		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "physics", physics );
-		if ( mode != -1 ) {
-			CG_DF_ReportPrintf( f, "%-24s %i\r\n", "mode", mode );
+	if ( sv.detected ) {
+		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "validation", dfViolationCount ? "failed" : "passed" );
+		if ( runMs ) {
+			CG_DF_ReportPrintf( f, "%-24s %s\r\n", "time", CG_DF_FormatTime( runMs ) );
 		}
-		if ( obs != -1 ) {
-			CG_DF_ReportPrintf( f, "%-24s %i\r\n", "overbounces", obs );
+		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "map", Info_ValueForKey( si, "mapname" ) );
+		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "gametype", dfGametypeNames[sv.gt >= 0 && sv.gt < 8 ? sv.gt : 0] );
+		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "physics", sv.promode ? "cpm" : "vq3" );
+		if ( sv.mode != -1 ) {
+			CG_DF_ReportPrintf( f, "%-24s %i\r\n", "mode", sv.mode );
 		}
-	} else {
-		CG_DF_ReportPrintf( f, "%-24s %i\r\n", "gametype", gt );
-	}
-	if ( cg.snap && v ) {		// 0x48c7: a DeFRaG server reports the client's df_name ("dfn"), anything else the net name (0x4950)
-		char dfn[20];
+		if ( sv.obs != -1 ) {
+			CG_DF_ReportPrintf( f, "%-24s %i\r\n", "overbounces", sv.obs );
+		}
+		{		// 0x48c7: a DeFRaG server reports the client's df_name
+			char dfn[20];
 
-		CG_DF_ClientDfName( cg.snap->ps.clientNum, dfn );
-		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "player", dfn );
-	} else {
-		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "player", cg.snap ? cgs.clientinfo[cg.snap->ps.clientNum].name : "" );
-	}
-	if ( v ) {
-		Com_sprintf( vers, sizeof( vers ), "%i.%02i.%02i", v / 10000, ( v / 100 ) % 100, v % 100 );
-		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "comp", Info_ValueForKey( si, "df_competition" ) );
+			dfn[0] = 0;
+			if ( cg.snap ) {
+				CG_DF_ClientDfName( cg.snap->ps.clientNum, dfn );
+			}
+			CG_DF_ReportPrintf( f, "%-24s %s\r\n", "player", dfn );
+		}
+		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "comp", comp );
+		Com_sprintf( vers, sizeof( vers ), "%i.%02i.%02i", sv.ver / 10000, ( sv.ver / 100 ) % 100, sv.ver % 100 );
 		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "version", vers );
 	} else {
-		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "gamename", Info_ValueForKey( sys, "gamename" ) );
+		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "validation", "failed" );		// 0x4910 tests a constant address, i.e. always "failed" here
+		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "map", Info_ValueForKey( si, "mapname" ) );
+		CG_DF_ReportPrintf( f, "%-24s %i\r\n", "gametype", cgs.gametype );
+		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "player", cg.snap ? cgs.clientinfo[cg.snap->ps.clientNum].name : "" );
+		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "gamename", Info_ValueForKey( si, "gamename" ) );
 		CG_DF_ReportPrintf( f, "%-24s %s\r\n", "fs_game", Info_ValueForKey( sys, "fs_game" ) );
 	}
 
@@ -1065,10 +1216,16 @@ static void CG_DF_WriteReport( const char *arg, int runMs, qboolean usage ) {
 	CG_DF_ReportInfo( f, si );
 	CG_DF_ReportPrintf( f, "\r\n*** System Info\r\n" );
 	CG_DF_ReportInfo( f, sys );
-	CG_DF_ReportPrintf( f, "\r\n*** sv_referencedPaks\r\n" );
-	CG_DF_ReportPaks( f, Info_ValueForKey( sys, "sv_referencedPaks" ), Info_ValueForKey( sys, "sv_referencedPakNames" ) );
-	CG_DF_ReportPrintf( f, "\r\n*** sv_paks\r\n" );
-	CG_DF_ReportPaks( f, Info_ValueForKey( sys, "sv_paks" ), Info_ValueForKey( sys, "sv_pakNames" ) );
+	for ( i = 0; i < MAX_CLIENTS; i++ ) {		// 0x4a12: the CS_PLAYERS strings that exist
+		const char *ci = CG_ConfigString( CS_PLAYERS + i );
+
+		if ( ci[0] ) {
+			CG_DF_ReportPrintf( f, "\r\n*** Client Info %i\r\n", i );
+			CG_DF_ReportInfo( f, ci );
+		}
+	}
+	CG_DF_ReportPaks( f, "sv_referencedPaks", Info_ValueForKey( sys, "sv_referencedPaks" ), Info_ValueForKey( sys, "sv_referencedPakNames" ) );
+	CG_DF_ReportPaks( f, "sv_paks", Info_ValueForKey( sys, "sv_paks" ), Info_ValueForKey( sys, "sv_pakNames" ) );
 
 	trap_FS_FCloseFile( f );
 	CG_Printf( "report written to %s\n", path );
@@ -1091,8 +1248,9 @@ static void CG_DF_SummaryLine( fileHandle_t f, int indent, const char *key, cons
 
 // worker of 0x4b67(name, timeMs, usage)
 static void CG_DF_WriteSummary( const char *arg, int runMs, qboolean usage ) {
-	char		name[MAX_QPATH], path[MAX_QPATH + 16], si[BIG_INFO_STRING], sys[BIG_INFO_STRING], tmp[64];
+	char		name[MAX_QPATH], path[MAX_QPATH + 16], si[BIG_INFO_STRING], sys[BIG_INFO_STRING], tmp[64], servername[64];
 	fileHandle_t f;
+	dfSvFacts_t	sv;
 	int			i, v, gt, mode, obs, promode;
 
 	if ( !arg[0] ) {
@@ -1102,24 +1260,23 @@ static void CG_DF_WriteSummary( const char *arg, int runMs, qboolean usage ) {
 		return;
 	}
 	CG_DF_ReportFileName( arg, name, sizeof( name ) );
-	Com_sprintf( path, sizeof( path ), "system/reports/%s.txt", name );
-	trap_FS_FOpenFile( path, &f, FS_WRITE );
+	Com_sprintf( path, sizeof( path ), "system/reports/%s", name );
+	trap_FS_FOpenFile( path, &f, FS_APPEND );		// 0x4bbb opens the summary with mode 2
 	if ( !f ) {
 		CG_Printf( "SVI_WriteSummary(): failed to open \"%s\" for writing.\n", name );
 		return;
 	}
 	Q_strncpyz( si, CG_ConfigString( CS_SERVERINFO ), sizeof( si ) );
 	Q_strncpyz( sys, CG_ConfigString( CS_SYSTEMINFO ), sizeof( sys ) );
-	v = atoi( Info_ValueForKey( si, "defrag_vers" ) );
-	if ( v > 0 && v < 1000 ) {
-		v *= 100;
-	}
-	gt = atoi( Info_ValueForKey( si, "defrag_gametype" ) );
-	mode = Info_ValueForKey( si, "defrag_mode" )[0] ? atoi( Info_ValueForKey( si, "defrag_mode" ) ) : -1;
-	obs = Info_ValueForKey( si, "defrag_obs" )[0] ? atoi( Info_ValueForKey( si, "defrag_obs" ) ) : -1;
-	promode = atoi( Info_ValueForKey( si, "df_promode" ) ) != 0;
+	CG_DF_SvFacts( si, sys, &sv );
+	v = sv.detected ? 1 : 0;
+	gt = sv.gt;
+	mode = sv.mode;
+	obs = sv.obs;
+	promode = sv.promode;
+	CG_DF_ServerNameCvar( servername, sizeof( servername ) );
 
-	CG_DF_ReportPrintf( f, "%s {\r\n", Info_ValueForKey( si, "defrag_servername" ) );
+	CG_DF_ReportPrintf( f, "%s {\r\n", servername );
 	if ( v ) {
 		if ( runMs ) {
 			CG_DF_SummaryLine( f, 1, "time", CG_DF_FormatTime( runMs ) );
@@ -1144,14 +1301,14 @@ static void CG_DF_WriteSummary( const char *arg, int runMs, qboolean usage ) {
 		if ( Info_ValueForKey( si, "df_competition" )[0] ) {
 			CG_DF_SummaryLine( f, 1, "comp", Info_ValueForKey( si, "df_competition" ) );
 		}
-		Com_sprintf( tmp, sizeof( tmp ), "%i.%02i.%02i", v / 10000, ( v / 100 ) % 100, v % 100 );
+		Com_sprintf( tmp, sizeof( tmp ), "%i.%02i.%02i", sv.ver / 10000, ( sv.ver / 100 ) % 100, sv.ver % 100 );
 		CG_DF_SummaryLine( f, 1, "version", tmp );
 	} else {
-		Com_sprintf( tmp, sizeof( tmp ), "%i", gt );
+		Com_sprintf( tmp, sizeof( tmp ), "%i", cgs.gametype );		// 0x4cbb: cgs.gametype
 		CG_DF_SummaryLine( f, 1, "gametype", tmp );
 		CG_DF_SummaryLine( f, 1, "map", Info_ValueForKey( si, "mapname" ) );
 		CG_DF_SummaryLine( f, 1, "player", cg.snap ? cgs.clientinfo[cg.snap->ps.clientNum].name : "" );
-		CG_DF_SummaryLine( f, 1, "gamename", Info_ValueForKey( sys, "gamename" ) );
+		CG_DF_SummaryLine( f, 1, "gamename", Info_ValueForKey( si, "gamename" ) );
 		CG_DF_SummaryLine( f, 1, "fs_game", Info_ValueForKey( sys, "fs_game" ) );
 	}
 	if ( dfViolationCount ) {
@@ -1354,6 +1511,25 @@ void CG_DF_SnapshotTransition( const playerState_t *ops, const playerState_t *ps
 		CG_DF_RecTrack( ( CG_DF_RaceTime( ps, &live ) && live > 0 ) ? live : 0 );		// 0x5248 @0x52b8: B[N] = the running time, every snapshot
 	}
 	CG_DF_TrackStats( ops, ps, changed );
+	// 0x1d49: the start / checkpoint / finish events are only derived when no respawn event (team or spawn count change) was seen
+	if ( ps->persistant[PERS_SPAWN_COUNT] != ops->persistant[PERS_SPAWN_COUNT] || ps->persistant[PERS_TEAM] != ops->persistant[PERS_TEAM] ) {
+		changed = 0;
+	} else if ( ops->stats[STAT_HEALTH] > 0 && ps->stats[STAT_HEALTH] <= 0 && ( ps->stats[STAT_DEFRAG_FLAGS] & 2 ) && CG_DF_Serverinfo( "defrag_vers" )[0] ) {
+		// 0x1c8b event 8 + 0x1b10: dying while the timer is initialized prints the end-of-run stats (not on the multiplayer gametypes >= 5)
+		int	sver = atoi( CG_DF_Serverinfo( "defrag_vers" ) ), dms;
+
+		if ( sver < 1000 ) {
+			sver *= 100;
+		}
+		if ( !( sver >= 18100 && atoi( CG_DF_Serverinfo( "defrag_gametype" ) ) >= 5 ) ) {
+			CG_DF_RaceTime( ps, &dms );
+			CG_DF_PrintStats( dms );
+		}
+	}
+	// 0x1c56: event 0x20 (flags bit 1 toggled): a current weapon that is not owned is replaced by the machinegun
+	if ( ( changed & 1 ) && CG_DF_Serverinfo( "defrag_vers" )[0] && !( ps->stats[STAT_WEAPONS] & ( 1 << ps->weapon ) ) ) {
+		cg.weaponSelect = WP_MACHINEGUN;
+	}
 	// bit 0x4: run (re)started
 	if ( ( changed & 4 ) && ( ps->stats[STAT_DEFRAG_FLAGS] & 4 ) ) {
 		CG_DF_ResetStats();
@@ -1403,6 +1579,8 @@ void CG_DF_ScriptEvents( const snapshot_t *old, const snapshot_t *cur ) {
 	int ev = 0;
 	const char *team;
 
+	dfSnapDelta = old ? cur->serverTime - old->serverTime : 0;
+
 	if ( !old ) {
 		ev = 0x11;
 	} else if ( ( cur->snapFlags ^ old->snapFlags ) & SNAPFLAG_SERVERCOUNT ) {
@@ -1415,11 +1593,16 @@ void CG_DF_ScriptEvents( const snapshot_t *old, const snapshot_t *cur ) {
 			ev |= 0x10;
 		}
 	}
+	if ( ev & 1 ) {
+		dfValHasteMemo = 0;		// 0x62d2: a map load clears the haste memo
+	}
+	if ( ev & 0x10 ) {
+		CG_DF_RecReset( qfalse );		// 0x5273: a respawn clears the checkpoint list of the finished / aborted run (also in demos)
+	}
 	if ( !( ev & 0x10 ) || cg.demoPlayback ) {
 		return;
 	}
 	CG_DF_ArRespawnEvent();
-	CG_DF_RecRunStopped();
 	if ( ( ev & 1 ) && df_script_onMapLoad.integer ) {
 		trap_SendConsoleCommand( va( "exec %s.cfg\n", Info_ValueForKey( CG_ConfigString( CS_SERVERINFO ), "mapname" ) ) );
 	}

@@ -604,6 +604,9 @@ extern void			UI_StartDemoLoop( void );
 extern qboolean		m_entersound;
 extern uiStatic_t	uis;
 
+// DeFRaG ui (0xc8fb / 0x126ad): the ^N index is ((c - '0') & 15) % 10, so ^8 is orange and ^9 grey (ColorIndex masks with 7)
+#define UI_ColorIndex(c)	( ( ( (c) - '0' ) & 15 ) % 10 )
+
 //
 // ui_spLevel.c
 //

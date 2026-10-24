@@ -59,8 +59,8 @@ static void CG_DF_ReadCmd( usercmd_t *cmd ) {
 
 // 0x15658: PM_CmdScale
 static float CG_DF_CmdScale( const usercmd_t *cmd, int speed ) {
-	int		max, total;
-	float	t;
+	int		max;
+	float	total, t;
 
 	max = abs( cmd->forwardmove );
 	if ( abs( cmd->rightmove ) > max ) {
@@ -75,6 +75,25 @@ static float CG_DF_CmdScale( const usercmd_t *cmd, int speed ) {
 	total = sqrt( cmd->forwardmove * cmd->forwardmove + cmd->rightmove * cmd->rightmove + cmd->upmove * cmd->upmove );
 	t = (float)speed * max / ( 127.0f * total );
 	return t;
+}
+
+// 0x15774: wish speed used by the simulation step.  Re-reads the usercmd with upmove forced to 0 and reuses the (normalised, z = 0)
+// forward/right vectors left over from the last CG_DF_WishVel call, so it differs from len * scale of that call while jump/crouch is held.
+static float CG_DF_StepWishSpeed( void ) {
+	usercmd_t	cmd;
+	vec3_t		w;
+	float		scale;
+	int			i;
+
+	memset( &cmd, 0, sizeof( cmd ) );
+	CG_DF_ReadCmd( &cmd );
+	cmd.upmove = 0;
+	scale = CG_DF_CmdScale( &cmd, cg.snap->ps.speed );
+	for ( i = 0; i < 2; i++ ) {
+		w[i] = acFwd[i] * cmd.forwardmove + acRight[i] * cmd.rightmove;
+	}
+	w[2] = 0;
+	return VectorLength( w ) * scale;
 }
 
 // 0x156f7: wish velocity (unnormalised, z = 0) for the given view angles; returns the command scale
@@ -241,7 +260,8 @@ static void CG_DF_AccelStep( const vec3_t pos, const vec3_t vel, const vec3_t wi
 	VectorNormalize( h );
 	acAngleAcc += CG_DF_AcosDeg( h[0] );
 
-	wish = wishSpeed;
+	(void)wishSpeed;		// the original ignores its wishSpeed argument and calls 0x15774 here
+	wish = CG_DF_StepWishSpeed();
 	if ( wish == 0 && ( cg.demoPlayback ) ) {
 		wish = cg.snap->ps.speed;
 	}
@@ -389,6 +409,11 @@ void CG_DF_JumpHistoryText( int type, char *out, int size ) {
 			Q_strncpyz( out, tmp, size );
 		}
 	}
+}
+
+// 0x16282 / 0x1626c: resetjumpmeter clears the whole 284-byte logger record (rings, maxima, last ground state)
+void CG_DF_JumpLogReset( void ) {
+	Com_Memset( &jlog, 0, sizeof( jlog ) );
 }
 
 // CHS items 145-148: 0 = max speed, 1 = max accel, 2 = max distance, 3 = max height
@@ -545,7 +570,7 @@ void CG_DF_DrawAccel( void ) {
 		cx = CG_DF_AccelShift( (int)fx, CG_DF_AccelScale() );
 
 		idx = ( dfChs[2].labelColor.integer & 15 ) % 10;
-		VectorCopy( g_color_table[idx], col );
+		VectorCopy( chsPalette[idx], col );
 		col[3] = dfChs[2].fontTransparency.value;
 		trap_R_SetColor( col );
 		if ( df_accel_Mode.integer == 1 ) {
@@ -555,7 +580,7 @@ void CG_DF_DrawAccel( void ) {
 			CG_DrawStringExt( cx + 320, (int)fy + 240, "+", col, qfalse, dfChs[2].fontShadow.integer, fs, fs, 1 );
 		}
 		idx = ( dfChs[2].fontColor.integer & 15 ) % 10;
-		VectorCopy( g_color_table[idx], col );
+		VectorCopy( chsPalette[idx], col );
 		col[3] = dfChs[2].fontTransparency.value;
 		trap_R_SetColor( col );
 		CG_DrawStringExt( (int)fx + 320, (int)fy + 240, "+", col, qfalse, dfChs[2].fontShadow.integer, fs, fs, 1 );

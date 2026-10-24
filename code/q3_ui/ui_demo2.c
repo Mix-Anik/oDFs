@@ -43,7 +43,7 @@ Differences to the stock q3_ui demo menu:
    df_demos_ModSupport, df_demos_validation and timedemo
  - double click on a list entry, Enter / Right arrow, middle mouse and Backspace / Left arrow (up one folder)
  - starting a demo also hands "#1 demo <name>" to the cgame ghost system through df_ghosts_Command
- - the demo name is lower-cased
+ - names are upper-cased like the stock menu (0x1e7ba is Q_strupr: it maps through 0x1c190 = toupper; iteration 134 read it as lower-casing)
  (The DeFRaG flag word at ui 0x12390, bit 0 = keep case, bit 1 = flat list, is never written in the qvm: both bits are 0.)
 */
 
@@ -227,7 +227,7 @@ static void Demos_BuildList( void ) {
 		}
 		Q_strncpyz( s_demos.names + off, "/", 2 );
 		off += 1;
-		Q_strlwr( d );
+		Q_strupr( d );
 		Q_strncpyz( s_demos.names + off, d, len + 1 );
 		off += len + 1;
 		s_demos.numDirs++;
@@ -274,7 +274,7 @@ static void Demos_BuildList( void ) {
 		if ( len >= 4 && !strcmp( d + len - 4, ".dm3" ) ) {
 			d[len - 4] = 0;
 		}
-		Q_strlwr( d );
+		Q_strupr( d );
 		d += len + 1;
 	}
 
@@ -348,7 +348,7 @@ static void Demos_Play( void ) {
 	int		len = strlen( item );
 
 	if ( len >= DEMONAME_SIZE ) {
-		Com_Printf( "^1ERROR:^7 Demo filename too long, maximum length = %i, filename length = %i.", DEMONAME_SIZE, len );
+		Com_Printf( "^1ERROR:^7 Demo filename too long, maximum length = %i, filename length = %i.\n", DEMONAME_SIZE, len );
 		return;
 	}
 	Q_strncpyz( name, item, sizeof( name ) );
@@ -371,8 +371,8 @@ Demos_Activate (0xef16): enter the folder or play the demo
 ===============
 */
 static void Demos_Activate( void ) {
-	if ( s_demos.list.numitems <= 0 ) {
-		return;
+	if ( s_demos.list.numitems <= 0 || ( s_demos.go.generic.flags & QMF_HIDDEN ) ) {
+		return;		// empty list, or only the "No Demos Found." placeholder (the original has no such guard)
 	}
 	trap_Cvar_Set( "df_demos_CurrentListVars", va( "%i %i", s_demos.list.top, s_demos.list.curvalue ) );
 	if ( s_demos.list.curvalue < s_demos.numDirs ) {
@@ -572,6 +572,7 @@ static void Demos_MenuInit( void ) {
 		s_demos.demolist[0] = s_demos.names;
 		s_demos.list.numitems = 1;
 		s_demos.list.curvalue = 0;
+		s_demos.list.top = 0;		// the saved list vars clamp to -1 on an empty list (itemnames[-1] would be drawn)
 		s_demos.go.generic.flags |= (QMF_INACTIVE|QMF_HIDDEN);
 	}
 

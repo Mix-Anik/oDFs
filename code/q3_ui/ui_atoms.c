@@ -658,7 +658,7 @@ static void UI_DrawString2( int x, int y, const char* str, vec4_t color, int cha
 		{
 			if ( !forceColor )
 			{
-				memcpy( tempcolor, g_color_table[ColorIndex(s[1])], sizeof( tempcolor ) );
+				memcpy( tempcolor, g_color_table[UI_ColorIndex(s[1])], sizeof( tempcolor ) );
 				tempcolor[3] = color[3];
 				trap_R_SetColor( tempcolor );
 			}
@@ -913,10 +913,7 @@ void UI_MouseEvent( int dx, int dy )
 		{
 			Menu_SetCursor( uis.activemenu, i );
 			((menucommon_s*)(uis.activemenu->items[uis.activemenu->cursor_prev]))->flags &= ~QMF_HASMOUSEFOCUS;
-
-			if ( !(((menucommon_s*)(uis.activemenu->items[uis.activemenu->cursor]))->flags & QMF_SILENT ) ) {
-				trap_S_StartLocalSound( menu_move_sound, CHAN_LOCAL_SOUND );
-			}
+			// DeFRaG (0xcc22): the QMF_SILENT test is there but the menu_move_sound call is not, so the mouse makes no tick
 		}
 
 		((menucommon_s*)(uis.activemenu->items[uis.activemenu->cursor]))->flags |= QMF_HASMOUSEFOCUS;

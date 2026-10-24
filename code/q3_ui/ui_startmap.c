@@ -713,6 +713,9 @@ static void DFS_BuildTimer( int x, int y, int w ) {			// 0x326f / 0x12e5 / 0x114
 			s->generic.id = ID_TIMER + g;
 			s->generic.x = sx;
 			s->generic.y = y + 20 * k;
+			// Menu_AddItem -> SpinControl_Init measures the item names for the hit box, so the lists have to be in place first
+			// (the Item list is measured with the longest group so the hit box covers every group it can switch to)
+			s->itemnames = k == 0 ? ( g == 0 ? dfsListT1 : dfsListT2 ) : k == 1 ? dfsListGroup : dfsListG0;
 			DFS_PanelAdd( p, s );
 		}
 		t[0].itemnames = g == 0 ? dfsListT1 : dfsListT2;

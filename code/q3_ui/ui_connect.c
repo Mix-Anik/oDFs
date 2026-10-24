@@ -72,7 +72,7 @@ static void UI_DisplayDownloadInfo( const char *downloadName ) {
 	static char xferText[]	= "Transfer rate:";
 
 	int downloadSize, downloadCount, downloadTime;
-	char dlSizeBuf[64], totalSizeBuf[64], xferRateBuf[64], dlTimeBuf[64];
+	char dlSizeBuf[64], totalSizeBuf[64], xferRateBuf[64], dlTimeBuf[64], motd[MAX_INFO_VALUE];
 	int xferRate;
 	int width, leftWidth;
 	int style = UI_LEFT|UI_SMALLFONT|UI_DROPSHADOW;
@@ -94,7 +94,7 @@ static void UI_DisplayDownloadInfo( const char *downloadName ) {
 	UI_DrawProportionalString( 8, 224, xferText, style, color_white );
 
 	if (downloadSize > 0) {
-		s = va( "%s (%d%%)", downloadName, (int)( (float)downloadCount * 100.0f / downloadSize ) );
+		s = va( "%s (%.0f%%)", downloadName, ( 100.0f * (float)downloadCount ) / (float)downloadSize );		// 0xcef6: float, not an int cast
 	} else {
 		s = downloadName;
 	}
@@ -149,6 +149,12 @@ static void UI_DisplayDownloadInfo( const char *downloadName ) {
 				va("%s/Sec", xferRateBuf), style, color_white );
 		}
 	}
+
+	// DeFRaG 0xd582 end: the download message of the day (cl_downloadMotd, set by the client) centred near the bottom
+	trap_Cvar_VariableStringBuffer( "cl_downloadMotd", motd, sizeof( motd ) );
+	if ( motd[0] ) {
+		UI_DrawString( 320, 380, motd, UI_CENTER|UI_SMALLFONT|UI_DROPSHADOW, color_white );
+	}
 }
 
 /*
@@ -177,21 +183,25 @@ void UI_DrawConnectScreen( qboolean overlay ) {
 	// DeFRaG 0xd7b0: the name of the server being connected to is published for cgame (CHS items 190 / 191)
 	trap_Cvar_Set( "defrag_servername", cstate.servername );
 
-	info[0] = '\0';
-	if( trap_GetConfigString( CS_SERVERINFO, info, sizeof(info) ) ) {
-		UI_DrawProportionalString( 320, 16, va( "Loading %s", Info_ValueForKey( info, "mapname" ) ), UI_BIGFONT|UI_CENTER|UI_DROPSHADOW, color_white );
-	}
+	// DeFRaG (0xd7df): the map / server / motd / message block is only drawn before the loading state, and the server
+	// message is plain (not auto-wrapped) text
+	if ( cstate.connState < CA_LOADING ) {
+		info[0] = '\0';
+		if( trap_GetConfigString( CS_SERVERINFO, info, sizeof(info) ) ) {
+			UI_DrawProportionalString( 320, 16, va( "Loading %s", Info_ValueForKey( info, "mapname" ) ), UI_BIGFONT|UI_CENTER|UI_DROPSHADOW, color_white );
+		}
 
-	UI_DrawProportionalString( 320, 64, va("Connecting to %s", cstate.servername), UI_CENTER|UI_SMALLFONT|UI_DROPSHADOW, menu_text_color );
-	//UI_DrawProportionalString( 320, 96, "Press Esc to abort", UI_CENTER|UI_SMALLFONT|UI_DROPSHADOW, menu_text_color );
+		UI_DrawProportionalString( 320, 64, va("Connecting to %s", cstate.servername), UI_CENTER|UI_SMALLFONT|UI_DROPSHADOW, menu_text_color );
+		//UI_DrawProportionalString( 320, 96, "Press Esc to abort", UI_CENTER|UI_SMALLFONT|UI_DROPSHADOW, menu_text_color );
 
-	// display global MOTD at bottom
-	UI_DrawProportionalString( SCREEN_WIDTH/2, SCREEN_HEIGHT-32, 
-		Info_ValueForKey( cstate.updateInfoString, "motd" ), UI_CENTER|UI_SMALLFONT|UI_DROPSHADOW, menu_text_color );
-	
-	// print any server info (server full, bad version, etc)
-	if ( cstate.connState < CA_CONNECTED ) {
-		UI_DrawProportionalString_AutoWrapped( 320, 192, 630, 20, cstate.messageString, UI_CENTER|UI_SMALLFONT|UI_DROPSHADOW, menu_text_color );
+		// display global MOTD at bottom
+		UI_DrawProportionalString( SCREEN_WIDTH/2, SCREEN_HEIGHT-32,
+			Info_ValueForKey( cstate.updateInfoString, "motd" ), UI_CENTER|UI_SMALLFONT|UI_DROPSHADOW, menu_text_color );
+
+		// print any server info (server full, bad version, etc)
+		if ( cstate.connState < CA_CONNECTED ) {
+			UI_DrawProportionalString( 320, 192, cstate.messageString, UI_CENTER|UI_SMALLFONT|UI_DROPSHADOW, menu_text_color );
+		}
 	}
 
 #if 0

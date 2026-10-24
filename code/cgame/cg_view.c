@@ -810,8 +810,8 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	CG_PredictPlayerState();
 
 	// decide on third person view
-	cg.renderingThirdPerson = cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR
-							&& (cg_thirdPerson.integer || (cg.snap->ps.stats[STAT_HEALTH] <= 0));
+	// (0x29d46: no spectator exclusion, unlike newer ioq3)
+	cg.renderingThirdPerson = cg_thirdPerson.integer || (cg.snap->ps.stats[STAT_HEALTH] <= 0);
 	CG_DF_ReplayViewPrep();		// DeFRaG 0x7972: replay / demo cameras force the third-person view, replay FOV override
 
 	// build cg.refdef
@@ -887,6 +887,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	}
 
 	// actually issue the rendering calls
+	CG_DF_SpeedFrame();		// DeFRaG 0x3a4a: predicted horizontal speed for the HUD speed widget and the Max Speed statistic
 	CG_DrawActive( stereoView );
 	CG_DF_Miniview();		// DeFRaG miniview (cgame 0x7a04): a second small scene drawn over the HUD
 

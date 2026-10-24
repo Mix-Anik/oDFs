@@ -20,6 +20,12 @@ static int CG_DF_ChsColorIndex( int c ) {
 	return ( c & 15 ) % 10;
 }
 
+// the colour table at cgame data 0x4144: the 8 Q3 colours, then 8 = orange, 9 = grey (g_color_table has only 8 entries)
+const vec4_t chsPalette[10] = {
+	{ 0, 0, 0, 1 }, { 1, 0, 0, 1 }, { 0, 1, 0, 1 }, { 1, 1, 0, 1 }, { 0, 0, 1, 1 }, { 0, 1, 1, 1 }, { 1, 0, 1, 1 }, { 1, 1, 1, 1 },
+	{ 1, 0.5f, 0, 1 }, { 0.5f, 0.5f, 0.5f, 1 }
+};
+
 // 0xbe67: per-row layout from the panel cvars
 static void CG_DF_ChsLayout( int p, chsRow_t rows[8] ) {
 	dfChsCvars_t	*c = &dfChs[p];
@@ -87,10 +93,10 @@ static void CG_DF_ChsLayout( int p, chsRow_t rows[8] ) {
 		rows[k].shadow = shadow;
 		rows[k].id = c->info[k].integer;
 		ci = CG_DF_ChsColorIndex( c->fontColor.integer );
-		VectorCopy( g_color_table[ci], rows[k].fontCol );
+		VectorCopy( chsPalette[ci], rows[k].fontCol );
 		rows[k].fontCol[3] = alpha;
 		ci = CG_DF_ChsColorIndex( c->labelColor.integer );
-		VectorCopy( g_color_table[ci], rows[k].labelCol );
+		VectorCopy( chsPalette[ci], rows[k].labelCol );
 		rows[k].labelCol[3] = alpha;
 	}
 }
@@ -258,7 +264,7 @@ static void CG_DF_ChsInputLine( int item, char *label, char *value ) {
 	value[0] = 0;
 	Q_strcat( value, CHS_BUF, CG_DF_Keys( 32 ) ? "J " : ( CG_DF_Keys( 64 ) ? "C " : "  " ) );
 	Q_strcat( value, CHS_BUF, CG_DF_Keys( 8 ) ? kL : " " );
-	Q_strcat( value, CHS_BUF, CG_DF_Keys( 1 ) ? kF : ( CG_DF_Keys( 2 ) ? kB : " " ) );
+	Q_strcat( value, CHS_BUF, CG_DF_Keys( 1 ) ? kF : ( CG_DF_Keys( 2 ) ? kB : "  " ) );		// 0xe641..0xe66b: two blanks when neither key is down
 	Q_strcat( value, CHS_BUF, CG_DF_Keys( 16 ) ? va( "%s ", kR ) : "  " );
 	Q_strcat( value, CHS_BUF, CG_DF_Keys( 512 ) ? "W " : "  " );
 	Q_strcat( value, CHS_BUF, CG_DF_Keys( 256 ) ? "A" : " " );
@@ -343,10 +349,10 @@ static void CG_DF_ChsMisc( int item, char *label, char *value, const char *sep, 
 			}
 		}
 		break;
-	case 192: case 193:		// cgame 0xeb02: name of tracked client (0x120e44, assumed = viewed client; its writer is not decoded)
+	case 192: case 193:		// cgame 0xeb02: name of the client chosen by df_mp_TrackPlayerNum (0x120e44 is the cvar's value, 0..63, no other checks)
 		Q_strncpyz( label, item == 192 ? "tracking player name" : "tracking player name (no color)", CHS_BUF );
-		if ( cg.snap && cg.snap->ps.clientNum >= 0 && cg.snap->ps.clientNum < MAX_CLIENTS && cgs.clientinfo[cg.snap->ps.clientNum].name[0] ) {
-			Q_strncpyz( value, cgs.clientinfo[cg.snap->ps.clientNum].name, CHS_BUF );
+		if ( df_mp_TrackPlayerNum.integer >= 0 && df_mp_TrackPlayerNum.integer < MAX_CLIENTS && cgs.clientinfo[df_mp_TrackPlayerNum.integer].name[0] ) {
+			Q_strncpyz( value, cgs.clientinfo[df_mp_TrackPlayerNum.integer].name, CHS_BUF );
 			if ( item == 193 ) {
 				Q_CleanStr( value );
 			}
@@ -354,10 +360,10 @@ static void CG_DF_ChsMisc( int item, char *label, char *value, const char *sep, 
 		break;
 	case 215: Q_strncpyz( label, va( "h%sa spent", sep ), CHS_BUF ); Com_sprintf( value, CHS_BUF, "%i%s%i", st.healthSpent, sep, st.armorSpent ); break;
 	case 216: Q_strncpyz( label, "shots fired", CHS_BUF ); Com_sprintf( value, CHS_BUF, "%i", st.shotsFired ); break;
-	case 225: Q_strncpyz( label, "multiplayer", CHS_BUF ); Q_strncpyz( value, ( ver >= 18100 && atoi( Info_ValueForKey( srv, "defrag_gametype" ) ) < 5 ) ? "on" : "off", CHS_BUF ); break;		// 0x11d2ac
+	case 225: Q_strncpyz( label, "multiplayer", CHS_BUF ); Q_strncpyz( value, CG_DF_Multiplayer() ? "on" : "off", CHS_BUF ); break;		// 0x11d2ac: version >= 18100 and defrag_gametype >= 5
 	case 227: Q_strncpyz( label, "overbounces", CHS_BUF ); Q_strncpyz( value, ( ver >= 18100 && atoi( Info_ValueForKey( srv, "defrag_obs" ) ) != 0 ) ? "on" : "off", CHS_BUF ); break;		// 0x11d2b4
 	case 233: Q_strncpyz( label, "gamepath", CHS_BUF ); Q_strncpyz( value, Info_ValueForKey( sys, "fs_game" ), CHS_BUF ); break;		// 0x11d550 = fs_game
-	case 220: Q_strncpyz( label, "defrag", CHS_BUF ); Q_strncpyz( value, ver ? "on" : "off", CHS_BUF ); break;
+	case 220: Q_strncpyz( label, "defrag", CHS_BUF ); Q_strncpyz( value, ( ver || Info_ValueForKey( srv, "defrag_vers" )[0] || Info_ValueForKey( srv, "defrag_version" )[0] ) ? "on" : "off", CHS_BUF ); break;		// 0x11d298: also set when the key is merely present
 	case 221:
 		Q_strncpyz( label, "version", CHS_BUF );
 		Com_sprintf( value, CHS_BUF, "%i.%02i.%02i", ver / 10000, ( ver / 100 ) % 100, ver % 100 );
@@ -369,7 +375,7 @@ static void CG_DF_ChsMisc( int item, char *label, char *value, const char *sep, 
 	case 228: Q_strncpyz( label, "mapname", CHS_BUF ); Q_strncpyz( value, Info_ValueForKey( srv, "mapname" ), CHS_BUF ); break;
 	case 229: Q_strncpyz( label, "route", CHS_BUF ); Q_strncpyz( value, Info_ValueForKey( srv, "defrag_route" ), CHS_BUF ); break;
 	case 230: Q_strncpyz( label, "competition", CHS_BUF ); Q_strncpyz( value, Info_ValueForKey( srv, "df_competition" ), CHS_BUF ); break;
-	case 231: Q_strncpyz( label, "server name", CHS_BUF ); Q_strncpyz( value, Info_ValueForKey( srv, "sv_hostname" ), CHS_BUF ); break;
+	case 231: Q_strncpyz( label, "server name", CHS_BUF ); trap_Cvar_VariableStringBuffer( "defrag_servername", value, CHS_BUF ); break;		// 0x11d390: the client cvar, not sv_hostname
 	case 232: Q_strncpyz( label, "gamename", CHS_BUF ); Q_strncpyz( value, Info_ValueForKey( srv, "gamename" ), CHS_BUF ); break;
 	case 234: Q_strncpyz( label, "cheats", CHS_BUF ); Q_strncpyz( value, atoi( Info_ValueForKey( sys, "sv_cheats" ) ) ? "on" : "off", CHS_BUF ); break;
 	case 235: Q_strncpyz( label, "sv_pure", CHS_BUF ); Q_strncpyz( value, atoi( Info_ValueForKey( sys, "sv_pure" ) ) ? "on" : "off", CHS_BUF ); break;
@@ -529,7 +535,7 @@ static void CG_DF_ChsViewTrace( const vec3_t eye, const vec3_t ang, vec3_t hit )
 
 	AngleVectors( ang, fwd, NULL, NULL );
 	VectorMA( eye, 128000.0f, fwd, end );
-	CG_Trace( &tr, eye, vec3_origin, vec3_origin, end, cg.snap->ps.clientNum, CG_DF_ChsTraceMask() );
+	CG_Trace( &tr, eye, vec3_origin, vec3_origin, end, cg.snap->ps.clientNum, 33619969 );		// 0x8440: the view trace always uses the full mask (no interference override)
 	VectorCopy( tr.endpos, hit );
 }
 
@@ -745,7 +751,7 @@ static void CG_DF_ChsItem( int id, char *label, char *value, const char *sep ) {
 	switch ( item ) {
 	case 1:
 		Q_strncpyz( label, "speed", CHS_BUF );
-		Q_strncpyz( value, CG_DF_SpeedText( sqrt( vel[0] * vel[0] + vel[1] * vel[1] ) ), CHS_BUF );
+		Q_strncpyz( value, CG_DF_SpeedText( (float)dfSpeedInt ), CHS_BUF );		// 0xc4e0: the HUD speed text (0x41b6, cached predicted integer speed), not the item's own velocity source
 		break;
 	case 2:
 		Q_strncpyz( label, "health", CHS_BUF );
@@ -1027,13 +1033,13 @@ static int CG_DF_NextPlayerNum( int start, qboolean backward, qboolean inclSelf,
 		if ( !cgs.clientinfo[n].name[0] ) {
 			continue;
 		}
-		if ( !inclSelf && n == cg.clientNum ) {
+		if ( !inclSelf && n == cg.predictedPlayerState.clientNum ) {
 			continue;
 		}
 		if ( !inclSpect && cgs.clientinfo[n].team >= TEAM_SPECTATOR ) {
 			continue;
 		}
-		if ( teamOnly && cgs.clientinfo[cg.clientNum].team != cgs.clientinfo[n].team ) {
+		if ( teamOnly && cgs.clientinfo[cg.predictedPlayerState.clientNum].team != cgs.clientinfo[n].team ) {
 			continue;
 		}
 		return n;
@@ -1079,8 +1085,8 @@ qboolean CG_DF_ExpandVar( char *tok, int size ) {
 
 		for ( i = 0; i < 4; i++ ) {
 			if ( !Q_stricmp( name, pn[i].name ) ) {
-				// start = 0x120e44 (tracked client; assumed = viewed client, writer not decoded)
-				Com_sprintf( tok, size, "%i", CG_DF_NextPlayerNum( cg.snap ? cg.snap->ps.clientNum : cg.clientNum, pn[i].backward, qfalse, qfalse, pn[i].team ) );
+				// 0x89cc: the search starts at df_mp_TrackPlayerNum (-1 = from the first slot), the viewer is the predicted client
+				Com_sprintf( tok, size, "%i", CG_DF_NextPlayerNum( df_mp_TrackPlayerNum.integer, pn[i].backward, qfalse, qfalse, pn[i].team ) );
 				return qtrue;
 			}
 		}
@@ -1148,10 +1154,10 @@ void CG_DF_DrawChs0( void ) {
 	if ( oy < -240 ) oy = -240;
 	differ = c->fontColor.integer != c->labelColor.integer;
 	ci = CG_DF_ChsColorIndex( c->fontColor.integer );
-	VectorCopy( g_color_table[ci], on );
+	VectorCopy( chsPalette[ci], on );
 	on[3] = alpha;
 	ci = CG_DF_ChsColorIndex( c->labelColor.integer );
-	VectorCopy( g_color_table[ci], off );
+	VectorCopy( chsPalette[ci], off );
 	off[3] = alpha;
 	cx = 320 + ox - size / 2;
 	cy = 240 + oy - size / 2;
@@ -1268,18 +1274,19 @@ void CG_DF_DrawChs( int p ) {
 				}
 				CG_DF_ExpandVar( t2, sizeof( t2 ) );
 				if ( strcmp( t1, t2 ) != 0 ) {
-					if ( !t2[0] ) {
-						continue;
+					// 0xf6e8: a $variable expansion; an empty token ends the whole combo (0xf6f2 jumps to the end of the list)
+					if ( !t1[0] ) {
+						break;
 					}
 					Q_strncpyz( l, t1, sizeof( l ) );
 					Q_strncpyz( v, t2, sizeof( v ) );
 				} else {
-					int item = abs( atoi( t1 ) );
-
-					if ( !item ) {
-						continue;
+					// 0xf70f: a plain token is an item id, but only if the cvar's own leading integer (the row id) is non-zero
+					// (so a list that starts with a $variable shows no numeric items); an id of 0 prints empty strings
+					if ( !r->id ) {
+						break;
 					}
-					CG_DF_ChsItem( item, l, v, sep );
+					CG_DF_ChsItem( abs( atoi( t1 ) ), l, v, sep );
 				}
 				e[0] = 0;
 				if ( n == 0 ) {
@@ -1587,10 +1594,10 @@ void CG_DF_VarJoin_f( void ) {
 	trap_Cvar_VariableStringBuffer( name, acc, sizeof( acc ) );
 	for ( i = 2; i < 25 + 2; i++ ) {
 		trap_Argv( i, arg, sizeof( arg ) );
-		CG_DF_ExpandVar( arg, sizeof( arg ) );
-		if ( !arg[0] ) {
+		if ( !arg[0] ) {		// 0xaa4c: only the raw argument ends the list; a $variable expanding to nothing is appended as nothing
 			break;
 		}
+		CG_DF_ExpandVar( arg, sizeof( arg ) );
 		if ( !strcmp( arg, "<0>" ) ) {
 			acc[0] = 0;
 		} else {

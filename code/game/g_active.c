@@ -1157,7 +1157,9 @@ void ClientThink_real( gentity_t *ent ) {
 			}
 		
 			// pressing attack or use is the normal respawn method
-			if ( ucmd->buttons & ( BUTTON_ATTACK | BUTTON_USE_HOLDABLE ) ) {
+			// DeFRaG (0x1ac35-0x1ac4a): the button must be newly pressed, a held button (oldbuttons) does not respawn
+			if ( ( ucmd->buttons & ( BUTTON_ATTACK | BUTTON_USE_HOLDABLE ) ) &&
+				!( client->oldbuttons & ( BUTTON_ATTACK | BUTTON_USE_HOLDABLE ) ) ) {
 				ClientRespawn( ent );
 			}
 		}

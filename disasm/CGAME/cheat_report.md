@@ -76,3 +76,7 @@ Everything in 4-9 is satisfied by the existing oDFs qagame: `ps.speed` = `g_spee
 
 ## Iter 11 (full-port loop): PORTED into oDFs cgame (`cg_defrag.c`, cvar `df_validityChecks` default 1)
 Reporter `CG_DF_Violation` (first occurrence per code printed as `^2<category>: ^3<message>`, repeat log not ported) and per-snapshot checker `CG_DF_Validate` (called from `CG_DF_SnapshotTransition`): codes 10/11 (stats[12] 0x20/0x40), 4 (finish without seen start), 17 (roll), 1 (gravity), 0 (speed, haste memo 250 ms), 16 (promode flag vs `df_promode`), and the cvar validators 12/13/14 for sv_cheats 0, timescale 1, g_speed 320, g_gravity 800, g_knockback 1000 (systeminfo) and dmflags 0 (serverinfo). Not ported: 2 (time checksum; needs `0x5fd7`), 3, 5/6 (bsp crc, inactive for gametype<5), 7/8 (version), 9, 15 (latched cvar change), and DeFRaG's 'cvar OK' info prints. Frozen-ps test is the least certain decode (see item 5). Client-only, prints to the console. Syntax-checked, untested. Revert: `df_validityChecks 0`.
+
+
+## CORRECTION (re-audit iter 14)
+The "Gate variable 0x11d2ac" paragraph above has the polarity inverted: `0x3b5e` sets `0x11d2ac = 1` when version >= 18100 AND `defrag_gametype >= 5` (`3be6: if (gt < 5) -> 0`). The sv_fps / com_maxfps (60..140) and sv_maxclients checks, the bsp-crc compare, the 0x20 / 0x40 / code-4 block and the code-9 frame-rate test therefore run on the NON-multiplayer gametypes (gt < 5, i.e. oDFs). See PORT_STATUS "Re-audit cgame/ui iter 14".

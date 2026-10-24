@@ -535,7 +535,8 @@ static void CG_DF_DrawCGAZ( int flags, float opacity, int ypos ) {
 	tanHalf = CG_DF_Tan( halfFov );
 	yaw = pps->viewangles[YAW];
 	base = yaw;
-	if ( ( pps->stats[13] & 27 ) != 0 || atoi( CG_DF_Serverinfo( "defrag_vers" ) ) == 0 ) {
+	// 0x11d298 (set by 0x3c33 when defrag_vers or the legacy defrag_version key is non-empty), not the parsed number
+	if ( ( pps->stats[13] & 27 ) != 0 || !( CG_DF_Serverinfo( "defrag_vers" )[0] || CG_DF_Serverinfo( "defrag_version" )[0] ) ) {
 		base += 45.0f * pps->movementDir;
 	}
 
@@ -581,7 +582,7 @@ static void CG_DF_DrawCGAZ( int flags, float opacity, int ypos ) {
 		vlen = speed;
 		vyaw = 180.0f * atan2( vy, vx ) / M_PI;
 		if ( !( flags & 8 ) ) {
-			float e = CG_DF_AngleDiff( base, vyaw );
+			float e = CG_DF_AngleDiff( yaw, vyaw );		// 0x1a965 uses the raw view yaw (l7c), unlike the tape bars below which use base (lc0)
 			int   flip = 0;
 			float x, y, w, h;
 			const float *tc;
@@ -651,7 +652,6 @@ void CG_DF_DrawHUD( void ) {
 	int			i, id, n;
 	static int	secs[3];
 	static char	fragText[16];
-	float		speed;
 	int			ms;
 
 	if ( !CG_DF_HudOn() || !cg.snap ) {
@@ -699,8 +699,7 @@ void CG_DF_DrawHUD( void ) {
 	CG_DF_DrawWidget( &wLast );
 
 	if ( wSpeed.mode ) {
-		speed = sqrt( ps->velocity[0] * ps->velocity[0] + ps->velocity[1] * ps->velocity[1] );
-		wSpeed.text = CG_DF_SpeedText( speed );
+		wSpeed.text = CG_DF_SpeedText( (float)dfSpeedInt );		// 0x41b6 reads the integer speed cached by 0x3a4a
 	}
 	wSpeed.visible = df_drawSpeed.integer ? 1 : 0;
 	CG_DF_DrawWidget( &wSpeed );
@@ -721,8 +720,7 @@ void CG_DF_DrawHUD( void ) {
 	}
 	for ( i = 0; i < powerCount; i++ ) {
 		if ( !ps->powerups[wPower[powerList[i]].id] ) {
-			CG_DF_RemovePower( i );
-			i--;
+			CG_DF_RemovePower( i );		// 0x2b86: no re-check of the entry that moved up (a second expiry in the same frame is removed one frame later)
 		}
 	}
 	for ( i = 0; i < powerCount; i++ ) {
@@ -839,10 +837,7 @@ void CG_DF_DrawVideoCapture( void ) {
 	int			ms, size, len, x, y;
 	const float	*color;
 
-	if ( !cg.snap || !( cg.snap->ps.stats[STAT_DEFRAG_FLAGS] & 2 ) ) {		// race time initialised (plain form only; encoded times on listen servers are not decoded)
-		return;
-	}
-	ms = ( cg.snap->ps.stats[STAT_RACE_TIME_HI] << 16 ) | ( cg.snap->ps.stats[STAT_RACE_TIME_LO] & 0xffff );
+	ms = dfLastRunMs;		// 0x3387: the decoded run time of the last-time widget (0 = not running / not shown)
 	if ( !ms ) {
 		return;
 	}
@@ -869,6 +864,6 @@ void CG_DF_DrawVideoCapture( void ) {
 		y = df_hud_videocapture_y.integer;
 		break;
 	}
-	color = ( df_hud_videocapture_fontcolor.integer >= 0 && df_hud_videocapture_fontcolor.integer < 8 ) ? g_color_table[df_hud_videocapture_fontcolor.integer] : colorWhite;
+	color = CG_DF_HudColor( df_hud_videocapture_fontcolor.integer, NULL );		// 0x2559( cvar, 0 ): palette 0..7 / 8..12, white otherwise
 	CG_DrawStringExt( x, y, s, color, qtrue, df_hud_videocapture_fontshadow.integer, size, size, len );
 }

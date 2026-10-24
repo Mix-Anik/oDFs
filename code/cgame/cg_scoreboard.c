@@ -601,9 +601,11 @@ qboolean CG_DF_DrawScoreboard( void ) {
 	if ( !cg.demoPlayback ) {		// date / server name line
 		qtime_t	t;
 		int		len;
+		char	svname[256];
 
 		trap_RealTime( &t );
-		Com_sprintf( buf, sizeof( buf ), "%s %04i-%02i-%02i %02i:%02i", Info_ValueForKey( CG_ConfigString( CS_SERVERINFO ), "sv_hostname" ),
+		trap_Cvar_VariableStringBuffer( "defrag_servername", svname, sizeof( svname ) );		// 0x11d390 = cvar defrag_servername (cached by 0x3c33)
+		Com_sprintf( buf, sizeof( buf ), "%s %04i-%02i-%02i %02i:%02i", svname,
 			t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min );
 		len = strlen( buf );
 		CG_DrawStringExt( 320 - ( len << 3 ) / 2, 57, buf, dsbGrey, qtrue, qtrue, 8, 8, 0 );
@@ -719,6 +721,10 @@ qboolean CG_DF_DrawScoreboard( void ) {
 	// footer: map [physics], server / client versions
 	{
 		int ver = atoi( CG_DF_Serverinfo( "defrag_vers" ) );
+
+		if ( ver < 1000 ) {		// 0x3c33: short versions are stored x100
+			ver *= 100;
+		}
 
 		Com_sprintf( buf, sizeof( buf ), "%s [%s]", Info_ValueForKey( CG_ConfigString( CS_SERVERINFO ), "mapname" ),
 			atoi( CG_DF_Serverinfo( "df_promode" ) ) ? "cpm" : "vq3" );

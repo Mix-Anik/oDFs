@@ -86,10 +86,23 @@ typedef struct {
 	int		rem;
 } dfName_t;
 
+// DeFRaG 0x5431: a variable's value is copied with colour codes dropped (not counted against maxLen) and, besides the characters
+// of CG_DF_NameChar, '.' '(' ')' '[' ']' also become '-'
 static void CG_DF_NamePut( dfName_t *n, int maxLen, const char *s ) {
-	while ( *s && maxLen-- > 0 && n->rem > 0 ) {
-		*n->out++ = CG_DF_NameChar( *s++ );
+	char c;
+
+	while ( *s && maxLen > 0 && n->rem > 0 ) {
+		if ( s[0] == '^' && s[1] && s[1] != '^' ) {
+			s += 2;
+			continue;
+		}
+		c = CG_DF_NameChar( *s++ );
+		if ( c == '.' || c == '(' || c == ')' || c == '[' || c == ']' ) {
+			c = '-';
+		}
+		*n->out++ = c;
 		n->rem--;
+		maxLen--;
 	}
 }
 
@@ -276,7 +289,7 @@ static void CG_DF_WriteRecord( const char *path, const int *rec ) {
 
 	trap_FS_FOpenFile( path, &f, FS_WRITE );
 	if ( !f ) {
-		CG_Printf( "SetRecord(): failed to open \"%s\" for writing.\n", path );
+		CG_Printf( "SaveRecord(): failed to open %s for writing.\n", path );
 		return;
 	}
 	hdr[0] = 3;
@@ -344,6 +357,7 @@ void CG_DF_RecInit( void ) {
 	memset( dfRecR1, 0, sizeof( dfRecR1 ) );
 	memset( dfRecR2, 0, sizeof( dfRecR2 ) );
 	dfRecDirty = qfalse;
+	dfRecRunStarted = qfalse;
 	dfSessionModCount = -1;
 }
 
@@ -354,9 +368,10 @@ void CG_DF_RecLoad( void ) {
 	dfSessionModCount = df_recfiles_session.modificationCount;
 }
 
-// start of a run (stats[12] bit 4 set): clear the current run, refresh the references
-void CG_DF_RecStart( void ) {
-	dfRecRunStarted = qtrue;
+// 0x5273-0x52a1: on a run start (event 0x40), a respawn (0x10) or a change of the viewed client (0x800) the current run is cleared and the
+// references refreshed; `started` = the event was a run start (the finish is only processed for a started run)
+void CG_DF_RecReset( qboolean started ) {
+	dfRecRunStarted = started;
 	if ( dfRecDirty ) {
 		memcpy( dfRecR2, dfRecB, DF_REC_BYTES );
 		CG_DF_LoadR1();
@@ -365,14 +380,20 @@ void CG_DF_RecStart( void ) {
 		CG_DF_LoadR1();
 	}
 	memset( dfRecB, 0, sizeof( dfRecB ) );
-	if ( dfSessionModCount != df_recfiles_session.modificationCount ) {
-		CG_DF_LoadR1();
-		dfSessionModCount = df_recfiles_session.modificationCount;
-	}
+}
+
+// start of a run (stats[12] bit 4 set)
+void CG_DF_RecStart( void ) {
+	CG_DF_RecReset( qtrue );
 }
 
 // the current (open) entry of the run record follows the race time every snapshot: the last row of the checkpoint list is the running timer
 void CG_DF_RecTrack( int ms ) {
+	// 0x524d: a changed df_recfiles_session reloads the session reference at once (checked on every call)
+	if ( dfSessionModCount != df_recfiles_session.modificationCount ) {
+		CG_DF_LoadR1();
+		dfSessionModCount = df_recfiles_session.modificationCount;
+	}
 	dfRecB[dfRecB[DF_REC_COUNT]] = ms;
 }
 
@@ -400,7 +421,7 @@ void CG_DF_RecFinish( int t ) {
 	dfRecB[*N] = t;
 	// DeFRaG skips both the checkpoint popups and this whole block with sv_cheats; here the checkpoints stay visible (user choice),
 	// only the record files are not written for cheated runs
-	if ( !CG_DF_Cheats() && cg.snap && cgs.clientinfo[cg.snap->ps.clientNum].team != TEAM_SPECTATOR ) {
+	if ( dfRecRunStarted && !CG_DF_Cheats() && cg.snap && cgs.clientinfo[cg.snap->ps.clientNum].team != TEAM_SPECTATOR ) {
 		best = dfRecR2[dfRecR2[DF_REC_COUNT]];
 		if ( best == 0 || t < best ) {
 			isNew = qtrue;
@@ -419,7 +440,10 @@ void CG_DF_RecFinish( int t ) {
 		}
 	}
 	CG_DF_SetLastRunTime( t );
-	CG_DF_CheckpointPopup( *N );
+	// 0x52f3: the whole finish block (files and the final popup) only runs for a run whose start was seen since the last reset
+	if ( dfRecRunStarted ) {
+		CG_DF_CheckpointPopup( *N );
+	}
 }
 
 // ---- HUD checkpoint list (0x5153) and summary (0x4f9d) -----------------------------------------------------------

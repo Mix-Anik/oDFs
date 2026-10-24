@@ -1133,6 +1133,7 @@ typedef struct {
 } dfChsCvars_t;
 extern	dfChsCvars_t	dfChs[3];
 qboolean CG_DF_DrawAllowed( int mode );
+extern	const vec4_t	chsPalette[10];		// cgame data 0x4144: Q3 colours + orange + grey
 const char *CG_DF_SpeedText( float speed );
 void CG_DF_DrawChs( int panel );
 typedef struct {
@@ -1141,6 +1142,7 @@ typedef struct {
 extern	dfAmState_t	dfAm;
 void CG_DF_JumpHistoryText( int type, char *out, int size );
 float CG_DF_JumpHistoryMax( int which );
+void CG_DF_JumpLogReset( void );
 extern	vmCvar_t		df_accel_HistoryResetSpeed;
 typedef struct {
 	float	jumpHeight, jumpDist, tallest, longest, maxSpeed, distance;
@@ -1217,6 +1219,8 @@ extern	vmCvar_t		df_hud;
 qboolean CG_DF_HudOn( void );
 qboolean CG_DF_Cheats( void );
 void CG_DF_EnforceMaxFps( void );
+void CG_DF_SpeedFrame( void );
+extern int dfSpeedInt;
 void CG_DF_RecTrack( int ms );
 const char *CG_DF_FormatDelta( int v );
 void CG_DF_RecRunStopped( void );
@@ -1239,6 +1243,8 @@ extern	vmCvar_t		df_demos_HidePacketEntities, df_demos_HideLocalEntities, df_dem
 void CG_DF_DemoCamera( void );
 void CG_DF_ReplayFreeCamera( int mode, float speed );
 qboolean CG_DF_HideTrackedBody( int clientNum );
+qboolean CG_DF_CamOffsets( vec3_t pos, vec3_t ang );
+void CG_DF_CamAngleOffsets( vec3_t ang );
 void CG_DF_ArStartEvent( void );
 void CG_DF_ArRespawnEvent( void );
 void CG_DF_ArFinishEvent( int ms, qboolean keep );
@@ -1475,6 +1481,7 @@ void CG_DF_AuthRequest( int token );
 void CG_DF_RecInit( void );
 void CG_DF_RecLoad( void );
 void CG_DF_RecStart( void );
+void CG_DF_RecReset( qboolean started );
 void CG_DF_RecCheckpoint( int t );
 void CG_DF_RecFinish( int t );
 int CG_DF_ReferenceTime( void );
@@ -1482,6 +1489,7 @@ const char *CG_DF_CheckpointText( int i );
 extern int cg_dfOptionsSet;
 int CG_DF_DefragFlags( void );
 const char *CG_DF_Serverinfo( const char *key );
+qboolean CG_DF_Multiplayer( void );		// cgame 0x11d2ac: server version >= 18100 and defrag_gametype >= 5
 void CG_DF_ClientDfName( int clientNum, char *out );
 void CG_DF_ClientDfName( int clientNum, char *out );
 qboolean CG_DF_VoteIsDeadline( void );
