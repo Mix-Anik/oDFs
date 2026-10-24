@@ -327,7 +327,8 @@ qboolean G_AuthCommand( int clientNum, const char *cmd ) {
 
 void G_InitRaceMode( void ) {
 	memset( g_raceTimers, 0, sizeof(g_raceTimers) );
-	g_clockBadFrame = g_clockBadRatio = g_clockInitTime = g_clockGameAcc = g_clockRealAcc = g_clockPrevReal = 0;
+	// DeFRaG 0x406d only stamps the init time; the sticky flags and the accumulators survive a map_restart (the module stays loaded)
+	g_clockInitTime = level.time;
 	g_checkpointCount  = 0;
 	g_startTimerReady  = qfalse;
 	g_stopTimerReady   = qfalse;
@@ -672,9 +673,6 @@ void G_ClockSanityFrame( void ) {
 
 	if ( !df_clockCheck.integer ) {
 		return;
-	}
-	if ( !g_clockInitTime ) {
-		g_clockInitTime = level.time;
 	}
 	if ( level.time < g_clockInitTime + 2500 ) {
 		return;

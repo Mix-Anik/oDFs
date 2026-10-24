@@ -995,29 +995,8 @@ static void ArenaServers_StartRefresh( void )
 	}
 
 	if( g_servertype >= UIAS_GLOBAL0 && g_servertype <= UIAS_GLOBAL5 ) {
-		switch( g_arenaservers.gametype.curvalue ) {
-		default:
-		case GAMES_ALL:
-			myargs[0] = 0;
-			break;
-
-		case GAMES_FFA:
-			strcpy( myargs, " ffa" );
-			break;
-
-		case GAMES_TEAMPLAY:
-			strcpy( myargs, " team" );
-			break;
-
-		case GAMES_TOURNEY:
-			strcpy( myargs, " tourney" );
-			break;
-
-		case GAMES_CTF:
-			strcpy( myargs, " ctf" );
-			break;
-		}
-
+		// DeFRaG (0x158da): only the "empty" / "full" flags are sent, the Game Type spinner adds no keyword
+		myargs[0] = 0;
 
 		if (g_emptyservers) {
 			strcat(myargs, " empty");
@@ -1561,7 +1540,7 @@ static void ArenaServers_MenuInit( void ) {
 	Menu_AddItem( &g_arenaservers.menu, (void*) &g_arenaservers.create );
 	Menu_AddItem( &g_arenaservers.menu, (void*) &g_arenaservers.go );
 
-	Menu_AddItem( &g_arenaservers.menu, (void*) &g_arenaservers.punkbuster );
+	// DeFRaG has no Punkbuster spinner in the browser (no PunkBuster strings in the ui), so it is not added
 	Menu_AddItem( &g_arenaservers.menu, (void*) &g_arenaservers.pblogo );
 	
 	ArenaServers_LoadFavorites();

@@ -122,6 +122,8 @@ static qboolean CG_DF_FindDemoOffset( byte salt ) {
 	return qfalse;
 }
 
+static int	dfDecodeTime;		// serverTime of the snapshot whose events are being processed (0 outside CG_DF_ReadSnapshot)
+
 static qboolean CG_DF_RaceTime( const playerState_t *ps, int *ms ) {
 	unsigned int	e;
 	byte			salt;
@@ -144,7 +146,7 @@ static qboolean CG_DF_RaceTime( const playerState_t *ps, int *ms ) {
 		return qtrue;
 	}
 	salt = CG_DF_MapSalt();
-	t = cg.snap->serverTime;
+	t = dfDecodeTime ? dfDecodeTime : cg.snap->serverTime;		// the snapshot being read (see CG_DF_ReadSnapshot), else the current one
 	if ( !cg.demoPlayback ) {
 		return CG_DF_DecodeCore( e, (unsigned int)t, ps->origin[0], ps->velocity[0], ps->stats[STAT_HEALTH], ps->movementDir, salt, ms );
 	}
@@ -295,6 +297,44 @@ static int CG_DF_ServerVersionNumber( void ) {
 	return v < 1000 ? v * 100 : v;
 }
 
+// ---- map BSP checksum check (cgame 0x61c6 / 0x6222; the server side is qagame 0x2d02) ----
+// The server publishes the BSP checksum of its map as defrag_bspcrc (systeminfo) and every qagame stores the checksum of the maps it
+// loads in system/checksums/<map>.crc.  At cgame init that local record is read (not on the multiplayer gametypes); a missing or
+// unreadable record is reported as "Bsp crc: missing local record", and a server value that differs from the record as
+// "Bsp crc: checksum failed".
+static qboolean	dfBspRecord;		// 0x11d794
+static int		dfBspCrc;			// 0x11d798
+
+static void CG_DF_LoadBspRecord( void ) {		// 0x61c6
+	fileHandle_t	f;
+	char			buf[33];
+	int			len;
+
+	if ( !df_validityChecks.integer || CG_DF_Multiplayer() ) {		// (df_validityChecks 0 switches all run-validity checks off)
+		return;
+	}
+	len = trap_FS_FOpenFile( va( "system/checksums/%s.crc", Info_ValueForKey( CG_ConfigString( CS_SERVERINFO ), "mapname" ) ), &f, FS_READ );
+	if ( !f || len < 0 || len > 32 ) {
+		dfBspRecord = qfalse;
+		CG_DF_Violation( 6, dfViolations[6].format );
+		if ( f ) {
+			trap_FS_FCloseFile( f );
+		}
+		return;
+	}
+	memset( buf, 0, sizeof( buf ) );
+	trap_FS_Read( buf, len, f );
+	trap_FS_FCloseFile( f );
+	dfBspCrc = atoi( buf );
+	dfBspRecord = qtrue;
+}
+
+static void CG_DF_CheckBspCrc( int serverCrc ) {		// 0x6222
+	if ( dfBspRecord && serverCrc != dfBspCrc ) {
+		CG_DF_Violation( 5, dfViolations[5].format );
+	}
+}
+
 // the server settings DeFRaG requires (cgame 0x5b89 systeminfo / 0x5dd5 serverinfo validators).  The speed / gravity / knockback / fps lines
 // need a server version >= 18100; sv_fps / com_maxfps are checked on the non-multiplayer gametypes, sv_maxclients on those with
 // 18100 <= version < 19114.
@@ -318,6 +358,7 @@ static void CG_DF_CheckServerSettings( void ) {
 		CG_DF_CheckCvar( sys, "g_speed", "320", qfalse, 5, dfSysPassed );
 		CG_DF_CheckCvar( sys, "g_gravity", "800", qfalse, 6, dfSysPassed );
 		CG_DF_CheckCvar( sys, "g_knockback", "1000", qfalse, 7, dfSysPassed );
+		CG_DF_CheckBspCrc( atoi( Info_ValueForKey( sys, "defrag_bspcrc" ) ) );		// 0x5dc1
 	}
 	dfSysPassed = qtrue;
 	if ( CG_DF_Serverinfo( "defrag_vers" )[0] || CG_DF_Serverinfo( "defrag_version" )[0] ) {
@@ -387,7 +428,7 @@ static void CG_DF_Validate( const playerState_t *ops, const playerState_t *ps ) 
 	if ( ps->powerups[PW_HASTE] ) {
 		dfValHasteMemo = ps->powerups[PW_HASTE];
 	}
-	expected = ( cg.snap && cg.snap->serverTime < dfValHasteMemo + 250 ) ? 416 : 320;
+	expected = ( ( dfDecodeTime ? dfDecodeTime : ( cg.snap ? cg.snap->serverTime : 0 ) ) < dfValHasteMemo + 250 && ( dfDecodeTime || cg.snap ) ) ? 416 : 320;
 	if ( ps->speed != 320 && ps->speed != expected && ps->speed != dfValLastSpeed ) {
 		CG_DF_Violation( 0, va( dfViolations[0].format, ps->speed, expected ) );
 	}
@@ -406,6 +447,8 @@ static void CG_DF_Validate( const playerState_t *ops, const playerState_t *ps ) 
 vmCvar_t	df_noEndOfRunStats;
 
 static qboolean	runActive;			// 0x11d288
+static qboolean	dfFinishPrint;		// a finish was seen at snapshot read time: print the stats block when the snapshot becomes current
+static int			dfFinishPrintMs;
 static float	statMaxSpeed;		// 0x11d230
 static float	statDistance;		// 0x11d234
 static int		statHealthSpent, statArmorSpent, statShots;		// 0x11d238 / 3c / 40 (cgame 0x4677)
@@ -1402,6 +1445,7 @@ void CG_DF_InitCvars( void ) {
 	char	name[MAX_STRING_CHARS], si[BIG_INFO_STRING];
 	int		v;
 
+	CG_DF_LoadBspRecord();		// 0x63f5 -> 0x61c6
 	trap_Cvar_Set( "defrag_demoPlayback", cg.demoPlayback ? "1" : "0" );
 	trap_Cvar_VariableStringBuffer( "df_name", name, sizeof( name ) );
 	if ( !name[0] ) {
@@ -1455,8 +1499,8 @@ void CG_DF_DemoValidation( int ms ) {
 
 // ---- authentication reply (cgame 0x4337 / hash 0x11f9), see disasm/G_CLIENT/auth_handshake.md ----
 // The server (df_auth 1, non-dedicated DeFRaG-style servers) sends "auth_request <token> <mapChecksum>"; the client
-// answers "auth_reply <hash><random decoy digit>" or is dropped. The bsp-checksum comparison of the second argument
-// (cgame 0x6222) is inactive for defrag_gametype < 5 and is not ported.
+// answers "auth_reply <hash><random decoy digit>" or is dropped. The second argument is compared with the local bsp record
+// (cgame 0x6222, see CG_DF_CheckBspCrc) right after the reply.
 static int CG_DF_AuthHash( int token, const char *str ) {
 	int				sum = 0;
 	int				d;
@@ -1475,6 +1519,10 @@ static int CG_DF_AuthHash( int token, const char *str ) {
 		p++;
 	} while ( *p );
 	return token - 3 - 3 * sum;
+}
+
+void CG_DF_AuthBspCrc( int serverCrc ) {		// 0x3d84: auth_request <token> <sv_mapChecksum>
+	CG_DF_CheckBspCrc( serverCrc );
 }
 
 void CG_DF_AuthRequest( int token ) {
@@ -1549,10 +1597,35 @@ void CG_DF_SnapshotTransition( const playerState_t *ops, const playerState_t *ps
 		CG_DF_RecFinish( ms );
 		CG_DF_ArFinishEvent( ms, CG_DF_RecKeep() );
 		CG_DF_DemoValidation( ms );
-		if ( runActive ) {
-			CG_DF_PrintStats( ms );
-			runActive = qfalse;
-		}
+		// the stats block is printed when the snapshot becomes current (CG_DF_FlushFinishPrint), after its server commands: the 'stats' command
+		// of the finish clears runActive first, so the block is not printed twice
+		dfFinishPrint = qtrue;
+		dfFinishPrintMs = ms;
+	}
+}
+
+// DeFRaG 0x1e4c: runs the event word / validity checks / per-frame work when a snapshot is READ (CG_ReadNextSnapshot, before it is the next
+// snapshot), against the current one; snapshots flagged SNAPFLAG_NOT_ACTIVE are skipped.  The race time is decoded with the serverTime of
+// the snapshot being read.
+void CG_DF_ReadSnapshot( const snapshot_t *old, const snapshot_t *cur ) {
+	if ( !old || ( cur->snapFlags & SNAPFLAG_NOT_ACTIVE ) ) {
+		return;
+	}
+	dfDecodeTime = cur->serverTime;
+	CG_DF_ScriptEvents( old, cur );
+	CG_DF_SnapshotTransition( &old->ps, &cur->ps );
+	dfDecodeTime = 0;
+}
+
+// called when the read snapshot becomes the current one, after its server commands were executed
+void CG_DF_FlushFinishPrint( void ) {
+	if ( !dfFinishPrint ) {
+		return;
+	}
+	dfFinishPrint = qfalse;
+	if ( runActive ) {
+		CG_DF_PrintStats( dfFinishPrintMs );
+		runActive = qfalse;
 	}
 }
 

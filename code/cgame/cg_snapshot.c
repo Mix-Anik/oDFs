@@ -171,8 +171,8 @@ static void CG_TransitionSnapshot( void ) {
 
 		ops = &oldFrame->ps;
 		ps = &cg.snap->ps;
-		CG_DF_ScriptEvents( oldFrame, cg.snap );
-		CG_DF_SnapshotTransition( ops, ps );
+		// DeFRaG: the event handling ran when this snapshot was read (CG_DF_ReadSnapshot); only the deferred stats print is left
+		CG_DF_FlushFinishPrint();
 		// teleporting checks are irrespective of prediction
 		if ( ( ps->eFlags ^ ops->eFlags ) & EF_TELEPORT_BIT ) {
 			cg.thisFrameTeleport = qtrue;	// will be cleared by prediction code
@@ -284,6 +284,7 @@ static snapshot_t *CG_ReadNextSnapshot( void ) {
 
 		// if it succeeded, return
 		if ( r ) {
+			CG_DF_ReadSnapshot( cg.snap, dest );		// DeFRaG 0x1e4c (new snapshot, current snapshot)
 			CG_AddLagometerSnapshotInfo( dest );
 			return dest;
 		}

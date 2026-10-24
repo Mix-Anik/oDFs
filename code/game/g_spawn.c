@@ -458,6 +458,24 @@ qboolean g_disableScore;	// worldspawn "disableScore"
 extern vmCvar_t df_enforceSvFps;
 extern vmCvar_t df_forceGametype;
 
+// DeFRaG 0x2d02 (called at the end of the mode resolve 0x21fc) and the forced defrag_bspcrc of G_InitGame 0x1b57: the map's BSP checksum is
+// published to the clients (defrag_bspcrc) and stored in system/checksums/<map>.crc, which the cgame compares with the server's value
+// (cgame 0x61c6 / 0x6222: "Bsp crc" violations 5 / 6).
+static void G_PublishMapChecksum( void ) {
+	char			map[32], crc[32];
+	fileHandle_t	f;
+
+	trap_Cvar_VariableStringBuffer( "mapname", map, sizeof( map ) );
+	Q_strlwr( map );
+	trap_Cvar_VariableStringBuffer( "sv_mapChecksum", crc, sizeof( crc ) );
+	trap_Cvar_Set( "defrag_bspcrc", va( "%i", trap_Cvar_VariableIntegerValue( "sv_mapChecksum" ) ) );
+	trap_FS_FOpenFile( va( "system/checksums/%s.crc", map ), &f, FS_WRITE );
+	if ( f ) {
+		trap_FS_Write( crc, strlen( crc ), f );
+		trap_FS_FCloseFile( f );
+	}
+}
+
 void G_ResolveDfMode( void ) {
 	int mode = df_gametype.integer;
 	int dfFlags;
@@ -521,6 +539,7 @@ void G_ResolveDfMode( void ) {
 			trap_Cvar_Set( "g_synchronousClients", "0" );
 		}
 	}
+	G_PublishMapChecksum();
 }
 
 ndmSettings_t g_ndm;

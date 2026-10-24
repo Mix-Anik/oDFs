@@ -1040,6 +1040,7 @@ static void CG_ServerCommand( void ) {
 	// DeFRaG dispatcher (cgame 0x3d52, disasm/CGAME/server_commands.md): commands consumed before vanilla handling
 	if ( !strcmp( cmd, "auth_request" ) ) {
 		CG_DF_AuthRequest( atoi( CG_Argv(1) ) );
+		CG_DF_AuthBspCrc( atoi( CG_Argv(2) ) );
 		return;
 	}
 	if ( !strcmp( cmd, "chkpt" ) ) {

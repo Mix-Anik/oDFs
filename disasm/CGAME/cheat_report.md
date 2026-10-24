@@ -80,3 +80,5 @@ Reporter `CG_DF_Violation` (first occurrence per code printed as `^2<category>: 
 
 ## CORRECTION (re-audit iter 14)
 The "Gate variable 0x11d2ac" paragraph above has the polarity inverted: `0x3b5e` sets `0x11d2ac = 1` when version >= 18100 AND `defrag_gametype >= 5` (`3be6: if (gt < 5) -> 0`). The sv_fps / com_maxfps (60..140) and sv_maxclients checks, the bsp-crc compare, the 0x20 / 0x40 / code-4 block and the code-9 frame-rate test therefore run on the NON-multiplayer gametypes (gt < 5, i.e. oDFs). See PORT_STATUS "Re-audit cgame/ui iter 14".
+
+**Correction (bsp crc port):** the statements above that the bsp-crc check is "only for gametype >= 5" / "inactive for oDFs" have the gate inverted (see the polarity correction): `0x61c6` returns when `0x11d2ac != 0`, i.e. on the multiplayer gametypes (>= 5); the check RUNS on the normal race gametypes. Ported: qagame `G_PublishMapChecksum` (g_spawn.c: `defrag_bspcrc` + `system/checksums/<map>.crc`), cgame `CG_DF_LoadBspRecord` / `CG_DF_CheckBspCrc` (cg_defrag.c).

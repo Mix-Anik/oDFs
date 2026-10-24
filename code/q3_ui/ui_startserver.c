@@ -788,7 +788,7 @@ static void ServerOptions_Start( void ) {
 	trap_Cvar_SetValue( "sv_pure", pure );
 	trap_Cvar_Set("sv_hostname", s_serveroptions.hostname.field.buffer );
 	
-	trap_Cvar_SetValue( "sv_punkbuster", s_serveroptions.punkbuster.curvalue );
+	// DeFRaG (ui 0x18141 / 0x18974): the server options have no Punkbuster item and sv_punkbuster is not touched
 
 	// the wait commands will allow the dedicated to take effect
 	info = UI_GetArenaInfoByNumber( s_startserver.maplist[ s_startserver.currentmap ]);
@@ -1482,7 +1482,7 @@ static void ServerOptions_MenuInit( qboolean multiplayer ) {
 	Menu_AddItem( &s_serveroptions.menu, &s_serveroptions.next );
 	Menu_AddItem( &s_serveroptions.menu, &s_serveroptions.go );
 
-	Menu_AddItem( &s_serveroptions.menu, (void*) &s_serveroptions.punkbuster );
+	// (punkbuster spinner is not added: DeFRaG has none)
 	
 	ServerOptions_SetMenuItems();
 }

@@ -1478,6 +1478,7 @@ void CG_DF_GhostRunEnd( int ms );
 void CG_DF_StatsCommand( void );
 void CG_DF_SvinfoReport_f( void );
 void CG_DF_AuthRequest( int token );
+void CG_DF_AuthBspCrc( int serverCrc );
 void CG_DF_RecInit( void );
 void CG_DF_RecLoad( void );
 void CG_DF_RecStart( void );
@@ -1501,6 +1502,8 @@ void CG_DF_DrawHUD( void );
 void CG_DF_SetLastRunTime( int ms );
 void CG_DF_Reset( void );	// cg_defrag.c
 void CG_DF_SnapshotTransition( const playerState_t *ops, const playerState_t *ps );
+void CG_DF_ReadSnapshot( const snapshot_t *old, const snapshot_t *cur );		// 0x1e4c: events when a snapshot is read
+void CG_DF_FlushFinishPrint( void );
 void CG_DF_DrawCheckpointList( void );
 void CG_DrawHead( float x, float y, float w, float h, int clientNum, vec3_t headAngles );
 void CG_DrawActive( stereoFrame_t stereoView );

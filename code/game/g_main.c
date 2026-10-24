@@ -262,6 +262,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ NULL,                  "defrag_obs",           "",     CVAR_SYSTEMINFO | CVAR_LATCH | CVAR_ROM, 0, qfalse },
 	{ &df_lockPromode,      "df_lockPromode",       "0",    CVAR_ARCHIVE, 0, qfalse },
 	// not CVAR_ROM: the stock engine rejects trap_Cvar_Set on ROM cvars (DeFRaG's engine allows it)
+	{ NULL,                  "defrag_bspcrc",        "",     CVAR_SYSTEMINFO, 0, qfalse },		// map BSP checksum for the cgame check (not ROM: the stock engine rejects trap_Cvar_Set on ROM cvars)
 	{ NULL,                  "defrag_svfps",         "0",    CVAR_SYSTEMINFO, 0, qfalse },
 	{ NULL,                  "defrag_clfps",         "0",    CVAR_SYSTEMINFO, 0, qfalse },
 	{ &df_sv_script_idleCfg, "df_sv_script_idleCfg", "",     CVAR_ARCHIVE, 0, qfalse },

@@ -265,7 +265,7 @@ static bind_t g_bindings[] =
 	{"messagemode2", 	"chat - team",		ID_CHAT2,		ANIM_CHAT,		-1,				-1,		-1, -1},
 	{"messagemode3", 	"chat - target",	ID_CHAT3,		ANIM_CHAT,		-1,				-1,		-1, -1},
 	{"messagemode4", 	"chat - attacker",	ID_CHAT4,		ANIM_CHAT,		-1,				-1,		-1, -1},
-	{"+button5", 		"grappling hook",	ID_HOOK,		ANIM_ATTACK,	-1,				-1,		-1, -1},
+	{"+button5", 		"grappling hook",	ID_HOOK,		ANIM_ATTACK,	K_MOUSE2,		-1,		-1, -1},
 	{"togglemenu", 		"toggle menu",		ID_TOGGLEMENU,	ANIM_IDLE,		K_ESCAPE,		-1,		-1, -1},
 	{(char*)NULL,		(char*)NULL,		0,				0,				-1,				-1,		-1,	-1},
 };
@@ -313,6 +313,7 @@ static menucommon_s *g_weapons_controls[] = {
 	(menucommon_s *)&s_controls.railgun,          
 	(menucommon_s *)&s_controls.plasma,           
 	(menucommon_s *)&s_controls.bfg,              
+	(menucommon_s *)&s_controls.hook,		// DeFRaG (ui 0xe3ef): the grappling hook binding is the last item of the weapons page
 	NULL,
 };
 
@@ -339,8 +340,6 @@ static menucommon_s *g_misc_controls[] = {
 	(menucommon_s *)&s_controls.chat2,
 	(menucommon_s *)&s_controls.chat3,
 	(menucommon_s *)&s_controls.chat4,
-	(menucommon_s *)&s_controls.hook,
-	(menucommon_s *)&s_controls.togglemenu,
 	NULL,
 };
 
