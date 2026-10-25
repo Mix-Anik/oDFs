@@ -1,0 +1,17 @@
+# A systemd USER service (no root needed): one per server, odfs@cpm, odfs@vq3, odfs@mixed. The part after @ is the config name;
+# the port and lan / public come from the file <name>.env next to this one (see README.md, "Run in the background").
+# %h is the home folder of the user that runs it (/home/defrag). Adjust the folder if yours is not ~/servers/odfs.
+[Unit]
+Description=oDFs server (%i)
+
+[Service]
+WorkingDirectory=%h/servers/odfs
+EnvironmentFile=%h/servers/odfs/systemd/%i.env
+ExecStart=%h/servers/odfs/start_server.sh %i ${PORT} ${VISIBILITY}
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target

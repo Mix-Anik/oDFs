@@ -51,3 +51,28 @@ start_server.bat cpm 27960 public       announced to the master servers
 ```
 
 Open the UDP ports in your firewall / router. The script restarts the server if it stops; close the window (Ctrl+C) to stop it.
+
+## 5. Run in the background (Linux, no root needed)
+
+As root, once: `loginctl enable-linger defrag` (lets the user's services start at boot and keep running after logout).
+
+Then as the `defrag` user (the `systemd/` folder from this repo sits next to `start_server.sh`; adjust the folder if yours is not `~/servers/odfs`):
+
+```
+mkdir -p ~/.config/systemd/user
+cp ~/servers/odfs/systemd/odfs@.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now odfs@cpm odfs@vq3 odfs@mixed       # only the ones you want
+```
+
+The ports and `lan` / `public` of each server are in `systemd/cpm.env`, `vq3.env`, `mixed.env` (27960, 27961, 27962; change
+`VISIBILITY=lan` to `public`). The servers start with the machine and restart if they crash.
+
+```
+systemctl --user status odfs@cpm          is it running
+journalctl --user -u odfs@cpm -f          server console output
+systemctl --user restart odfs@cpm         restart (after changing a cfg)
+systemctl --user stop odfs@cpm            stop
+```
+
+Open the three UDP ports in the firewall (needs root, once). Use `rcon` from the game to give commands to a running server.

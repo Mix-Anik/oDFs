@@ -22,9 +22,18 @@ HOME_ROOT=${HOME_ROOT:-$BASE/homes}
 
 cd "$BASE" || exit 1
 mkdir -p "$HOME_ROOT/$NAME/defrag"
-while true; do
-	./oDFe.ded.x64 +set fs_basepath "$BASE" +set fs_homepath "$HOME_ROOT/$NAME" +set fs_game defrag \
-		+set net_port "$PORT" +set dedicated "$DEDICATED" +exec "$NAME.cfg"
-	echo "server $NAME exited ($?), restarting in 5 s (Ctrl+C to stop)"
-	sleep 5
+# Ctrl+C / kill / systemd stop: stop the server and do not restart it
+STOP=0
+PID=
+trap 'STOP=1; [ -n "$PID" ] && kill -TERM "$PID" 2>/dev/null' INT TERM
+while [ "$STOP" = 0 ]; do
+	./oDFe.ded.x64 +set fs_basepath "$BASE" +set fs_homepath "$HOME_ROOT/$NAME" +set fs_game defrag 		+set net_port "$PORT" +set dedicated "$DEDICATED" +exec "$NAME.cfg" &
+	PID=$!
+	wait "$PID"
+	RC=$?
+	wait "$PID" 2>/dev/null		# a trapped signal ends the first wait early: wait for the server to really exit
+	[ "$STOP" = 1 ] && break
+	echo "server $NAME exited ($RC), restarting in 5 s (Ctrl+C to stop)"
+	sleep 5 &
+	wait $!
 done

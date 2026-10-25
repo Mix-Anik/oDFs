@@ -3,3 +3,6 @@
 
 # shell scripts run on Linux and in bash: always LF
 *.sh text eol=lf
+*.bat text eol=crlf
+*.service text eol=lf
+*.env text eol=lf
