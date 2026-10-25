@@ -1536,6 +1536,12 @@ void CheckExitRules( void ) {
 		}
 	}
 
+	// DeFRaG (qagame 0xc73, as in vanilla Q3): the frag / capture limits only apply with at least two players in the game, so
+	// a single racer who collects the keycards of a target_fragsFilter map does not end the level
+	if ( level.numPlayingClients < 2 ) {
+		return;
+	}
+
 	if ( g_fraglimit.integer < 0 ) {
 		G_Printf( "fraglimit %i is out of range, defaulting to 0\n", g_fraglimit.integer );
 		trap_Cvar_Set( "fraglimit", "0" );

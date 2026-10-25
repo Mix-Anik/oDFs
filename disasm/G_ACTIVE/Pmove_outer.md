@@ -287,6 +287,6 @@ else:
 | `Pmove(pmove_t *pm)` | `Pmove(gentity_t *ent)` |
 | Builds pmove_t in ClientThink_real | Builds pm struct inside Pmove outer |
 | `pm.obs_disabled = df_ob_killobs.integer` | OBS stored in `ps->stats[12] & 0x200` |
-| `pm.gauntletHit = CheckGauntletAttack(ent)` | gauntletHit always 0, never called |
+| `pm.gauntletHit = CheckGauntletAttack(ent)` | **CORRECTED (demo replay, PORT_STATUS entry 85):** `0x1a9d9..0x1aa05` calls `fn_288b1` (`CheckGauntletAttack`) with weapon == gauntlet, attack down, no talk key, `weaponTime <= 0`, and stores the result at pm+0x2c (gauntletHit); the earlier "never called" reading was wrong |
 | `pm.noFootsteps`, `pm.debugLevel` set | Always 0 (zeroed by memset) |
 | `pm.promode = df_promode.integer` | func_0x2575 sets `ps->pm_flags & 0x8000` |

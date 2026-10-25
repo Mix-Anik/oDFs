@@ -30,6 +30,8 @@
 
 # Executables
 *.exe
+# the Q3VM compiler tools the CI builds the game QVM with
+!bin/*.exe
 *.out
 *.app
 *.i*86
@@ -58,4 +60,6 @@ dkms.conf
 build
 build-dll
 build-qvm
-testing
+build-ci
+testing/out/
+testing/local.cfg

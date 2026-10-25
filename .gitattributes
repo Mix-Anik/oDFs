@@ -1,0 +1,2 @@
+# golden files are binary: never convert line endings
+*.dfg binary

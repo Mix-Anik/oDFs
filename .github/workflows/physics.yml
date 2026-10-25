@@ -1,0 +1,26 @@
+name: physics
+
+# Replays the golden files (movement and gameplay recorded on the original DeFRaG) through the game QVM built from
+# this commit. A step that matched the recording when the file was made and does not any more fails the run.
+# See testing/README.md.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  golden:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tools
+        shell: bash
+        run: |
+          gcc --version
+          cmake --version
+          python --version
+
+      - name: Build and replay the golden files
+        shell: bash
+        run: bash testing/ci.sh

@@ -100,10 +100,8 @@ int Pickup_Powerup( gentity_t *ent, gentity_t *other ) {
 	}
 
 	if ( !other->client->ps.powerups[ent->item->giTag] ) {
-		// round timing to seconds to make multiple powerup timers
-		// count in sync
-		other->client->ps.powerups[ent->item->giTag] = 
-			level.time - ( level.time % 1000 );
+		// DeFRaG func_0x20afa: the timer starts at the exact level time (vanilla rounds it down to whole seconds)
+		other->client->ps.powerups[ent->item->giTag] = level.time;
 	}
 
 	if ( ent->count ) {
@@ -262,6 +260,8 @@ void Add_Ammo (gentity_t *ent, int weapon, int count)
 	ent->client->ps.ammo[weapon] += count;
 	if ( ent->client->ps.ammo[weapon] > 200 ) {
 		ent->client->ps.ammo[weapon] = 200;
+	} else if ( ent->client->ps.ammo[weapon] < -1 ) {
+		ent->client->ps.ammo[weapon] = -1;		// DeFRaG func_0x20c97: the ammo does not go below -1 (a negative item count takes ammo away)
 	}
 }
 
@@ -322,6 +322,15 @@ int Pickup_Weapon (gentity_t *ent, gentity_t *other) {
 
 	if (ent->item->giTag == WP_GRAPPLING_HOOK)
 		other->client->ps.ammo[ent->item->giTag] = -1; // unlimited ammo
+
+	// DeFRaG func_0x20d2d (0x20df6 / 0x20e07): picking up a lightning gun / grappling hook item sets the LG knockback flag /
+	// grapple mode of the player from the item's "speed" key (a map can enable them per weapon)
+	if ( ent->item->giTag == WP_LIGHTNING ) {
+		G_SetLGKnockback( &other->client->ps, (int)ent->speed );
+	}
+	if ( ent->item->giTag == WP_GRAPPLING_HOOK ) {
+		G_SetGrappleMode( &other->client->ps, (int)ent->speed );
+	}
 
 	// team deathmatch has slow weapon respawns
 	if ( g_gametype.integer == GT_TEAM ) {
@@ -615,7 +624,7 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 		break;
 	case IT_POWERUP:
 		respawn = Pickup_Powerup(ent, other);
-		predict = qfalse;
+		// DeFRaG 0x20f11: no "predict = qfalse" here (vanilla has one); a powerup pickup follows the client's cg_predictItems like the rest
 		break;
 #ifdef MISSIONPACK
 	case IT_PERSISTANT_POWERUP:

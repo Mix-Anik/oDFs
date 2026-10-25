@@ -849,6 +849,47 @@ void SendPendingPredictableEvents( playerState_t *ps ) {
 
 /*
 ==============
+G_SetOBSFlag / G_SetGrappleMode / G_SetLGKnockback
+
+DeFRaG qagame func_0x426b / 0x42b5 / 0x4290: the cvar-derived bits of ps.stats[STAT_DEFRAG_FLAGS].
+G_SetDefragFlags is func_0x421b (called once from ClientSpawn).
+==============
+*/
+void G_SetOBSFlag( playerState_t *ps, int on ) {
+	if ( on ) {
+		ps->stats[STAT_DEFRAG_FLAGS] |= DFLAG_OBS_DISABLED;
+	} else {
+		ps->stats[STAT_DEFRAG_FLAGS] &= ~DFLAG_OBS_DISABLED;
+	}
+}
+
+// the mode (0-3) is packed into two bits: 0x400 = mode & 1, 0x800 = mode & 2 (see disasm/G_ACTIVE/GrappleMode.md)
+void G_SetGrappleMode( playerState_t *ps, int mode ) {
+	ps->stats[STAT_DEFRAG_FLAGS] &= ~( DFLAG_GRAPPLE_MODE_1 | DFLAG_GRAPPLE_MODE_2 );
+	if ( mode & 1 && mode >= 0 && mode <= 3 ) {
+		ps->stats[STAT_DEFRAG_FLAGS] |= DFLAG_GRAPPLE_MODE_1;
+	}
+	if ( mode & 2 && mode >= 0 && mode <= 3 ) {
+		ps->stats[STAT_DEFRAG_FLAGS] |= DFLAG_GRAPPLE_MODE_2;
+	}
+}
+
+void G_SetLGKnockback( playerState_t *ps, int on ) {
+	if ( on ) {
+		ps->stats[STAT_DEFRAG_FLAGS] |= DFLAG_LG_KNOCKBACK;
+	} else {
+		ps->stats[STAT_DEFRAG_FLAGS] &= ~DFLAG_LG_KNOCKBACK;
+	}
+}
+
+void G_SetDefragFlags( playerState_t *ps ) {
+	G_SetOBSFlag( ps, df_ob_killobs.integer );
+	G_SetGrappleMode( ps, df_hook_type.integer );
+	G_SetLGKnockback( ps, df_lg_knockback.integer );
+}
+
+/*
+==============
 ClientThink
 
 This will be called once for each client frame, which will
@@ -970,7 +1011,13 @@ void ClientThink_real( gentity_t *ent ) {
 
 	memset (&pm, 0, sizeof(pm));
 
-	// DeFRaG: gauntletHit is always 0 — no per-frame hit detection
+	// DeFRaG ClientThink_real (0x1a9d9..0x1aa05): the gauntlet only "fires" when it hits something; with the attack key down, no
+	// talk key and the weapon ready, the hit is traced (and applied) here and handed to Pmove as pm.gauntletHit
+	if ( client->ps.weapon == WP_GAUNTLET && !( ucmd->buttons & BUTTON_TALK ) && ( ucmd->buttons & BUTTON_ATTACK ) &&
+			client->ps.weaponTime <= 0 ) {
+		pm.gauntletHit = CheckGauntletAttack( ent );
+	}
+
 	if ( ent->flags & FL_FORCE_GESTURE ) {
 		ent->flags &= ~FL_FORCE_GESTURE;
 		ent->client->pers.cmd.buttons |= BUTTON_GESTURE;
@@ -1023,19 +1070,9 @@ void ClientThink_real( gentity_t *ent ) {
 	pm.pmove_msec = pmove_msec.integer;
 	pm.obs_disabled = df_ob_killobs.integer;
 
-	// DeFRaG: pack cvar state into ps.stats[STAT_DEFRAG_FLAGS] so client prediction
-	// reads the same values as the server.
-	client->ps.stats[STAT_DEFRAG_FLAGS] &= ~(DFLAG_OBS_DISABLED | DFLAG_GRAPPLE_MODE_1 | DFLAG_GRAPPLE_MODE_2 | DFLAG_LG_KNOCKBACK);
-	if ( df_ob_killobs.integer )
-		client->ps.stats[STAT_DEFRAG_FLAGS] |= DFLAG_OBS_DISABLED;
-	// df_hook_Type (0-3) encodes into two bits the same way DeFRaG's qagame does:
-	// bit 0x400 = mode & 1, bit 0x800 = mode & 2 (see disasm/G_ACTIVE/GrappleMode.md)
-	if ( df_hook_type.integer & 1 )
-		client->ps.stats[STAT_DEFRAG_FLAGS] |= DFLAG_GRAPPLE_MODE_1;
-	if ( df_hook_type.integer & 2 )
-		client->ps.stats[STAT_DEFRAG_FLAGS] |= DFLAG_GRAPPLE_MODE_2;
-	if ( df_lg_knockback.integer )
-		client->ps.stats[STAT_DEFRAG_FLAGS] |= DFLAG_LG_KNOCKBACK;
+	// DeFRaG: the cvar state packed into ps.stats[STAT_DEFRAG_FLAGS] (so client prediction reads the same values as
+	// the server) is not refreshed here: qagame sets it once per spawn (G_SetDefragFlags, from ClientSpawn) and the
+	// pickup of a lightning gun / grappling hook item sets the LG knockback / grapple mode bits (Pickup_Weapon).
 
 	pm.promode     = df_promode.integer;
 	pm.killWallbug = g_killWallbug.integer;

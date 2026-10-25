@@ -1549,6 +1549,8 @@ sfxHandle_t	CG_CustomSound( int clientNum, const char *soundName );
 // cg_predict.c
 //
 void CG_BuildSolidList( void );
+qboolean CG_DF_IsDefragServer( void );		// cg_defrag.c, 0xa174
+qboolean CG_DF_ItemAvailable( const entityState_t *es, int clientNum );		// cg_ents.c, cgame 0x4e14
 int	CG_PointContents( const vec3_t point, int passEntityNum );
 void CG_Trace( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, 
 					 int skipNumber, int mask );

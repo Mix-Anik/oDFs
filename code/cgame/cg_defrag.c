@@ -1388,7 +1388,7 @@ qboolean CG_DF_ModSupport( void ) {
 }
 
 // 0xa174: the server counts as DeFRaG when o3j_version or defrag_vers (parsed or merely present) is set
-static qboolean CG_DF_IsDefragServer( void ) {
+qboolean CG_DF_IsDefragServer( void ) {
 	char si[BIG_INFO_STRING];
 
 	Q_strncpyz( si, CG_ConfigString( CS_SERVERINFO ), sizeof( si ) );

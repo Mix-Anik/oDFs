@@ -150,9 +150,9 @@ void SnapVectorTowards( vec3_t v, vec3_t to ) {
 
 	for ( i = 0 ; i < 3 ; i++ ) {
 		if ( to[i] <= v[i] ) {
-			v[i] = floor(v[i]);
+			v[i] = (int)v[i];
 		} else {
-			v[i] = ceil(v[i]);
+			v[i] = (int)v[i] + 1;
 		}
 	}
 }
@@ -673,7 +673,7 @@ void Weapon_LightningFire( gentity_t *ent ) {
 	// DeFRaG df_lg_Knockback: fire an invisible splash-knockback "phantom rocket"
 	// along the beam, independent of whether the hitscan trace below connects.
 	// Confirmed from qagame.qvm disassembly — see disasm/G_ACTIVE/LG_Knockback.md.
-	if ( df_lg_knockback.integer ) {
+	if ( ent->client->ps.stats[STAT_DEFRAG_FLAGS] & DFLAG_LG_KNOCKBACK ) {
 		gentity_t *bolt;
 		vec3_t lgDir;
 

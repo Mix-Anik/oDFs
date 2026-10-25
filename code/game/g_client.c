@@ -1419,6 +1419,10 @@ void ClientSpawn(gentity_t *ent) {
 		client->ps.stats[STAT_ARMOR] = 200;
 	}
 
+	// DeFRaG ClientSpawn (0x1d576, after func_0x274b): the cvar bits of stats[12] (df_ob_KillOBs, df_hook_Type, df_lg_Knockback)
+	// are packed once per spawn; a cvar changed later takes effect with the next spawn
+	G_SetDefragFlags( &client->ps );
+
 	G_SetOrigin( ent, spawn_origin );
 	VectorCopy( spawn_origin, client->ps.origin );
 

@@ -361,7 +361,7 @@ static void CG_DF_ChsMisc( int item, char *label, char *value, const char *sep, 
 	case 215: Q_strncpyz( label, va( "h%sa spent", sep ), CHS_BUF ); Com_sprintf( value, CHS_BUF, "%i%s%i", st.healthSpent, sep, st.armorSpent ); break;
 	case 216: Q_strncpyz( label, "shots fired", CHS_BUF ); Com_sprintf( value, CHS_BUF, "%i", st.shotsFired ); break;
 	case 225: Q_strncpyz( label, "multiplayer", CHS_BUF ); Q_strncpyz( value, CG_DF_Multiplayer() ? "on" : "off", CHS_BUF ); break;		// 0x11d2ac: version >= 18100 and defrag_gametype >= 5
-	case 227: Q_strncpyz( label, "overbounces", CHS_BUF ); Q_strncpyz( value, ( ver >= 18100 && atoi( Info_ValueForKey( srv, "defrag_obs" ) ) != 0 ) ? "on" : "off", CHS_BUF ); break;		// 0x11d2b4
+	case 227: Q_strncpyz( label, "overbounces", CHS_BUF ); Q_strncpyz( value, ( ver >= 18100 && atoi( Info_ValueForKey( sys, "defrag_obs" ) ) != 0 ) ? "on" : "off", CHS_BUF ); break;		// 0x11d2b4 (defrag_obs is a SYSTEMINFO cvar, not in the serverinfo)
 	case 233: Q_strncpyz( label, "gamepath", CHS_BUF ); Q_strncpyz( value, Info_ValueForKey( sys, "fs_game" ), CHS_BUF ); break;		// 0x11d550 = fs_game
 	case 220: Q_strncpyz( label, "defrag", CHS_BUF ); Q_strncpyz( value, ( ver || Info_ValueForKey( srv, "defrag_vers" )[0] || Info_ValueForKey( srv, "defrag_version" )[0] ) ? "on" : "off", CHS_BUF ); break;		// 0x11d298: also set when the key is merely present
 	case 221:

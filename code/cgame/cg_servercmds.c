@@ -496,11 +496,8 @@ static void CG_MapRestart( void ) {
 
 	// we really should clear more parts of cg here and stop sounds
 
-	// play the "fight" sound if this is a restart without warmup
-	if ( cg.warmup == 0 /* && cgs.gametype == GT_TOURNAMENT */) {
-		trap_S_StartLocalSound( cgs.media.countFightSound, CHAN_ANNOUNCER );
-		CG_CenterPrint( "FIGHT!", 120, GIANTCHAR_WIDTH*2 );
-	}
+	// DeFRaG: no "fight" sound and no "FIGHT!" centre print after a restart. The original cgame registers sound/feedback/fight.wav
+	// (0x3c5) but nothing ever reads the handle (0x114338) and the string "FIGHT!" does not exist in it.
 #ifdef MISSIONPACK
 	if (cg_singlePlayerActive.integer) {
 		trap_Cvar_Set("ui_matchStartTime", va("%i", cg.time));

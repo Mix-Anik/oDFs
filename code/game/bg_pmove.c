@@ -1428,8 +1428,11 @@ static void PM_GroundTrace( void ) {
 
 	pm->ps->groundEntityNum = trace.entityNum;
 
-	// OBS (overbounce) kill
-	if ( (pm->obs_disabled || (pml.groundTrace.surfaceFlags & SURF_NOOB)) &&
+	// OBS (overbounce) kill. DeFRaG reads the networked ps flag (set by the server from
+	// df_ob_KillOBs, see ClientThink_real), so client prediction sees it too; pm->obs_disabled
+	// is only set on the server and is kept for compatibility.
+	if ( ((pm->ps->stats[STAT_DEFRAG_FLAGS] & DFLAG_OBS_DISABLED) || pm->obs_disabled ||
+	     (pml.groundTrace.surfaceFlags & SURF_NOOB)) &&
 	     trace.plane.normal[2] == 1.0f ) {
 		pm->ps->velocity[2] = 0;
 	}
@@ -2308,6 +2311,11 @@ void Pmove (pmove_t *pmove) {
 	int			finalTime;
 
 	finalTime = pmove->cmd.serverTime;
+
+	// DeFRaG: the physics mode is the networked PMF_PROMODE bit of the playerState (qagame writes it
+	// from df_promode every frame, func_0x2575; the original cgame's Pmove copy tests the same bit).
+	// Deriving pm->promode from it makes client prediction use the same physics as the server.
+	pmove->promode = ( pmove->ps->pm_flags & PMF_PROMODE ) != 0;
 
 	if ( finalTime < pmove->ps->commandTime ) {
 		return;	// should not happen

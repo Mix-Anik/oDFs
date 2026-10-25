@@ -62,6 +62,13 @@ void CG_BuildSolidList( void ) {
 		cent = &cg_entities[ snap->entities[ i ].number ];
 		ent = &cent->currentState;
 
+		// DeFRaG (cgame 0x270e6): an item this player has already taken (the server keeps it in the world for everyone and marks it
+		// in es->time / time2, see G_ItemSetClientBit) is not touched by the prediction: without this every frame spent on it
+		// predicts the pickup again (sound and effect over and over, with nothing given by the server)
+		if ( ent->eType == ET_ITEM && !CG_DF_ItemAvailable( ent, snap->ps.clientNum ) ) {
+			continue;
+		}
+
 		if ( ent->eType == ET_ITEM || ent->eType == ET_PUSH_TRIGGER || ent->eType == ET_TELEPORT_TRIGGER ) {
 			cg_triggerEntities[cg_numTriggerEntities] = cent;
 			cg_numTriggerEntities++;

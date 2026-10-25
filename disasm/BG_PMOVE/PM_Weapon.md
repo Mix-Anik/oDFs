@@ -106,6 +106,8 @@ No promode modification to fire delay. ✓
 
 ## Gauntlet check (0x80ec) — resolved
 
+> **CORRECTION (demo replay, PORT_STATUS entry 85):** the "always 0" conclusion below is wrong. `ClientThink_real` (`0x1a9d9..0x1aa05`) calls `CheckGauntletAttack` (`0x288b1`) when the weapon is the gauntlet, attack is down, the talk button is up and `weaponTime <= 0`, and stores the result in `pm+0x2c`; a recorded gauntlet hit fires the weapon (event, `weaponTime` 400). The port now does the same.
+
 At 0x80ec: loads `*(pm + 0x2c)` and checks `!= 0` (branch to TORSO_ATTACK2 vs WEAPON_READY+return).
 
 **Resolved via [../G_ACTIVE/func_0x1a394.md](../G_ACTIVE/func_0x1a394.md#resolved-gauntlethit-always-0):**

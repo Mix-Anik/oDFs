@@ -693,6 +693,10 @@ void ClientCommand( int clientNum );
 // g_active.c
 //
 void ClientThink( int clientNum );
+void G_SetOBSFlag( playerState_t *ps, int on );
+void G_SetGrappleMode( playerState_t *ps, int mode );
+void G_SetLGKnockback( playerState_t *ps, int on );
+void G_SetDefragFlags( playerState_t *ps );
 void ClientEndFrame( gentity_t *ent );
 void G_RunClient( gentity_t *ent );
 

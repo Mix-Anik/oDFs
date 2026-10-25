@@ -228,7 +228,7 @@ The qagame marks an item as taken for one client by setting bit <clientNum> in
 es->time (clients 0..31) / es->time2 (32..63). A set bit = NOT available.
 ==================
 */
-static qboolean CG_DF_ItemAvailable( const entityState_t *es, int clientNum ) {
+qboolean CG_DF_ItemAvailable( const entityState_t *es, int clientNum ) {
 	if ( es->eType != ET_ITEM ) {
 		return qfalse;
 	}

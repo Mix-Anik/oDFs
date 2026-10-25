@@ -2671,7 +2671,11 @@ static void CG_Draw2D(stereoFrame_t stereoFrame)
 	}
 #endif
 
-	if ( !CG_DrawFollow() ) {
+	// On a DeFRaG server the countdown of a delayed map_restart (a vote that passed runs "map_restart 3", the engine publishes the restart
+	// time as CS_WARMUP) is not drawn and its 3-2-1 sounds are not played: only the "prepare to fight" voice of CG_ParseWarmup plays.
+	// That is what the original DeFRaG does (observed in game; the original CG_DrawWarmup 0x1cb7e is the vanilla function and the qagame
+	// never sets CS_WARMUP in run mode, so the reason it stays silent there is not known, see disasm/OPEN_QUESTIONS.md).
+	if ( !CG_DrawFollow() && !( cg.warmup && CG_DF_IsDefragServer() ) ) {
 		CG_DrawWarmup();
 	}
 
