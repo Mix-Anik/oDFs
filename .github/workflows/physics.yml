@@ -21,12 +21,9 @@ jobs:
           cmake --version
           python --version
 
-      # The golden files are compressed with zlib. dfgolden has the vendored miniz (DFG_ZLIB unset) or the system zlib
-      # (DFG_ZLIB=ON, this run); the step installs zlib when the compiler on the runner does not already have it.
+      # The golden files are zlib streams: install zlib when the compiler on the runner does not already have it.
       - name: zlib
         shell: bash
-        env:
-          DFG_ZLIB: "ON"
         run: |
           if echo '#include <zlib.h>
           int main(void) { return zlibVersion()[0] == 0; }' | gcc -x c - -lz -o zlibprobe.exe; then
@@ -39,6 +36,4 @@ jobs:
 
       - name: Build and replay the golden files
         shell: bash
-        env:
-          DFG_ZLIB: "ON"
         run: bash testing/ci.sh

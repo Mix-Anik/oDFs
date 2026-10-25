@@ -31,17 +31,8 @@ for f in $E/cm_load.c $E/cm_test.c $F/cm_trace.c $F/cm_patch.c $F/cm_polylib.c $
 	EXTRA="$EXTRA $OBJ/f32_$(basename "$f" .c).o"
 done
 
-# DFG_ZLIB=1 links the system zlib instead of the vendored miniz
-ZIP="$T/third_party/miniz/miniz.c"
-LIBS="-lm"
-if [ -n "$DFG_ZLIB" ]; then
-	ZIP=""
-	DEFS="$DEFS -DDFG_USE_ZLIB"
-	LIBS="-lm -lz"
-fi
-
 gcc $FLAGS $DEFS "$HERE"/{main,golden,goldmake,goldrun,goldmain,demo,steps,gamerun,gamesteps,psdiff,cfgcompare}.c \
 	"$T"/host/{pmhost,gamehost,pmvm}.c "$T/common/enginestubs.c" \
-	$ZIP "$S/sv_world.c" \
+	"$S/sv_world.c" \
 	"$E"/{msg,huffman,huffman_static,q_shared,q_math,cm_load,cm_test,cm_trace,cm_patch,cm_polylib,md4}.c \
-	$EXTRA -o "$OUT" $LIBS
+	$EXTRA -o "$OUT" -lm -lz

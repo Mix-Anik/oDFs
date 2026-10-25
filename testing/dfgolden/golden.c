@@ -6,17 +6,7 @@
 #include <string.h>
 
 #include "golden.h"
-#ifdef DFG_USE_ZLIB
-/* system zlib instead of the vendored miniz (cmake -DDFG_ZLIB=ON): same zlib stream format, the files are interchangeable */
 #include <zlib.h>
-#define mz_ulong			uLong
-#define mz_compressBound	compressBound
-#define mz_compress2		compress2
-#define mz_uncompress		uncompress
-#define MZ_OK				Z_OK
-#else
-#include "../third_party/miniz/miniz.h"
-#endif
 
 #define GOLD_MAGIC		"DFGOLD1"
 
@@ -125,7 +115,7 @@ int Gold_Write( const golden_t *g, const char *path, char *err, int errSize ) {
 	buf_t b = { 0 };
 	const int words = (int)( sizeof( playerState_t ) / 4 );
 	int i, k;
-	mz_ulong packedLen;
+	uLong packedLen;
 	unsigned char *packed;
 	FILE *f;
 
@@ -187,9 +177,9 @@ int Gold_Write( const golden_t *g, const char *path, char *err, int errSize ) {
 		}
 	}
 
-	packedLen = mz_compressBound( (mz_ulong)b.len );
+	packedLen = compressBound( (uLong)b.len );
 	packed = (unsigned char *)malloc( packedLen );
-	if ( mz_compress2( packed, &packedLen, b.data, (mz_ulong)b.len, 9 ) != MZ_OK ) {
+	if ( compress2( packed, &packedLen, b.data, (uLong)b.len, 9 ) != Z_OK ) {
 		Com_sprintf( err, errSize, "compression failed" );
 		free( packed );
 		free( b.data );
@@ -226,7 +216,7 @@ int Gold_Read( golden_t *g, const char *path, char *err, int errSize ) {
 	unsigned char head[20], *packed = NULL, *raw = NULL;
 	long fileLen;
 	unsigned int rawLen, packedLen;
-	mz_ulong outLen;
+	uLong outLen;
 	rd_t r;
 	int i, k, words;
 
@@ -262,7 +252,7 @@ int Gold_Read( golden_t *g, const char *path, char *err, int errSize ) {
 	}
 	fclose( f );
 	outLen = rawLen;
-	if ( mz_uncompress( raw, &outLen, packed, packedLen ) != MZ_OK || outLen != rawLen ) {
+	if ( uncompress( raw, &outLen, packed, packedLen ) != Z_OK || outLen != rawLen ) {
 		Com_sprintf( err, errSize, "%s is damaged (data)", path );
 		free( packed );
 		free( raw );

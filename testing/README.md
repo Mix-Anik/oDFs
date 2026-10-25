@@ -30,7 +30,7 @@ testing/ci.sh                  # builds qagame.qvm, the helper QVM and dfgolden,
 ```
 
 The CI (`.github/workflows/physics.yml`, Windows) runs exactly this. It needs the tools in `bin/` (the project's Q3VM
-compiler), cmake, gcc and python. Output per file:
+compiler), cmake, gcc (with zlib, which the CI installs when the runner lacks it) and python. Output per file:
 
 ```
 dfwc2019-7[df.cpm]00.34.736(WIZ.Wizland).dm_68  steps=5464 exact=5440 (99.56%) known=24 NEW=0 fixed=0 race=4342/4342 finish 0:34.736/0:34.736
@@ -83,7 +83,7 @@ testing/
   host/           headless host: QVM interpreter (pmvm.c), Pmove host (pmhost.c), game host with the syscalls (gamehost.c)
   pmove_qvm/      helper QVM with bg_pmove.c only (input search)
   offsets_qvm/    helper QVM that reports field offsets of the compiled game (health, decay clock)
-  third_party/    engine (vendored collision + message code), engine_shim (sv_world.c), miniz
+  third_party/    engine (vendored collision + message code), engine_shim (sv_world.c)
   golden/         committed golden files
   out/            local scratch (ignored by git)
   ci.sh           what the CI runs
