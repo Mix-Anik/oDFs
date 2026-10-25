@@ -193,6 +193,10 @@ void CG_ImpactMark( qhandle_t markShader, const vec3_t origin, const vec3_t dir,
 			vec3_t		delta;
 
 			VectorCopy( markPoints[mf->firstPoint + j], v->xyz );
+			// lift the decal off the surface: a coplanar poly depends entirely on the renderer's
+			// polygonOffset (client cvar, cheat protected, weak when looking straight at the surface)
+			// and z-fights with the wall
+			VectorMA( v->xyz, cg_markOffset.value, axis[0], v->xyz );
 
 			VectorSubtract( v->xyz, origin, delta );
 			v->st[0] = 0.5 + DotProduct( delta, axis[1] ) * texCoordScale;

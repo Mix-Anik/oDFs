@@ -143,6 +143,7 @@ vmCvar_t	cg_noPlayerAnims;
 vmCvar_t	cg_showmiss;
 vmCvar_t	cg_footsteps;
 vmCvar_t	cg_addMarks;
+vmCvar_t	cg_markOffset;
 vmCvar_t	cg_brassTime;
 vmCvar_t	cg_viewsize;
 vmCvar_t	cg_drawGun;
@@ -411,6 +412,7 @@ static cvarTable_t cvarTable[] = {
 	{ &cg_brassTime, "cg_brassTime", "2500", CVAR_ARCHIVE },
 	{ &cg_simpleItems, "cg_simpleItems", "0", CVAR_ARCHIVE },
 	{ &cg_addMarks, "cg_marks", "1", CVAR_ARCHIVE },
+	{ &cg_markOffset, "cg_markOffset", "1", CVAR_ARCHIVE },	// units decals are lifted off the surface (0 = coplanar, relies on the renderer's polygonOffset)
 	{ &cg_lagometer, "cg_lagometer", "1", CVAR_ARCHIVE },
 	{ &cg_lagometer_x, "cg_lagometer_x", "1", CVAR_ARCHIVE },
 	{ &cg_lagometer_y, "cg_lagometer_y", "1", CVAR_ARCHIVE },
