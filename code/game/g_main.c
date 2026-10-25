@@ -2010,55 +2010,6 @@ void G_RunThink (gentity_t *ent) {
 
 /*
 ================
-G_MonitorDoorStates
-
-Prints door states in binary format (0=closed, 1=open)
-Order: func_door2, func_door12, func_door14, func_door16, func_door34, func_door28, func_door30, func_door32
-================
-*/
-void G_MonitorDoorStates( void ) {
-	static int prevState = -1;
-	int doorNumbers[] = {2, 12, 14, 16, 34, 28, 30, 32};
-	char doorNames[9][16];
-	int i, j, currentState = 0;
-	gentity_t *ent;
-	char buffer[16] = "";
-
-	for (i = 0; i < 8; i++) {
-		Com_sprintf(doorNames[i], sizeof(doorNames[i]), "func_door%d", doorNumbers[i]);
-	}
-
-	for (i = 0; i < level.num_entities; i++) {
-		ent = &g_entities[i];
-
-		if (!ent->inuse || !ent->classname)
-			continue;
-
-		if (Q_stricmp(ent->classname, "func_door") != 0)
-			continue;
-
-		for (j = 0; j < 8; j++) {
-			if (ent->targetname && Q_stricmp(ent->targetname, doorNames[j]) == 0) {
-				if (ent->moverState == MOVER_POS2 || ent->moverState == MOVER_1TO2) {
-					currentState |= (1 << j);
-				}
-				break;
-			}
-		}
-	}
-
-	if (currentState != prevState) {
-		for (i = 7; i >= 0; i--) {
-			buffer[7 - i] = (currentState & (1 << i)) ? '1' : '0';
-		}
-		buffer[8] = '\0';
-		G_Printf("^3[DOORS]^7 %s\n", buffer);
-		prevState = currentState;
-	}
-}
-
-/*
-================
 G_RunFrame
 
 Advances the non-player objects in the world
@@ -2196,6 +2147,4 @@ void G_RunFrame( int levelTime ) {
 		}
 		trap_Cvar_Set("g_listEntity", "0");
 	}
-
-	G_MonitorDoorStates();
 }

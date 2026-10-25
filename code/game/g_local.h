@@ -30,7 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // the "gameversion" client command will print this plus compile date
 #define	GAMEVERSION		"defrag-5"
-#define	ODFS_VERSION	"0.1.0"
+#define	ODFS_VERSION	DF_VERSION_STRING		// the df_version serverinfo cvar, see qcommon/df_version.h
 
 #define BODY_QUEUE_SIZE		8
 

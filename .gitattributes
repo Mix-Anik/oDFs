@@ -1,2 +1,5 @@
 # golden files are binary: never convert line endings
 *.dfg binary
+
+# shell scripts run on Linux and in bash: always LF
+*.sh text eol=lf
