@@ -19,6 +19,7 @@ case "$(uname -s)" in
 		fi ;;
 esac
 
+T0=$SECONDS
 echo "== game QVM"
 cmake -S "$ROOT" -B "$OUT/qvm" "${GEN[@]}" -DBUILD_QVM=ON $CMAKE_EXTRA_ARGS > "$OUT/qvm-configure.log"
 cmake --build "$OUT/qvm" --target qagame
@@ -27,11 +28,14 @@ echo "== offsets helper QVM"
 bash "$HERE/offsets_qvm/build.sh" "$OUT/offsets"
 
 echo "== dfgolden"
-cmake -S "$HERE" -B "$OUT/dfgolden" "${GEN[@]}" -DCMAKE_BUILD_TYPE=Release $CMAKE_EXTRA_ARGS > "$OUT/dfgolden-configure.log"
+cmake -S "$HERE" -B "$OUT/dfgolden" "${GEN[@]}" -DCMAKE_BUILD_TYPE=Release ${DFG_ZLIB:+-DDFG_ZLIB=$DFG_ZLIB} $CMAKE_EXTRA_ARGS > "$OUT/dfgolden-configure.log"
 cmake --build "$OUT/dfgolden"
 
 EXE="$OUT/dfgolden/dfgolden"
 [ -x "$EXE" ] || EXE="$EXE.exe"
 
+echo "== build took $(( SECONDS - T0 )) s${DFG_ZLIB:+ (system zlib)}"
+T0=$SECONDS
 echo "== golden files"
 "$EXE" test --game "$OUT/qvm/vm/qagame.qvm" --offsets "$OUT/offsets/offsets.qvm" "$HERE/golden"
+echo "== replay took $(( SECONDS - T0 )) s${DFG_ZLIB:+ (system zlib)}"

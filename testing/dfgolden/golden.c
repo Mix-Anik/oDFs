@@ -6,7 +6,17 @@
 #include <string.h>
 
 #include "golden.h"
+#ifdef DFG_USE_ZLIB
+/* system zlib instead of the vendored miniz (cmake -DDFG_ZLIB=ON): same zlib stream format, the files are interchangeable */
+#include <zlib.h>
+#define mz_ulong			uLong
+#define mz_compressBound	compressBound
+#define mz_compress2		compress2
+#define mz_uncompress		uncompress
+#define MZ_OK				Z_OK
+#else
 #include "../third_party/miniz/miniz.h"
+#endif
 
 #define GOLD_MAGIC		"DFGOLD1"
 

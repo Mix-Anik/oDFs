@@ -12,7 +12,7 @@ jobs:
   golden:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Tools
         shell: bash
@@ -21,6 +21,24 @@ jobs:
           cmake --version
           python --version
 
+      # The golden files are compressed with zlib. dfgolden has the vendored miniz (DFG_ZLIB unset) or the system zlib
+      # (DFG_ZLIB=ON, this run); the step installs zlib when the compiler on the runner does not already have it.
+      - name: zlib
+        shell: bash
+        env:
+          DFG_ZLIB: "ON"
+        run: |
+          if echo '#include <zlib.h>
+          int main(void) { return zlibVersion()[0] == 0; }' | gcc -x c - -lz -o zlibprobe.exe; then
+            echo "zlib is available to gcc"
+          else
+            echo "installing zlib (msys2)"
+            /c/msys64/usr/bin/pacman -S --noconfirm --needed mingw-w64-x86_64-zlib
+            echo "CMAKE_EXTRA_ARGS=-DZLIB_ROOT=C:/msys64/mingw64" >> "$GITHUB_ENV"
+          fi
+
       - name: Build and replay the golden files
         shell: bash
+        env:
+          DFG_ZLIB: "ON"
         run: bash testing/ci.sh

@@ -45,6 +45,19 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86|X86|AMD64|amd64|i[3-6]86")
 	set(COLL_DEFS DFG_HAVE_X87)
 endif()
 
+# golden file compression: the vendored miniz (default) or the system zlib; both read and write the same format
+option(DFG_ZLIB "Use the system zlib instead of the vendored miniz" OFF)
+if(DFG_ZLIB)
+	if(MINGW)
+		set(ZLIB_USE_STATIC_LIBS ON)
+	endif()
+	find_package(ZLIB)
+	set(ZIP_SOURCES "")
+	set(COLL_DEFS ${COLL_DEFS} DFG_USE_ZLIB)
+else()
+	set(ZIP_SOURCES third_party/miniz/miniz.c)
+endif()
+
 add_executable(dfgolden
 	dfgolden/main.c
 	dfgolden/golden.c
@@ -62,7 +75,6 @@ add_executable(dfgolden
 	host/pmvm.c
 	common/enginestubs.c
 	third_party/engine_shim/sv_world.c
-	third_party/miniz/miniz.c
 	${ENGINE}/msg.c
 	${ENGINE}/huffman.c
 	${ENGINE}/huffman_static.c
@@ -74,6 +86,7 @@ add_executable(dfgolden
 	${ENGINE}/cm_patch.c
 	${ENGINE}/cm_polylib.c
 	${ENGINE}/md4.c
+	${ZIP_SOURCES}
 	${COLL_OBJECTS}
 )
 # the shim's server.h has to win over any other file of that name
@@ -85,3 +98,11 @@ target_compile_definitions(dfgolden PRIVATE DEDICATED ${COLL_DEFS})
 # the tests compare floats bit for bit: never let the compiler fuse operations
 target_compile_options(dfgolden PRIVATE -O2 -Wall -Wno-unused-function -ffp-contract=off)
 target_link_libraries(dfgolden m)
+if(DFG_ZLIB)
+	if(ZLIB_FOUND)
+		target_link_libraries(dfgolden ZLIB::ZLIB)
+	else()
+		# a compiler that ships zlib in its own prefix; static, so the exe needs no dll next to it
+		target_link_libraries(dfgolden -l:libz.a)
+	endif()
+endif()
