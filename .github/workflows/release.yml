@@ -1,0 +1,96 @@
+name: release
+
+# Manual run (Actions tab -> release -> Run workflow): builds qagame / cgame / ui as QVMs from the selected commit, packs them into
+# zzz-defrag_vm.pk3 and publishes a GitHub release with the pk3 (and its SHA-256) attached. It does not run the golden test: check that
+# the "physics" workflow succeeded for the commit before releasing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (empty: v<version> from code/qcommon/df_version.h)"
+        required: false
+        default: ""
+      prerelease:
+        description: "Mark as pre-release"
+        type: boolean
+        default: false
+      notes:
+        description: "Release notes (added above the generated install notes)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Version and tag
+        id: ver
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          H=code/qcommon/df_version.h
+          MAJOR=$(sed -n 's/^#define DF_VERSION_MAJOR[[:space:]]*\([0-9]*\).*/\1/p' $H | tr -d '\r')
+          MINOR=$(sed -n 's/^#define DF_VERSION_MINOR[[:space:]]*\([0-9]*\).*/\1/p' $H | tr -d '\r')
+          PATCH=$(sed -n 's/^#define DF_VERSION_PATCH[[:space:]]*\([0-9]*\).*/\1/p' $H | tr -d '\r')
+          if [ -z "$MAJOR" ] || [ -z "$MINOR" ] || [ -z "$PATCH" ]; then
+            echo "::error::cannot read the version from $H"
+            exit 1
+          fi
+          VERSION="$MAJOR.$MINOR.$PATCH"
+          TAG="${INPUT_TAG:-v$VERSION}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "DeFRaG $VERSION, tag $TAG"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "::error::release $TAG already exists: delete it or give another tag"
+            exit 1
+          fi
+
+      # the QVM tools (q3lcc, q3asm) in bin/ are Windows executables; the Visual Studio generator is the default on the runner,
+      # the tools want a Makefiles build with gcc (same as testing/ci.sh)
+      - name: Build the QVMs
+        shell: bash
+        run: |
+          cmake -S . -B build-release -G "MinGW Makefiles" -DBUILD_QVM=ON
+          cmake --build build-release
+
+      - name: Pack
+        shell: bash
+        run: |
+          mkdir -p dist
+          python scripts/create_pk3.py build-release/vm dist/zzz-defrag_vm.pk3
+          for m in qagame cgame ui; do
+            [ -f "build-release/vm/$m.qvm" ] || { echo "::error::$m.qvm was not built"; exit 1; }
+          done
+          (cd dist && sha256sum zzz-defrag_vm.pk3 > zzz-defrag_vm.pk3.sha256 && cat zzz-defrag_vm.pk3.sha256)
+
+      - name: Create the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          NOTES: ${{ inputs.notes }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          SHA=$(cut -d' ' -f1 dist/zzz-defrag_vm.pk3.sha256)
+          {
+            [ -n "$NOTES" ] && printf '%s\n\n' "$NOTES"
+            echo "DeFRaG $VERSION, commit ${GITHUB_SHA::8}."
+            echo
+            echo "Put \`zzz-defrag_vm.pk3\` into the \`defrag\` folder of the server and of every client (remove older \`zz*-defrag_vm*.pk3\` files)."
+            echo
+            echo "SHA-256: \`$SHA\`"
+          } > notes.md
+          FLAGS=""
+          [ "$PRERELEASE" = "true" ] && FLAGS="--prerelease"
+          gh release create "$TAG" dist/zzz-defrag_vm.pk3 dist/zzz-defrag_vm.pk3.sha256 \
+            --target "$GITHUB_SHA" --title "oDFs $VERSION" --notes-file notes.md $FLAGS

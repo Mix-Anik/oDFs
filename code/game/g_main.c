@@ -216,8 +216,8 @@ static cvarTable_t		gameCvarTable[] = {
 
 	// oDFs cvars
 	{ NULL,        		"df_version",    	ODFS_VERSION,	CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
-	// DeFRaG cgame parses atoi(defrag_vers) (cgame 0x3c33) and below 18100 uses a legacy time-decoding path -> must be numeric, DeFRaG itself publishes 19131 (=1.91.31)
-	{ NULL, 			"defrag_vers",     	"19131",	CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
+	// DeFRaG cgame parses atoi(defrag_vers) (cgame 0x3c33) and below 18100 uses a legacy time-decoding path -> must be numeric, DeFRaG 1.91.31 published 19131; this project publishes its own version (qcommon/df_version.h)
+	{ NULL, 			"defrag_vers",     	DF_VERSION_NUMBER_STRING,	CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
 	{ &df_promode,    	"df_promode",    	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_ob_killobs, 	"df_ob_KillOBs", 	"0",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &df_mode,       	"df_mode",       	"1",			CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },

@@ -730,7 +730,7 @@ qboolean CG_DF_DrawScoreboard( void ) {
 			atoi( CG_DF_Serverinfo( "df_promode" ) ) ? "cpm" : "vq3" );
 		CG_DrawStringExt( 472, 456, DSB_Pad( buf, 28 ), dsbWhite, qtrue, qfalse, 6, 8, 28 );
 		CG_DrawStringExt( 520, 464, DSB_Pad( va( "sv:%i.%02i.%02i", ver / 10000, ( ver / 100 ) % 100, ver % 100 ), 20 ), dsbWhite, qtrue, qfalse, 6, 8, 20 );
-		CG_DrawStringExt( 520, 472, DSB_Pad( "cl:1.91.31", 20 ), dsbWhite, qtrue, qfalse, 6, 8, 20 );
+		CG_DrawStringExt( 520, 472, DSB_Pad( "cl:" DF_VERSION_STRING, 20 ), dsbWhite, qtrue, qfalse, 6, 8, 20 );
 	}
 	return qtrue;
 }

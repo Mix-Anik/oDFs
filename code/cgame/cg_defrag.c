@@ -49,7 +49,7 @@ static qboolean CG_DF_DecodeCore( unsigned int e, unsigned int t, float originX,
 		( (byte *)&e )[i + 1] ^= ( (byte *)&e )[i];
 	}
 	x = t << 2;
-	x += ( (unsigned int)mapSalt + 19131u ) << 8;
+	x += ( (unsigned int)mapSalt + DF_PROTOCOL_SALT ) << 8;
 	x ^= t << 24;
 	e ^= x;
 	r = e >> 28;
@@ -1438,7 +1438,7 @@ void CG_DF_ModSupportSnapshot( void ) {
 
 // ---- cgame init cvar sequence (cgame 0x3985, called from CG_Init after the glconfig) ----
 // defrag_demoPlayback = cg.demoPlayback ("1"/"0"; read by the DeFRaG ui, 0x1a92), df_name defaults to the player's name,
-// defrag_version_server = parsed server defrag_vers as "%i.%02i.%02i" (0x3c33 result), defrag_version_client = "1.91.31".
+// defrag_version_server = parsed server defrag_vers as "%i.%02i.%02i" (0x3c33 result), defrag_version_client = DF_VERSION_STRING.
 // (cg.demoPlayback is still 0 at this point of CG_Init - DeFRaG writes the cvar only here too.) The shader registrations of 0x3985
 // (sprites/notAvailable, gfx/unavailableItem, df_gfx/scoreboard/*) belong to the features that use them.
 void CG_DF_InitCvars( void ) {
@@ -1458,7 +1458,7 @@ void CG_DF_InitCvars( void ) {
 		v *= 100;
 	}
 	trap_Cvar_Set( "defrag_version_server", va( "%i.%02i.%02i", v / 10000, ( v / 100 ) % 100, v % 100 ) );
-	trap_Cvar_Set( "defrag_version_client", va( "%i.%02i.%02i", 1, 91, 31 ) );
+	trap_Cvar_Set( "defrag_version_client", DF_VERSION_STRING );
 }
 
 void CG_DF_DemoValidation( int ms ) {
@@ -1526,7 +1526,7 @@ void CG_DF_AuthBspCrc( int serverCrc ) {		// 0x3d84: auth_request <token> <sv_ma
 }
 
 void CG_DF_AuthRequest( int token ) {
-	int h = CG_DF_AuthHash( token, va( "%i.%02i.%02i", 1, 91, 31 ) );
+	int h = CG_DF_AuthHash( token, DF_PROTOCOL_VERSION_STRING );
 
 	if ( h ) {
 		trap_SendClientCommand( va( "auth_reply %i%i", h, rand() % 10 ) );

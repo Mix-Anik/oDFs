@@ -1,6 +1,6 @@
 .PHONY: qvm dll clean help
 
-QVM_PK3 := zz-defrag_vm_191_custom.pk3
+QVM_PK3 := zzz-defrag_vm.pk3
 
 help:
 	@echo "Available targets:"

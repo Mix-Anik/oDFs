@@ -157,7 +157,7 @@ static void G_RaceFinished( gentity_t *ent ) {
 			G_LogPrintf( "ClientTimerStop: %i %i \"%s\" \"%s\" %i %i %i %i %i %i %s\n", clientNum,
 			             level.time - t->startTime, mapname, ent->client->pers.netname,
 			             g_dfMode, df_promode.integer, g_dfSubMode, df_mp_InterferenceOff.integer,
-			             df_ob_killobs.integer == 0, 19131,
+			             df_ob_killobs.integer == 0, DF_VERSION_NUMBER,
 			             va( "%04i-%02d-%02d", qt.tm_year + 1900, qt.tm_mon + 1, qt.tm_mday ) );
 		}
 	} else {
@@ -176,10 +176,10 @@ static void G_RaceFinished( gentity_t *ent ) {
 		}
 		trap_Cvar_VariableStringBuffer( "defrag_route", route, sizeof( route ) );
 		if ( route[0] ) {
-			trap_SendServerCommand( clientNum, va( "print \"Time performed by ^2%s^7 on route ^2%s^7 : ^3%s^7 (v1.91.31 beta) (est. %s)\n\"",
+			trap_SendServerCommand( clientNum, va( "print \"Time performed by ^2%s^7 on route ^2%s^7 : ^3%s^7 (v" DF_VERSION_STRING DF_VERSION_TAG ") (est. %s)\n\"",
 			                                ent->client->demoName, route, timeBuf, estBuf ) );		// client+0x268: the sanitised df_name, not the netname
 		} else {
-			trap_SendServerCommand( clientNum, va( "print \"Time performed by ^2%s^7 : ^3%s^7 (v1.91.31 beta) (est. %s)\n\"",
+			trap_SendServerCommand( clientNum, va( "print \"Time performed by ^2%s^7 : ^3%s^7 (v" DF_VERSION_STRING DF_VERSION_TAG ") (est. %s)\n\"",
 			                                ent->client->demoName, timeBuf, estBuf ) );
 		}
 	}
@@ -293,7 +293,7 @@ static void G_AuthReply( const char *reply, int clientNum ) {
 	if ( !rec->deadline ) {
 		return;
 	}
-	expected = G_AuthHash( rec->token, va( "%i.%02i.%02i", 1, 91, 31 ) );
+	expected = G_AuthHash( rec->token, DF_PROTOCOL_VERSION_STRING );
 	if ( expected == 0 || atoi( reply ) != expected ) {
 		trap_DropClient( clientNum, "dropped: Authentication failed\n" );
 	}
@@ -579,7 +579,7 @@ static int G_EncodeRaceTime( int ms, gclient_t *cl ) {
 	e |= r << 28;
 
 	x = (unsigned int)level.time << 2;
-	x += ( (unsigned int)mapSalt + 19131u ) << 8;
+	x += ( (unsigned int)mapSalt + DF_PROTOCOL_SALT ) << 8;
 	x ^= (unsigned int)level.time << 24;
 	e ^= x;
 

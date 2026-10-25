@@ -181,7 +181,7 @@ static void Main_MenuDraw( void ) {
 	else
 	{
 		// standard menu drawing, version text bottom right
-		UI_DrawString( 640, 460, va( "%s%s", va( "%i.%02i.%02i", 1, 91, 31 ), " (beta)" ), UI_RIGHT|UI_SMALLFONT, uiDfColorBig );
+		UI_DrawString( 640, 460, DF_VERSION_STRING DF_VERSION_TAG, UI_RIGHT|UI_SMALLFONT, uiDfColorBig );
 		Menu_Draw( &s_main.menu );
 	}
 }

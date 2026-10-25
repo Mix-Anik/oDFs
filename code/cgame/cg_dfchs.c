@@ -1740,7 +1740,7 @@ void CG_DF_Help_f( void ) {
 	CG_Printf( "\n" );
 	CG_Printf( "^2*** Note: you may substitute ^3help ^2with ^3?\n" );
 	CG_Printf( "\n" );
-	CG_Printf( "^1Defrag ^1for Quake3 ^1v%s\n", va( "%i.%02i.%02i", 1, 91, 31 ) );
+	CG_Printf( "^1Defrag ^1for Quake3 ^1v%s\n", DF_VERSION_STRING );
 	CG_Printf( "^1http://www.planetquake.com/defrag\n" );
 	CG_Printf( "\n" );
 }
