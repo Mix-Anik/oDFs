@@ -21,6 +21,7 @@ vmCvar_t	df_ui_PulseColor;
 vmCvar_t	df_ui_ListbarColor;
 vmCvar_t	df_ui_StatusColor;
 vmCvar_t	df_ui_CursorColor;
+vmCvar_t	df_ui_mouseSpeed;
 
 typedef struct {
 	vmCvar_t	*vmCvar;
@@ -48,6 +49,7 @@ static uiDfCvar_t uiDfCvarTable[] = {
 	{ &df_ui_ListbarColor, "df_ui_ListbarColor", "1.00 0.00 0.00 0.30", CVAR_ARCHIVE },
 	{ &df_ui_StatusColor, "df_ui_StatusColor", "1.00 1.00 1.00 1.00", CVAR_ARCHIVE },
 	{ &df_ui_CursorColor, "df_ui_CursorColor", "0.50 0.80 1.00 1.00", CVAR_ARCHIVE },
+	{ &df_ui_mouseSpeed, "df_ui_mouseSpeed", "1", CVAR_ARCHIVE },	// oDFs: menu cursor speed, 1 = one pixel per mouse count (UI_MouseEvent)
 };
 
 static int uiDfCvarTableSize = ARRAY_LEN( uiDfCvarTable );
@@ -481,9 +483,9 @@ qboolean UI_DF_DrawCursor( void ) {			// 0x807
 	} else {
 		UI_SetColor( color );
 	}
-	UI_DrawHandlePic( uis.cursorx - 16, uis.cursory - 16, 32, 32, uiDfCursorBack );
+	UI_DrawHandlePic( uis.cursorx + uis.cursorFracX - 16, uis.cursory + uis.cursorFracY - 16, 32, 32, uiDfCursorBack );
 	UI_SetColor( color );
-	UI_DrawHandlePic( uis.cursorx - 16, uis.cursory - 16, 32, 32, uiDfCursorFront );
+	UI_DrawHandlePic( uis.cursorx + uis.cursorFracX - 16, uis.cursory + uis.cursorFracY - 16, 32, 32, uiDfCursorFront );
 	UI_SetColor( NULL );
 	return qtrue;
 }

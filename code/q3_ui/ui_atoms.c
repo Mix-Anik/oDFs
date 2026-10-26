@@ -871,6 +871,8 @@ void UI_MouseEvent( int dx, int dy )
 {
 	int				i;
 	int				bias;
+	int				ix, iy;
+	float			fx, fy, speed, xs, ys;
 	menucommon_s*	m;
 
 	if (!uis.activemenu)
@@ -879,18 +881,35 @@ void UI_MouseEvent( int dx, int dy )
 	// convert X bias to 640 coords
 	bias = uis.bias / uis.xscale;
 
-	// update mouse screen position
-	uis.cursorx += dx;
-	if (uis.cursorx < -bias)
-		uis.cursorx = -bias;
-	else if (uis.cursorx > SCREEN_WIDTH+bias)
-		uis.cursorx = SCREEN_WIDTH+bias;
+	// update mouse screen position.  oDFs: the 640x480 menu space is scaled up to the screen (3 pixels per unit at
+	// 1440p), which made the cursor several times faster than the desktop one and move in steps.  A mouse count now moves
+	// the cursor one screen pixel (times df_ui_mouseSpeed), the part below one menu unit is kept in cursorFrac and used
+	// when drawing; the menus still test against the whole units
+	speed = df_ui_mouseSpeed.value > 0 ? df_ui_mouseSpeed.value : 1.0f;
+	xs = uis.xscale > 0 ? uis.xscale : 1.0f;
+	ys = uis.yscale > 0 ? uis.yscale : 1.0f;
 
-	uis.cursory += dy;
-	if (uis.cursory < 0)
-		uis.cursory = 0;
-	else if (uis.cursory > SCREEN_HEIGHT)
-		uis.cursory = SCREEN_HEIGHT;
+	fx = uis.cursorx + uis.cursorFracX + dx * speed / xs;
+	if (fx < -bias)
+		fx = -bias;
+	else if (fx > SCREEN_WIDTH+bias)
+		fx = SCREEN_WIDTH+bias;
+	ix = (int)fx;
+	if (fx < ix)
+		ix--;
+	uis.cursorx = ix;
+	uis.cursorFracX = fx - ix;
+
+	fy = uis.cursory + uis.cursorFracY + dy * speed / ys;
+	if (fy < 0)
+		fy = 0;
+	else if (fy > SCREEN_HEIGHT)
+		fy = SCREEN_HEIGHT;
+	iy = (int)fy;
+	if (fy < iy)
+		iy--;
+	uis.cursory = iy;
+	uis.cursorFracY = fy - iy;
 
 	// region test the active menu items
 	for (i=0; i<uis.activemenu->nitems; i++)
@@ -1250,7 +1269,7 @@ void UI_Refresh( int realtime )
 		// DeFRaG menus can hide the cursor (menu flag +544)
 	} else if ( !UI_DF_DrawCursor() ) {
 		UI_SetColor( NULL );
-		UI_DrawHandlePic( uis.cursorx-16, uis.cursory-16, 32, 32, uis.cursor);
+		UI_DrawHandlePic( uis.cursorx + uis.cursorFracX - 16, uis.cursory + uis.cursorFracY - 16, 32, 32, uis.cursor);
 	}
 
 #ifndef NDEBUG

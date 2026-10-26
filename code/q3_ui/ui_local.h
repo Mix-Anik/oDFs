@@ -547,6 +547,8 @@ typedef struct {
 	int					realtime;
 	int					cursorx;
 	int					cursory;
+	float				cursorFracX;		// oDFs: the cursor is at cursorx + cursorFracX (0 <= frac < 1): the whole part is what the menus test against
+	float				cursorFracY;
 	int					menusp;
 	menuframework_s*	activemenu;
 	menuframework_s*	stack[MAX_MENUDEPTH];
@@ -568,6 +570,8 @@ typedef struct {
 	qboolean			demoversion;
 	qboolean			firstdraw;
 } uiStatic_t;
+
+extern vmCvar_t		df_ui_mouseSpeed;
 
 extern void			UI_Init( void );
 extern void			UI_Shutdown( void );

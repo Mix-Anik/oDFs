@@ -10,3 +10,6 @@ Opensource DeFRaG server runtime
 - Persistent index file (`df_demos_index.dat`), new demos merged in, F5 rescans
 - Scrollbar instead of arrow buttons
 - Redesigned layout, useless settings removed
+
+### Menus
+- Smooth menu mouse cursor: one pixel per mouse count (`df_ui_mouseSpeed` to adjust)
