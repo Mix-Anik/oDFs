@@ -1,2 +1,12 @@
 # oDFs
 Opensource DeFRaG server runtime
+
+## New features
+
+### Demo browser
+- Search autocomplete: dropdown + Tab completion, Up/Down/Enter, click
+- Search: case-insensitive "contains", globs (`*`, `?`, `**/`), sub folders
+- Blazingly fast searching among tens of thousands of demos
+- Persistent index file (`df_demos_index.dat`), new demos merged in, F5 rescans
+- Scrollbar instead of arrow buttons
+- Redesigned layout, useless settings removed

@@ -808,6 +808,7 @@ void UI_SetActiveMenu( uiMenuCommand_t menu ) {
 		// DeFRaG 0xcadd: a queued demo (dmq_play) is started before the main menu is shown
 		if ( !UI_DF_DemoQueueNext() ) {
 			UI_MainMenu();
+			UI_DemosReturnAfterPlayback();		// oDFs: a demo started from the demo browser returns to it
 		}
 		return;
 	case UIMENU_NEED_CD:
@@ -1019,6 +1020,12 @@ qboolean UI_ConsoleCommand( int realTime ) {
 
 	if ( Q_stricmp (cmd, "ui_cache") == 0 ) {
 		UI_Cache_f();
+		return qtrue;
+	}
+
+	// oDFs: opens the demo browser (the same menu as the main menu button)
+	if ( Q_stricmp (cmd, "ui_demos") == 0 ) {
+		UI_DemosMenu();
 		return qtrue;
 	}
 

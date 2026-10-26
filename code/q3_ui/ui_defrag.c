@@ -6,6 +6,9 @@
 vmCvar_t	df_demos_UICompatibility;
 vmCvar_t	df_demos_CurrentPath;
 vmCvar_t	df_demos_CurrentListVars;
+vmCvar_t	df_demos_Search;
+vmCvar_t	df_demos_ReturnToBrowser;
+vmCvar_t	df_demos_indexMaxAge;
 vmCvar_t	df_ui_CustomMenu;
 vmCvar_t	df_ui_DisplayCVarName;
 vmCvar_t	df_ui_TextColorLabel;
@@ -30,6 +33,9 @@ static uiDfCvar_t uiDfCvarTable[] = {
 	{ &df_demos_UICompatibility, "df_demos_UICompatibility", "1", CVAR_ARCHIVE },
 	{ &df_demos_CurrentPath, "df_demos_CurrentPath", "", CVAR_TEMP },
 	{ &df_demos_CurrentListVars, "df_demos_CurrentListVars", "0 0", CVAR_TEMP },
+	{ &df_demos_Search, "df_demos_Search", "", CVAR_TEMP },		// oDFs: demo browser search text, kept while a demo plays
+	{ &df_demos_ReturnToBrowser, "df_demos_ReturnToBrowser", "", CVAR_TEMP },	// oDFs: name of the demo the browser started (UI_DemosReturnAfterPlayback)
+	{ &df_demos_indexMaxAge, "df_demos_indexMaxAge", "24", CVAR_ARCHIVE },	// oDFs: hours a demo index file is trusted before a rescan (0 = always scan)
 	{ &df_ui_CustomMenu, "df_ui_CustomMenu", "2", CVAR_ARCHIVE },
 	{ &df_ui_DisplayCVarName, "df_ui_DisplayCVarName", "1", CVAR_ARCHIVE },
 	{ &df_ui_TextColorLabel, "df_ui_TextColorLabel", "1.00 1.00 0.00 1.00", CVAR_ARCHIVE },

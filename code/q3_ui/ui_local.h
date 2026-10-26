@@ -372,6 +372,7 @@ extern void Controls_Cache( void );
 // ui_demo2.c
 //
 extern void UI_DemosMenu( void );
+extern qboolean UI_DemosReturnAfterPlayback( void );
 extern void Demos_Cache( void );
 
 //
@@ -638,6 +639,7 @@ void UI_SPSkillMenu_Cache( void );
 void			trap_Print( const char *string );
 void			trap_Error( const char *string ) Q_NO_RETURN;
 int				trap_Milliseconds( void );
+int				trap_RealTime( qtime_t *qtime );
 void			trap_Cvar_Register( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, int flags );
 void			trap_Cvar_Update( vmCvar_t *vmCvar );
 void			trap_Cvar_Set( const char *var_name, const char *value );
