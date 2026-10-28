@@ -76,3 +76,20 @@ systemctl --user stop odfs@cpm            stop
 ```
 
 Open the three UDP ports in the firewall (needs root, once). Use `rcon` from the game to give commands to a running server.
+
+## 6. Online records (optional)
+
+A server can save the finished runs of logged-in players to a records API. It needs an oDFe with plugin support, the `records` plugin
+and an API (oDF-api) with this server registered on it. Do this for each server:
+
+1. On the API, register the server with the address(es) players reach it at, and create its key (shown once):
+   `odfctl server add cpm 1.2.3.4:27960` and `odfctl apikey create cpm`.
+2. Put the plugin in the server's own home: `homes/cpm/plugins/records.so` (`records.dll` on Windows).
+3. Copy [autoexec.cfg.example](autoexec.cfg.example) to `homes/cpm/defrag/autoexec.cfg` and put the server's key in it. The file must
+   be called `autoexec.cfg` and must not be `cpm.cfg`: the plugin starts before `cpm.cfg` is loaded. It holds a secret, so keep it
+   private (`chmod 600`) and out of git.
+4. Restart the server. The log shows `Plugin 'records' ... loaded` and `saving records to ...`; `plugins` in the server console
+   lists it and, if it did not start, says why.
+
+Players log in with their key (`login` / `logout` in the game; the key is created on first use, `auth_key` shows the public key to
+register on the records website). Players who are not logged in are not saved.

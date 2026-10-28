@@ -1,0 +1,13 @@
+// Online records (optional): saves the finished runs of logged-in players to a records API.
+//
+// Copy this file to  homes/<name>/defrag/autoexec.cfg  of EACH server (next to <name>.cfg) and fill in the key of that
+// server. Every server has its own key. Put the records plugin in  homes/<name>/plugins/  (records.so on Linux,
+// records.dll on Windows).
+//
+// It has to be autoexec.cfg: the plugin starts before <name>.cfg (which the start script loads with +exec) is read.
+// The real file contains a secret: keep it out of git and private (chmod 600 on Linux).
+// Use "set". "seta" would save the key into the server's config file, and "sets" would publish it in the server info.
+
+set sv_plugins "records"
+set records_url "https://api.example.com"
+set records_key "odfk_PASTE_THE_KEY_OF_THIS_SERVER_HERE"

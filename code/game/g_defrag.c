@@ -105,6 +105,46 @@ static int g_clockBadRatio;		// 0x1320f8: game clock drifted >20% from the wall 
 static int g_clockInitTime;		// 0x1320fc
 static int g_clockGameAcc, g_clockRealAcc, g_clockPrevReal;
 
+// oDFe extension (not in DeFRaG): can this engine hand events to server plugins? The engine publishes the number of
+// trap_GetValue in the read-only cvar "//trap_GetValue"; on engines without it the extension syscalls do not exist
+// and calling them would be a fatal "bad game system trap", so they are only used after this has said yes.
+qboolean G_EventsSupported( void ) {
+	static int state;		// 0 not asked yet, 1 yes, -1 no
+	char value[16];
+
+	if ( state == 0 ) {
+		state = -1;
+		if ( trap_Cvar_VariableIntegerValue( "//trap_GetValue" ) == G_TRAP_GETVALUE ) {
+			value[0] = '\0';
+			if ( trap_GetValue( value, sizeof( value ), "trap_Event_ODF" ) && atoi( value ) == G_ODF_EVENT ) {
+				state = 1;
+			}
+		}
+	}
+	return state > 0;
+}
+
+// Tells the server plugins that a player finished a timed run (online records). The keys are listed in the oDFe
+// plugin API (odf_plugin_api.h, event "player_finish").
+static void G_ReportFinish( gentity_t *ent, int timeMs, int estMs ) {
+	char data[MAX_INFO_STRING];
+
+	if ( !G_EventsSupported() || ( ent->r.svFlags & SVF_BOT ) || timeMs <= 0 ) {
+		return;
+	}
+	data[0] = '\0';
+	Info_SetValueForKey( data, "client", va( "%i", (int)( ent - g_entities ) ) );
+	Info_SetValueForKey( data, "time", va( "%i", timeMs ) );
+	Info_SetValueForKey( data, "est", va( "%i", estMs ) );
+	Info_SetValueForKey( data, "promode", va( "%i", df_promode.integer ) );
+	Info_SetValueForKey( data, "mode", va( "%i", g_dfMode ) );
+	Info_SetValueForKey( data, "submode", va( "%i", g_dfSubMode ) );
+	Info_SetValueForKey( data, "interference_off", va( "%i", df_mp_InterferenceOff.integer ) );
+	Info_SetValueForKey( data, "killobs", va( "%i", df_ob_killobs.integer ) );
+	Info_SetValueForKey( data, "version", va( "%i", DF_VERSION_NUMBER ) );
+	trap_ODF_Event( "player_finish", data );
+}
+
 // DeFRaG finish handler (func_0x35ce): the whole-millisecond time plus the sub-millisecond-corrected estimate ("est.")
 static void G_RaceFinished( gentity_t *ent ) {
 	raceTimer_t *t         = G_GetTimerRecord( ent->client );
@@ -128,6 +168,8 @@ static void G_RaceFinished( gentity_t *ent ) {
 
 	G_FormatTime( level.time - t->startTime, timeBuf, sizeof(timeBuf) );
 	G_FormatTime( t->bestTime, estBuf, sizeof(estBuf) );
+
+	G_ReportFinish( ent, level.time - t->startTime, t->bestTime );
 
 	if ( g_dfVariant ) {
 		{

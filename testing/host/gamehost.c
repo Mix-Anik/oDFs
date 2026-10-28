@@ -56,6 +56,13 @@ typedef struct {
 	char	text[1024];
 } hcommand_t;
 
+#define MAX_EVENTS			32
+
+typedef struct {
+	char	name[32];
+	char	data[MAX_INFO_STRING];
+} hevent_t;
+
 struct gamehost_s {
 	pmvm_t		*vm;
 	hcvar_t		cvars[MAX_HCVARS];
@@ -78,6 +85,9 @@ struct gamehost_s {
 
 	hcommand_t	commands[MAX_COMMANDS];
 	int			numCommands;
+
+	hevent_t	events[MAX_EVENTS];		/* trap_Event: what the game handed to the server plugins */
+	int			numEvents;
 
 	char		error[256];
 	char		unhandled[256];
@@ -562,6 +572,21 @@ static int HostSyscall( pmvm_t *vm, const int32_t *a ) {
 		return sprintf( (char *)PMVM_Ptr( vm, a[1] ), "%i", (int)a[2] );
 	case G_TESTPRINTFLOAT:
 		return sprintf( (char *)PMVM_Ptr( vm, a[1] ), "%f", ArgF( a, 2 ) );
+
+	/* oDFe engine extensions */
+	case G_TRAP_GETVALUE:
+		if ( !Q_stricmp( (const char *)PMVM_Ptr( vm, a[3] ), "trap_Event_ODF" ) ) {
+			Com_sprintf( (char *)PMVM_Ptr( vm, a[1] ), a[2], "%d", G_ODF_EVENT );
+			return 1;
+		}
+		return 0;
+	case G_ODF_EVENT:
+		if ( gh->numEvents < MAX_EVENTS ) {
+			Q_strncpyz( gh->events[gh->numEvents].name, (const char *)PMVM_Ptr( vm, a[1] ), sizeof( gh->events[0].name ) );
+			Q_strncpyz( gh->events[gh->numEvents].data, (const char *)PMVM_Ptr( vm, a[2] ), sizeof( gh->events[0].data ) );
+			gh->numEvents++;
+		}
+		return 0;
 	}
 
 	Unhandled( gh, a[0] );
@@ -700,6 +725,8 @@ int GH_StartMap( gamehost_t *gh, const void *bsp, int length, int startTime, cha
 		CvarCreate( gh, "sv_maxclients", "8", CVAR_SERVERINFO | CVAR_LATCH );
 	}
 	CvarCreate( gh, "mapname", "test", CVAR_SERVERINFO | CVAR_ROM );
+	/* the engine says it has trap_GetValue (and with it the plugin event syscall) through this cvar */
+	CvarCreate( gh, "//trap_GetValue", va( "%d", G_TRAP_GETVALUE ), CVAR_ROM );
 	gh->maxclients = CvarFind( gh, "sv_maxclients" )->integer;
 	if ( gh->maxclients > MAX_HOST_CLIENTS ) {
 		gh->maxclients = MAX_HOST_CLIENTS;
@@ -818,4 +845,22 @@ const char *GH_Command( const gamehost_t *gh, int index, int *clientNum ) {
 
 void GH_ClearCommands( gamehost_t *gh ) {
 	gh->numCommands = 0;
+}
+
+int GH_NumEvents( const gamehost_t *gh ) {
+	return gh->numEvents;
+}
+
+const char *GH_Event( const gamehost_t *gh, int index, const char **data ) {
+	if ( index < 0 || index >= gh->numEvents ) {
+		return "";
+	}
+	if ( data ) {
+		*data = gh->events[index].data;
+	}
+	return gh->events[index].name;
+}
+
+void GH_ClearEvents( gamehost_t *gh ) {
+	gh->numEvents = 0;
 }

@@ -47,6 +47,9 @@ equ trap_TraceCapsule		-44
 equ trap_EntityContactCapsule	-45
 equ trap_FS_Seek -46
 
+equ trap_GetValue		-701
+equ trap_ODF_Event		-711
+
 equ	memset					-101
 equ	memcpy					-102
 equ	strncpy					-103

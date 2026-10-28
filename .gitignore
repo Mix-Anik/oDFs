@@ -63,3 +63,5 @@ build-qvm
 build-ci
 testing/out/
 testing/local.cfg
+# a real autoexec.cfg holds the records API key of a server (server/autoexec.cfg.example is the template)
+server/**/autoexec.cfg

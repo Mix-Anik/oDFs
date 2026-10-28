@@ -55,6 +55,7 @@ int Gold_Run( golden_t *g, const goldRunOpts_t *o, goldRunResult_t *res ) {
 	memset( res, 0, sizeof( *res ) );
 	gHostColl = ( g->knownFlags & GOLD_KNOWN_X87 ) ? 1 : ( g->knownFlags & GOLD_KNOWN_F32 ) ? 2 : 0;
 	res->finishWant = res->finishGot = -1;
+	res->eventTime = -1;
 	PSDiffUlps = g->ulps;
 
 	gh = GH_Create( o->game, err, sizeof( err ) );
@@ -298,6 +299,22 @@ int Gold_Run( golden_t *g, const goldRunOpts_t *o, goldRunResult_t *res ) {
 			g->knownFlags &= ~1;
 		}
 	}
+
+	/* what the server plugins are told (online records): when the game finished with the demo's time, the
+	   "player_finish" event has to carry exactly that time */
+	for ( i = 0; i < GH_NumEvents( gh ); i++ ) {
+		const char *data;
+
+		if ( !strcmp( GH_Event( gh, i, &data ), "player_finish" ) ) {
+			res->eventTime = atoi( Info_ValueForKey( data, "time" ) );
+			break;
+		}
+	}
+	if ( !o->markKnown && res->finishGot >= 0 && res->finishGot == res->finishWant && res->eventTime != res->finishGot ) {
+		res->eventBad = 1;
+		res->regressions++;
+	}
+
 	if ( GH_Unhandled( gh )[0] && !o->quiet ) {
 		printf( "      unhandled syscalls:%s\n", GH_Unhandled( gh ) );
 	}

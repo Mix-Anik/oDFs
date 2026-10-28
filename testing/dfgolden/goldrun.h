@@ -48,6 +48,8 @@ typedef struct {
 	int			knock, pad, damage;	/* steps with server knockback, a jump pad, damage */
 	int			finishBad;		/* the game's finish time differs and the file does not list that */
 	int			finishFrom;		/* finishWant is the time in the demo's file name (else the last time the recording publishes) */
+	int			eventTime;		/* time in the game's first "player_finish" event for the server plugins (-1 none) */
+	int			eventBad;		/* the game matched the finish time but the plugin event is missing or has another time */
 	int			error;			/* the game could not run */
 	int			missCount;		/* mismatching steps stored in opts->miss */
 } goldRunResult_t;

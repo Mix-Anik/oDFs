@@ -1084,6 +1084,11 @@ int		trap_GeneticParentsAndChildSelection(int numranks, float *ranks, int *paren
 
 void	trap_SnapVector( float *v );
 
+// oDFe engine extensions, call only after G_EventsSupported()
+qboolean	trap_GetValue( char *value, int valueSize, const char *key );
+void		trap_ODF_Event( const char *name, const char *data );
+qboolean	G_EventsSupported( void );
+
 // ─── DeFRaG race timer ───────────────────────────────────────────────────────
 
 typedef enum {

@@ -52,6 +52,9 @@ static void Summary( const golden_t *g, const goldRunResult_t *r ) {
 			Q_strncpyz( b, "none", sizeof( b ) );
 		}
 		Com_sprintf( finish, sizeof( finish ), " finish %s/%s%s", a, b, r->finishGot != r->finishWant ? ( r->finishBad ? " WRONG" : " (known)" ) : "" );
+		if ( r->eventBad ) {
+			Q_strcat( finish, sizeof( finish ), " EVENT-WRONG" );
+		}
 	}
 	printf( "%-58.58s steps=%-6d exact=%-6d (%.2f%%) known=%-4d NEW=%-4d fixed=%-3d race=%d/%d%s\n", g->name, r->steps, r->exact,
 		r->steps ? 100.0 * r->exact / r->steps : 0.0, r->knownMiss, r->regressions, r->fixed, r->raceChecked - r->raceBad,

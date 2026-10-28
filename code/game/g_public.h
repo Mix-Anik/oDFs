@@ -237,6 +237,11 @@ typedef enum {
 	G_TESTPRINTINT,
 	G_TESTPRINTFLOAT,
 
+	// oDFe / Quake3e engine extensions. Only call them when G_EventsSupported() says the engine has them:
+	// on any other engine they are unknown syscalls.
+	G_TRAP_GETVALUE = 700,			// qboolean ( char *value, int valueSize, const char *key ): looks an extension up by name
+	G_ODF_EVENT = 710,				// void ( const char *name, const char *data ): hands an event to the server plugins
+
 	BOTLIB_SETUP = 200,				// ( void );
 	BOTLIB_SHUTDOWN,				// ( void );
 	BOTLIB_LIBVAR_SET,

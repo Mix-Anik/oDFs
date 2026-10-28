@@ -55,4 +55,9 @@ int			GH_NumCommands( const gamehost_t *gh );
 const char	*GH_Command( const gamehost_t *gh, int index, int *clientNum );
 void		GH_ClearCommands( gamehost_t *gh );
 
+/* events the game raised with trap_Event (what the engine hands to its server plugins); cleared by GH_ClearEvents() */
+int			GH_NumEvents( const gamehost_t *gh );
+const char	*GH_Event( const gamehost_t *gh, int index, const char **data );
+void		GH_ClearEvents( gamehost_t *gh );
+
 #endif

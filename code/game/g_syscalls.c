@@ -230,6 +230,14 @@ void trap_SnapVector( float *v ) {
 	syscall( G_SNAPVECTOR, v );
 }
 
+qboolean trap_GetValue( char *value, int valueSize, const char *key ) {
+	return syscall( G_TRAP_GETVALUE, value, valueSize, key );
+}
+
+void trap_ODF_Event( const char *name, const char *data ) {
+	syscall( G_ODF_EVENT, name, data );
+}
+
 // BotLib traps start here
 int trap_BotLibSetup( void ) {
 	return syscall( BOTLIB_SETUP );
