@@ -283,9 +283,13 @@ int Gold_Build( const char *path, const goldMakeOpts_t *o, golden_t *g, char *er
 		if ( rec[i].regular ) {
 			s->flags |= GS_REGULAR;
 		}
-		if ( rec[i].regular || B->commandTime - A->commandTime == step ) {
+		if ( rec[i].regular || B->commandTime - A->commandTime == step ||
+				( B->commandTime - A->commandTime > step && B->commandTime - A->commandTime <= 8 * step &&
+				( B->commandTime - A->commandTime ) % step == 0 ) ) {
 			/* the game ran this step too (a respawn or teleport step has no recovered command; the keys of the
-			   input word are enough because the state is taken from the recording afterwards) */
+			   input word are enough because the state is taken from the recording afterwards). A command clock that
+			   jumped by several steps (the server got two commands in one frame) is run once with the whole span: it
+			   advances the game's own clocks (health decay) by what the server advanced them */
 			int buttons = ( B->stats[13] & 0x100 ) ? 1 : 0;		/* DINPUT_ATTACK */
 			int fm = rec[i].regular ? rec[i].fm : ( B->stats[13] & 1 ) ? 127 : ( B->stats[13] & 2 ) ? -127 : 0;
 			int rm = rec[i].regular ? rec[i].rm : ( B->stats[13] & 16 ) ? 127 : ( B->stats[13] & 8 ) ? -127 : 0;

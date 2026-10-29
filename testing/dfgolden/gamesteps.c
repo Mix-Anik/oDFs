@@ -230,7 +230,10 @@ static int RunGameDemo( const char *path, const gsOpts_t *o, FILE *times ) {
 			printf( "%s: RunFrame failed at snapshot %d: %s\n", path, i, GH_Error( gh ) );
 			break;
 		}
-		if ( rec[i].regular || B->commandTime - A->commandTime == d.snaps[1].serverTime - d.snaps[0].serverTime ) {
+		if ( rec[i].regular || B->commandTime - A->commandTime == d.snaps[1].serverTime - d.snaps[0].serverTime ||
+				( B->commandTime - A->commandTime > d.snaps[1].serverTime - d.snaps[0].serverTime &&
+				B->commandTime - A->commandTime <= 8 * ( d.snaps[1].serverTime - d.snaps[0].serverTime ) &&
+				( B->commandTime - A->commandTime ) % ( d.snaps[1].serverTime - d.snaps[0].serverTime ) == 0 ) ) {
 			/* the game ran this step too (a respawn or teleport step has no recovered command; the keys of the
 			   input word are enough because the state is taken from the recording afterwards) */
 			int buttons = ( B->stats[13] & 0x100 ) ? 1 : 0;		/* DINPUT_ATTACK */
