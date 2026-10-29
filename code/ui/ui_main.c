@@ -3363,7 +3363,7 @@ static void UI_RunMenuScript(char **args) {
 			trap_Cvar_Set("ui_singlePlayerActive", "0");
 			trap_Cmd_ExecuteText( EXEC_NOW, "quit");
 		} else if (Q_stricmp(command, "Controls") == 0) {
-		  trap_Cvar_Set( "cl_paused", "1" );
+			// DeFRaG never pauses the game for menus
 			trap_Key_SetCatcher( KEYCATCH_UI );
 			Menus_CloseAll();
 			Menus_ActivateByName("setup_menu2");
@@ -4922,8 +4922,7 @@ static void UI_ParseGameInfo(const char *teamFile) {
 
 static void UI_Pause(qboolean b) {
 	if (b) {
-		// pause the game and set the ui keycatcher
-	  trap_Cvar_Set( "cl_paused", "1" );
+		// set the ui keycatcher (DeFRaG never pauses the game for menus)
 		trap_Key_SetCatcher( KEYCATCH_UI );
 	} else {
 		// unpause the game and clear the ui keycatcher
@@ -5344,7 +5343,7 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 		  //UI_ConfirmMenu( "Bad CD Key", NULL, NeedCDKeyAction );
 		  return;
 	  case UIMENU_INGAME:
-		  trap_Cvar_Set( "cl_paused", "1" );
+			// no cl_paused here: DeFRaG keeps the game running behind the in-game menu
 			trap_Key_SetCatcher( KEYCATCH_UI );
 			UI_BuildPlayerList();
 			Menus_CloseAll();

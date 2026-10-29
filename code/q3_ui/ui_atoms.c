@@ -823,7 +823,7 @@ void UI_SetActiveMenu( uiMenuCommand_t menu ) {
 		UI_RankingsMenu();
 		return;
 		*/
-		trap_Cvar_Set( "cl_paused", "1" );
+		// no cl_paused here: DeFRaG keeps the game running behind the in-game menu
 		UI_InGameMenu();
 		return;
 		

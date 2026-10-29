@@ -779,6 +779,7 @@ void ClientUserinfoChanged( int clientNum ) {
 	char	redTeam[MAX_INFO_STRING];
 	char	blueTeam[MAX_INFO_STRING];
 	char	userinfo[MAX_INFO_STRING];
+	qboolean	modelChanged;
 
 	ent = g_entities + clientNum;
 	client = ent->client;
@@ -843,7 +844,8 @@ void ClientUserinfoChanged( int clientNum ) {
 		G_CleanFileName( Info_ValueForKey( userinfo, "df_name" ), fileName, sizeof( fileName ) );
 		Q_strncpyz( client->demoName, fileName, 20 );
 	}
-	if ( client->pers.connected == CON_CONNECTED && strcmp( oldname, client->demoName ) ) {
+	// "UnnamedPlayer" is what an unset df_name cleans to; the cgame fills df_name in right after joining, which isn't a real change
+	if ( client->pers.connected == CON_CONNECTED && strcmp( oldname, "UnnamedPlayer" ) && strcmp( oldname, client->demoName ) ) {
 		trap_SendServerCommand( clientNum, va( "print \"Your demo name changed to %s" S_COLOR_WHITE "\n\"", client->demoName ) );
 	}
 
@@ -956,7 +958,24 @@ void ClientUserinfoChanged( int clientNum ) {
 			client->pers.maxHealth, client->sess.wins, client->sess.losses, teamTask, teamLeader, client->pers.bestFinishTime);
 	}
 
+	// cg_deferPlayers (default 1) keeps a player on their old model until the scoreboard is shown, so a model changed
+	// mid-game ("/model", model menu) would not appear; have every client load deferred models once the new one is known
+	modelChanged = qfalse;
+	if ( client->pers.connected == CON_CONNECTED && !( ent->r.svFlags & SVF_BOT ) ) {
+		char	oldInfo[MAX_INFO_STRING];
+
+		trap_GetConfigstring( CS_PLAYERS+clientNum, oldInfo, sizeof( oldInfo ) );
+		if ( oldInfo[0] && ( strcmp( Info_ValueForKey( oldInfo, "model" ), model ) ||
+				strcmp( Info_ValueForKey( oldInfo, "hmodel" ), headModel ) ) ) {
+			modelChanged = qtrue;
+		}
+	}
+
 	trap_SetConfigstring( CS_PLAYERS+clientNum, s );
+
+	if ( modelChanged ) {
+		trap_SendServerCommand( -1, "loaddefered\n" );	// spelled like the cgame command
+	}
 
 	// this is not the userinfo, more like the configstring actually
 	G_LogPrintf( "ClientUserinfoChanged: %i %s\n", clientNum, s );
@@ -1240,6 +1259,8 @@ void ClientSpawn(gentity_t *ent) {
 //	char	*savedAreaBits;
 	int		accuracy_hits, accuracy_shots;
 	int		eventSequence;
+	int		respawnMsec;
+	char	demoName[sizeof( client->demoName )];
 	char	userinfo[MAX_INFO_STRING];
 
 	index = ent - g_entities;
@@ -1306,11 +1327,16 @@ void ClientSpawn(gentity_t *ent) {
 		persistant[i] = client->ps.persistant[i];
 	}
 	eventSequence = client->ps.eventSequence;
+	// both are only (re)computed by ClientUserinfoChanged, not on every spawn
+	respawnMsec = client->respawnMsec;
+	Q_strncpyz( demoName, client->demoName, sizeof( demoName ) );
 
 	Com_Memset (client, 0, sizeof(*client));
 
 	client->pers = saved;
 	client->sess = savedSess;
+	client->respawnMsec = respawnMsec;
+	Q_strncpyz( client->demoName, demoName, sizeof( client->demoName ) );
 	client->ps.ping = savedPing;
 //	client->areabits = savedAreaBits;
 	client->accuracy_hits = accuracy_hits;

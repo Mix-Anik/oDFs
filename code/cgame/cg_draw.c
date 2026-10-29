@@ -2307,6 +2307,10 @@ static qboolean CG_DrawFollow( void ) {
 	if ( !(cg.snap->ps.pm_flags & PMF_FOLLOW) ) {
 		return qfalse;
 	}
+	// the DeFRaG HUD shows just the followed player's name at the bottom (CG_DF_DrawFollowName), not the big Q3 text
+	if ( CG_DF_HudOn() && df_hud_drawSpectFollow.integer ) {
+		return qtrue;
+	}
 	color[0] = 1;
 	color[1] = 1;
 	color[2] = 1;
