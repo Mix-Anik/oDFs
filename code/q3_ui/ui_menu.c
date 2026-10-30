@@ -171,40 +171,63 @@ sfxHandle_t ErrorMessage_Key(int key)
 ===============
 Main_DrawUpdate / Main_MenuKey
 
-oDFs update line above the version, driven by the odfs_update_* cvars of the engine's mod updater (cl_update.c).  An engine
-without it never sets odfs_update_state, so nothing is drawn.  "available" and "error" are clickable.
+Two update lines above the version, one for this mod (oDFs) and one for the engine (oDFe), driven by the <prefix>_* cvars of
+the engine's updater (cl_update.c).  An engine without it never sets <prefix>_state, so nothing is drawn.  "available" and
+"error" are clickable.
 ===============
 */
-#define UPDATE_LINE_Y		440
 #define UPDATE_BAR_WIDTH	120
 
-static qboolean Main_UpdateLine( char *text, int size, vec4_t color, int *percent ) {
-	char	state[32], value[64];
+typedef struct {
+	const char	*name;
+	const char	*prefix;
+	const char	*command;
+	const char	*versionCvar;	// shown next to the name when up to date, NULL: the version is shown elsewhere
+	int			y;
+} mainUpdater_t;
+
+static const mainUpdater_t main_updaters[] = {
+	{ "oDFs", "odfs_update", "odfs_update\n", NULL, 440 },
+	{ "oDFe", "odfe_update", "odfe_update\n", "odfe_version", 420 },
+};
+
+#define NUM_UPDATERS ( sizeof( main_updaters ) / sizeof( main_updaters[0] ) )
+
+static qboolean Main_UpdateLine( const mainUpdater_t *up, char *text, int size, vec4_t color, int *percent ) {
+	char	state[32], value[64], label[48];
 
 	*percent = -1;
-	trap_Cvar_VariableStringBuffer( "odfs_update_state", state, sizeof( state ) );
+	Q_strncpyz( label, up->name, sizeof( label ) );
+	if ( up->versionCvar ) {
+		trap_Cvar_VariableStringBuffer( up->versionCvar, value, sizeof( value ) );
+		Q_strcat( label, sizeof( label ), va( " %s", value ) );
+	}
+	trap_Cvar_VariableStringBuffer( va( "%s_state", up->prefix ), state, sizeof( state ) );
 
 	if ( !Q_stricmp( state, "checking" ) ) {
-		Q_strncpyz( text, "checking for updates...", size );
+		Com_sprintf( text, size, "%s: checking for updates...", up->name );
 		Vector4Copy( colorMdGrey, color );
 	} else if ( !Q_stricmp( state, "uptodate" ) ) {
-		Q_strncpyz( text, "up to date", size );
+		Com_sprintf( text, size, "%s: up to date", label );
 		Vector4Set( color, 0.35f, 0.65f, 0.35f, 1.0f );
+	} else if ( !Q_stricmp( state, "unsupported" ) ) {
+		Q_strncpyz( text, label, size );
+		Vector4Copy( colorMdGrey, color );
 	} else if ( !Q_stricmp( state, "available" ) ) {
-		trap_Cvar_VariableStringBuffer( "odfs_update_latest", value, sizeof( value ) );
-		Com_sprintf( text, size, "Update available: %s (click to install)", value );
+		trap_Cvar_VariableStringBuffer( va( "%s_latest", up->prefix ), value, sizeof( value ) );
+		Com_sprintf( text, size, "%s update available: %s (click to install)", up->name, value );
 		Vector4Copy( colorYellow, color );
 		return qtrue;
 	} else if ( !Q_stricmp( state, "downloading" ) ) {
-		*percent = trap_Cvar_VariableValue( "odfs_update_progress" );
-		Com_sprintf( text, size, "downloading update %i%%", *percent );
+		*percent = trap_Cvar_VariableValue( va( "%s_progress", up->prefix ) );
+		Com_sprintf( text, size, "%s: downloading update %i%%", up->name, *percent );
 		Vector4Copy( colorYellow, color );
 	} else if ( !Q_stricmp( state, "ready" ) ) {
-		Q_strncpyz( text, "Update downloaded, restart the game to install it", size );
+		Com_sprintf( text, size, "%s update downloaded, restart the game", up->name );
 		Vector4Copy( colorGreen, color );
 	} else if ( !Q_stricmp( state, "error" ) ) {
-		trap_Cvar_VariableStringBuffer( "odfs_update_error", value, sizeof( value ) );
-		Com_sprintf( text, size, "Update failed: %s (click to retry)", value );
+		trap_Cvar_VariableStringBuffer( va( "%s_error", up->prefix ), value, sizeof( value ) );
+		Com_sprintf( text, size, "%s update failed: %s (click to retry)", up->name, value );
 		Vector4Copy( colorRed, color );
 		return qtrue;
 	} else {
@@ -213,48 +236,58 @@ static qboolean Main_UpdateLine( char *text, int size, vec4_t color, int *percen
 	return qfalse;
 }
 
-static qboolean Main_UpdateHover( const char *text ) {
+static qboolean Main_UpdateHover( const mainUpdater_t *up, const char *text ) {
 	int	w = (int)strlen( text ) * SMALLCHAR_WIDTH;
 
-	return uis.cursorx >= 640 - w && uis.cursory >= UPDATE_LINE_Y && uis.cursory < UPDATE_LINE_Y + SMALLCHAR_HEIGHT;
+	return uis.cursorx >= 640 - w && uis.cursory >= up->y && uis.cursory < up->y + SMALLCHAR_HEIGHT;
 }
 
 static void Main_DrawUpdate( void ) {
-	char		text[128];
-	vec4_t		color;
-	int			percent;
-	qboolean	clickable;
+	int		i;
 
-	clickable = Main_UpdateLine( text, sizeof( text ), color, &percent );
-	if ( !text[0] ) {
-		return;
-	}
+	for ( i = 0; i < NUM_UPDATERS; i++ ) {
+		const mainUpdater_t	*up = &main_updaters[i];
+		char		text[128];
+		vec4_t		color;
+		int			percent;
+		qboolean	clickable;
 
-	if ( clickable && Main_UpdateHover( text ) ) {
-		Vector4Copy( colorWhite, color );
-	}
-	UI_DrawString( 640, UPDATE_LINE_Y, text, UI_RIGHT|UI_SMALLFONT, color );
-
-	if ( percent >= 0 ) {
-		vec4_t	back = { 0.2f, 0.2f, 0.2f, 0.8f };
-
-		if ( percent > 100 ) {
-			percent = 100;
+		clickable = Main_UpdateLine( up, text, sizeof( text ), color, &percent );
+		if ( !text[0] ) {
+			continue;
 		}
-		UI_FillRect( 640 - UPDATE_BAR_WIDTH, UPDATE_LINE_Y + SMALLCHAR_HEIGHT, UPDATE_BAR_WIDTH, 3, back );
-		UI_FillRect( 640 - UPDATE_BAR_WIDTH, UPDATE_LINE_Y + SMALLCHAR_HEIGHT, UPDATE_BAR_WIDTH * percent / 100, 3, color );
+
+		if ( clickable && Main_UpdateHover( up, text ) ) {
+			Vector4Copy( colorWhite, color );
+		}
+		UI_DrawString( 640, up->y, text, UI_RIGHT|UI_SMALLFONT, color );
+
+		if ( percent >= 0 ) {
+			vec4_t	back = { 0.2f, 0.2f, 0.2f, 0.8f };
+
+			if ( percent > 100 ) {
+				percent = 100;
+			}
+			UI_FillRect( 640 - UPDATE_BAR_WIDTH, up->y + SMALLCHAR_HEIGHT, UPDATE_BAR_WIDTH, 3, back );
+			UI_FillRect( 640 - UPDATE_BAR_WIDTH, up->y + SMALLCHAR_HEIGHT, UPDATE_BAR_WIDTH * percent / 100, 3, color );
+		}
 	}
 }
 
 static sfxHandle_t Main_MenuKey( int key ) {
 	if ( key == K_MOUSE1 ) {
-		char		text[128];
-		vec4_t		color;
-		int			percent;
+		int		i;
 
-		if ( Main_UpdateLine( text, sizeof( text ), color, &percent ) && Main_UpdateHover( text ) ) {
-			trap_Cmd_ExecuteText( EXEC_APPEND, "odfs_update\n" );
-			return menu_in_sound;
+		for ( i = 0; i < NUM_UPDATERS; i++ ) {
+			const mainUpdater_t	*up = &main_updaters[i];
+			char		text[128];
+			vec4_t		color;
+			int			percent;
+
+			if ( Main_UpdateLine( up, text, sizeof( text ), color, &percent ) && Main_UpdateHover( up, text ) ) {
+				trap_Cmd_ExecuteText( EXEC_APPEND, up->command );
+				return menu_in_sound;
+			}
 		}
 	}
 	return Menu_DefaultKey( &s_main.menu, key );

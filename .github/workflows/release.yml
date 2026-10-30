@@ -1,7 +1,7 @@
 name: release
 
 # Manual run (Actions tab -> release -> Run workflow): builds qagame / cgame / ui as QVMs from the selected commit, packs them into
-# zzz-defrag_vm.pk3 and publishes a GitHub release with the pk3 (and its SHA-256) attached. It does not run the golden test: check that
+# zzz-defrag_vm.pk3 and publishes a GitHub release with the pk3 (and its SHA-512) attached. It does not run the golden test: check that
 # the "physics" workflow succeeded for the commit before releasing.
 
 on:
@@ -70,7 +70,7 @@ jobs:
           for m in qagame cgame ui; do
             [ -f "build-release/vm/$m.qvm" ] || { echo "::error::$m.qvm was not built"; exit 1; }
           done
-          (cd dist && sha256sum zzz-defrag_vm.pk3 > zzz-defrag_vm.pk3.sha256 && cat zzz-defrag_vm.pk3.sha256)
+          (cd dist && sha512sum zzz-defrag_vm.pk3 > zzz-defrag_vm.pk3.sha512 && cat zzz-defrag_vm.pk3.sha512)
 
       - name: Create the release
         shell: bash
@@ -81,16 +81,16 @@ jobs:
           NOTES: ${{ inputs.notes }}
           PRERELEASE: ${{ inputs.prerelease }}
         run: |
-          SHA=$(cut -d' ' -f1 dist/zzz-defrag_vm.pk3.sha256)
+          SHA=$(cut -d' ' -f1 dist/zzz-defrag_vm.pk3.sha512)
           {
             [ -n "$NOTES" ] && printf '%s\n\n' "$NOTES"
             echo "DeFRaG $VERSION, commit ${GITHUB_SHA::8}."
             echo
             echo "Put \`zzz-defrag_vm.pk3\` into the \`defrag\` folder of the server and of every client (remove older \`zz*-defrag_vm*.pk3\` files)."
             echo
-            echo "SHA-256: \`$SHA\`"
+            echo "SHA-512: \`$SHA\`"
           } > notes.md
           FLAGS=""
           [ "$PRERELEASE" = "true" ] && FLAGS="--prerelease"
-          gh release create "$TAG" dist/zzz-defrag_vm.pk3 dist/zzz-defrag_vm.pk3.sha256 \
+          gh release create "$TAG" dist/zzz-defrag_vm.pk3 dist/zzz-defrag_vm.pk3.sha512 \
             --target "$GITHUB_SHA" --title "oDFs $VERSION" --notes-file notes.md $FLAGS
