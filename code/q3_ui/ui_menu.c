@@ -169,6 +169,99 @@ sfxHandle_t ErrorMessage_Key(int key)
 
 /*
 ===============
+Main_DrawUpdate / Main_MenuKey
+
+oDFs update line above the version, driven by the odfs_update_* cvars of the engine's mod updater (cl_update.c).  An engine
+without it never sets odfs_update_state, so nothing is drawn.  "available" and "error" are clickable.
+===============
+*/
+#define UPDATE_LINE_Y		440
+#define UPDATE_BAR_WIDTH	120
+
+static qboolean Main_UpdateLine( char *text, int size, vec4_t color, int *percent ) {
+	char	state[32], value[64];
+
+	*percent = -1;
+	trap_Cvar_VariableStringBuffer( "odfs_update_state", state, sizeof( state ) );
+
+	if ( !Q_stricmp( state, "checking" ) ) {
+		Q_strncpyz( text, "checking for updates...", size );
+		Vector4Copy( colorMdGrey, color );
+	} else if ( !Q_stricmp( state, "uptodate" ) ) {
+		Q_strncpyz( text, "up to date", size );
+		Vector4Set( color, 0.35f, 0.65f, 0.35f, 1.0f );
+	} else if ( !Q_stricmp( state, "available" ) ) {
+		trap_Cvar_VariableStringBuffer( "odfs_update_latest", value, sizeof( value ) );
+		Com_sprintf( text, size, "Update available: %s (click to install)", value );
+		Vector4Copy( colorYellow, color );
+		return qtrue;
+	} else if ( !Q_stricmp( state, "downloading" ) ) {
+		*percent = trap_Cvar_VariableValue( "odfs_update_progress" );
+		Com_sprintf( text, size, "downloading update %i%%", *percent );
+		Vector4Copy( colorYellow, color );
+	} else if ( !Q_stricmp( state, "ready" ) ) {
+		Q_strncpyz( text, "Update downloaded, restart the game to install it", size );
+		Vector4Copy( colorGreen, color );
+	} else if ( !Q_stricmp( state, "error" ) ) {
+		trap_Cvar_VariableStringBuffer( "odfs_update_error", value, sizeof( value ) );
+		Com_sprintf( text, size, "Update failed: %s (click to retry)", value );
+		Vector4Copy( colorRed, color );
+		return qtrue;
+	} else {
+		text[0] = '\0';
+	}
+	return qfalse;
+}
+
+static qboolean Main_UpdateHover( const char *text ) {
+	int	w = (int)strlen( text ) * SMALLCHAR_WIDTH;
+
+	return uis.cursorx >= 640 - w && uis.cursory >= UPDATE_LINE_Y && uis.cursory < UPDATE_LINE_Y + SMALLCHAR_HEIGHT;
+}
+
+static void Main_DrawUpdate( void ) {
+	char		text[128];
+	vec4_t		color;
+	int			percent;
+	qboolean	clickable;
+
+	clickable = Main_UpdateLine( text, sizeof( text ), color, &percent );
+	if ( !text[0] ) {
+		return;
+	}
+
+	if ( clickable && Main_UpdateHover( text ) ) {
+		Vector4Copy( colorWhite, color );
+	}
+	UI_DrawString( 640, UPDATE_LINE_Y, text, UI_RIGHT|UI_SMALLFONT, color );
+
+	if ( percent >= 0 ) {
+		vec4_t	back = { 0.2f, 0.2f, 0.2f, 0.8f };
+
+		if ( percent > 100 ) {
+			percent = 100;
+		}
+		UI_FillRect( 640 - UPDATE_BAR_WIDTH, UPDATE_LINE_Y + SMALLCHAR_HEIGHT, UPDATE_BAR_WIDTH, 3, back );
+		UI_FillRect( 640 - UPDATE_BAR_WIDTH, UPDATE_LINE_Y + SMALLCHAR_HEIGHT, UPDATE_BAR_WIDTH * percent / 100, 3, color );
+	}
+}
+
+static sfxHandle_t Main_MenuKey( int key ) {
+	if ( key == K_MOUSE1 ) {
+		char		text[128];
+		vec4_t		color;
+		int			percent;
+
+		if ( Main_UpdateLine( text, sizeof( text ), color, &percent ) && Main_UpdateHover( text ) ) {
+			trap_Cmd_ExecuteText( EXEC_APPEND, "odfs_update\n" );
+			return menu_in_sound;
+		}
+	}
+	return Menu_DefaultKey( &s_main.menu, key );
+}
+
+/*
+===============
 Main_MenuDraw (0x1e2a)
 this function is common to the main menu and errorMessage menu
 ===============
@@ -182,6 +275,7 @@ static void Main_MenuDraw( void ) {
 	{
 		// standard menu drawing, version text bottom right
 		UI_DrawString( 640, 460, DF_VERSION_STRING DF_VERSION_TAG, UI_RIGHT|UI_SMALLFONT, uiDfColorBig );
+		Main_DrawUpdate();
 		Menu_Draw( &s_main.menu );
 	}
 }
@@ -233,6 +327,7 @@ void UI_MainMenu( void ) {
 	}
 
 	s_main.menu.draw = Main_MenuDraw;
+	s_main.menu.key = Main_MenuKey;
 	s_main.menu.fullscreen = qtrue;
 	s_main.menu.wrapAround = qtrue;
 	s_main.menu.showlogo = qtrue;
@@ -252,6 +347,16 @@ void UI_MainMenu( void ) {
 		s_main.button[i].style				= UI_SMALLFONT|UI_DROPSHADOW|UI_FOCUSCOLOR;
 		Menu_AddItem( &s_main.menu, &s_main.button[i] );
 		y += MAIN_MENU_STEP;
+	}
+
+	// oDFs: look for a newer release once per run (the engine ignores this when odfs_update_check is 0)
+	{
+		char	state[8];
+
+		trap_Cvar_VariableStringBuffer( "odfs_update_state", state, sizeof( state ) );
+		if ( !state[0] ) {
+			trap_Cmd_ExecuteText( EXEC_APPEND, va( "odfs_checkupdate %i auto\n", DF_VERSION_NUMBER ) );
+		}
 	}
 
 	trap_Key_SetCatcher( KEYCATCH_UI );

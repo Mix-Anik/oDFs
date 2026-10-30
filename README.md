@@ -13,6 +13,7 @@ Opensource DeFRaG server runtime
 
 ### Menus
 - Smooth menu mouse cursor: one pixel per mouse count (`df_ui_mouseSpeed` to adjust)
+- Update check in the main menu (oDFe only): shows a new release, click to download it, installed at the next start (`odfs_update_check 0` disables)
 
 ### Plugin System
 Hooks for oDFe native plugins, so features can live outside the engine
