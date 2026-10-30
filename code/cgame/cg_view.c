@@ -819,6 +819,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	cg_dfClearAreamask = qfalse;
 	CG_DF_ReplayFrame();		// DeFRaG replay/recam runtime: may override cg.refdef view (df_demos_ReplayMode 2/3)
 	CG_DF_DemoCamera();		// DeFRaG demo camera (df_demos_CameraMode)
+	CG_PublishPlayerState();	// oDFe client plugins (shot preview, snap, cgaz): the view is known now
 
 	// first person blend blobs, done after AnglesToAxis
 	if ( !cg.renderingThirdPerson ) {

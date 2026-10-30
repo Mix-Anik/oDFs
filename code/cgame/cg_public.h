@@ -182,7 +182,12 @@ typedef enum {
 	CG_CEIL,
 	CG_TESTPRINTINT,
 	CG_TESTPRINTFLOAT,
-	CG_ACOS
+	CG_ACOS,
+
+	// oDFe engine extensions. Call them only after CG_PlayerStateExportSupported(): on any other engine they are unknown
+	// syscalls and a fatal "bad cgame system trap".
+	CG_TRAP_GETVALUE = 700,			// qboolean ( char *value, int valueSize, const char *key ): looks an extension up by name
+	CG_ODF_SET_PLAYERSTATE = 710	// void ( const playerState_t *ps ): hands the predicted player state to the client plugins
 } cgameImport_t;
 
 

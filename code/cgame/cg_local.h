@@ -1908,6 +1908,14 @@ qboolean	trap_getCameraInfo(int time, vec3_t *origin, vec3_t *angles);
 
 qboolean	trap_GetEntityToken( char *buffer, int bufferSize );
 
+// oDFe engine extensions, call only after CG_PlayerStateExportSupported()
+qboolean	trap_GetValue( char *value, int valueSize, const char *key );
+void		trap_ODF_SetPlayerState( const playerState_t *ps, int viewFlags );
+#define CG_ODF_VIEW_SCOREBOARD		1	// the scoreboard is up
+#define CG_ODF_VIEW_NOT_FIRST_PERSON	2	// third person, chase or replay camera: the view is not the player's
+qboolean	CG_PlayerStateExportSupported( void );
+void		CG_PublishPlayerState( void );
+
 void	CG_ClearParticles (void);
 void	CG_AddParticles (void);
 void	CG_ParticleSnow (qhandle_t pshader, vec3_t origin, vec3_t origin2, int turb, float range, int snum);

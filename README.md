@@ -14,5 +14,6 @@ Opensource DeFRaG server runtime
 ### Menus
 - Smooth menu mouse cursor: one pixel per mouse count (`df_ui_mouseSpeed` to adjust)
 
-### Server
-- `player_finish` event for oDFe server plugins (online records); other engines ignore it
+### Plugin System
+Hooks for oDFe native plugins, so features can live outside the engine
+

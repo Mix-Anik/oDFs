@@ -446,3 +446,11 @@ qboolean trap_GetEntityToken( char *buffer, int bufferSize ) {
 qboolean trap_R_inPVS( const vec3_t p1, const vec3_t p2 ) {
 	return syscall( CG_R_INPVS, p1, p2 );
 }
+
+qboolean trap_GetValue( char *value, int valueSize, const char *key ) {
+	return syscall( CG_TRAP_GETVALUE, value, valueSize, key );
+}
+
+void trap_ODF_SetPlayerState( const playerState_t *ps, int viewFlags ) {
+	syscall( CG_ODF_SET_PLAYERSTATE, ps, viewFlags );
+}

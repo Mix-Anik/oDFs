@@ -1815,3 +1815,43 @@ qboolean CG_DF_HideLocalForInterference( localEntity_t *le ) {
 	}
 	return ( st & 4 ) ? ( cgs.clientinfo[cg.predictedPlayerState.clientNum].team != cgs.clientinfo[owner].team ) : qtrue;
 }
+
+
+// oDFe extension (not in DeFRaG): can this engine take the predicted player state for its client plugins? The engine
+// publishes the number of trap_GetValue in the read-only cvar "//trap_GetValue"; on engines without it the extension
+// syscalls do not exist and calling them would be a fatal "bad cgame system trap", so they are only used after this has
+// said yes.
+qboolean CG_PlayerStateExportSupported( void ) {
+	static int state;		// 0 not asked yet, 1 yes, -1 no
+	char value[16];
+
+	if ( state == 0 ) {
+		state = -1;
+		trap_Cvar_VariableStringBuffer( "//trap_GetValue", value, sizeof( value ) );
+		if ( atoi( value ) == CG_TRAP_GETVALUE ) {
+			value[0] = ' ';
+			if ( trap_GetValue( value, sizeof( value ), "trap_ODF_SetPlayerState" ) && atoi( value ) == CG_ODF_SET_PLAYERSTATE ) {
+				state = 1;
+			}
+		}
+	}
+	return state > 0;
+}
+
+// Once per frame, when the view is settled and before the scene is drawn: the oDFe client plugins work out what a shot fired
+// now would do (grenade and rocket paths) and draw the strafe helpers (snap, cgaz) from the state the player really has now,
+// not from the one the server sent a moment ago, and they hide when the view is not the player's.
+void CG_PublishPlayerState( void ) {
+	int flags = 0;
+
+	if ( !CG_PlayerStateExportSupported() ) {
+		return;
+	}
+	if ( cg.showScores ) {
+		flags |= CG_ODF_VIEW_SCOREBOARD;
+	}
+	if ( cg.renderingThirdPerson || CG_DF_ReplayOwnsView() || ( cg.demoPlayback && df_demos_CameraMode.integer ) ) {
+		flags |= CG_ODF_VIEW_NOT_FIRST_PERSON;
+	}
+	trap_ODF_SetPlayerState( &cg.predictedPlayerState, flags );
+}
