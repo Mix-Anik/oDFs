@@ -1572,7 +1572,16 @@ void ClientDisconnect( int clientNum ) {
 
 		// They don't get to take powerups with them!
 		// Especially important for stuff like CTF flags
-		TossClientItems( ent );
+		// (not in defrag mode: no drops on death either, a reconnecting racer must not litter the map; a carried flag just returns)
+		if ( !df_mode.integer ) {
+			TossClientItems( ent );
+		} else if ( ent->client->ps.powerups[PW_REDFLAG] ) {
+			Team_ReturnFlag( TEAM_RED );
+		} else if ( ent->client->ps.powerups[PW_BLUEFLAG] ) {
+			Team_ReturnFlag( TEAM_BLUE );
+		} else if ( ent->client->ps.powerups[PW_NEUTRALFLAG] ) {
+			Team_ReturnFlag( TEAM_FREE );
+		}
 #ifdef MISSIONPACK
 		TossClientPersistantPowerups( ent );
 		if( g_gametype.integer == GT_HARVESTER ) {

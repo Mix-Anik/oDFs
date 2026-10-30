@@ -1538,6 +1538,8 @@ void CG_DF_Reset( void ) {
 	CG_DF_RecInit();
 }
 
+static int	dfPrevRunMs = -1;		// race time of the previous snapshot while the timer ran, else -1 (restart detection)
+
 // called for every snapshot transition with the previous and the new player state
 void CG_DF_SnapshotTransition( const playerState_t *ops, const playerState_t *ps ) {
 	int	changed = ops->stats[STAT_DEFRAG_FLAGS] ^ ps->stats[STAT_DEFRAG_FLAGS];
@@ -1545,6 +1547,7 @@ void CG_DF_SnapshotTransition( const playerState_t *ops, const playerState_t *ps
 
 	if ( ops->clientNum != ps->clientNum ) {
 		dfFollowStamp = 0;
+		dfPrevRunMs = -1;
 		CG_DF_Reset();
 		CG_DF_RecLoad();
 		return;
@@ -1577,6 +1580,17 @@ void CG_DF_SnapshotTransition( const playerState_t *ops, const playerState_t *ps
 	// 0x1c56: event 0x20 (flags bit 1 toggled): a current weapon that is not owned is replaced by the machinegun
 	if ( ( changed & 1 ) && CG_DF_Serverinfo( "defrag_vers" )[0] && !( ps->stats[STAT_WEAPONS] & ( 1 << ps->weapon ) ) ) {
 		cg.weaponSelect = WP_MACHINEGUN;
+	}
+	// A start trigger touched again while the timer runs (allowed after 750 ms) restarts the clock without toggling bit 0x4: the published
+	// race time just jumps back. The ghosts start over then too (the stats / records / autorecord are not touched).
+	{
+		int			runMs;
+		qboolean	valid = ( ps->stats[STAT_DEFRAG_FLAGS] & 4 ) && CG_DF_RaceTime( ps, &runMs );
+
+		if ( valid && !( changed & 4 ) && ( ops->stats[STAT_DEFRAG_FLAGS] & 4 ) && dfPrevRunMs > 0 && runMs < dfPrevRunMs ) {
+			CG_DF_GhostRunStart();
+		}
+		dfPrevRunMs = valid ? runMs : -1;
 	}
 	// bit 0x4: run (re)started
 	if ( ( changed & 4 ) && ( ps->stats[STAT_DEFRAG_FLAGS] & 4 ) ) {

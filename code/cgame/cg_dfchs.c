@@ -1192,10 +1192,10 @@ void CG_DF_DrawChs0( void ) {
 		return;
 	}
 	if ( type == 0 || type == 2 ) {		// arrow glyphs of the bigchars font
-		Q_strncpyz( kF, "", sizeof( kF ) );		// bigchars arrow glyphs 135 / 134 / 136 / 141
-		Q_strncpyz( kB, "", sizeof( kB ) );
-		Q_strncpyz( kL, "", sizeof( kL ) );
-		Q_strncpyz( kR, "", sizeof( kR ) );
+		Q_strncpyz( kF, "\x87", sizeof( kF ) );		// bigchars arrow glyphs 135 / 134 / 136 / 141
+		Q_strncpyz( kB, "\x86", sizeof( kB ) );
+		Q_strncpyz( kL, "\x88", sizeof( kL ) );
+		Q_strncpyz( kR, "\x8d", sizeof( kR ) );
 	}
 	x = cx;
 	y = cy;
