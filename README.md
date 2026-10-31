@@ -21,6 +21,7 @@ Opensource DeFRaG server runtime
 - Info / Gameplay / Weapons / Timer as tabs (only the ones the mode has), server cheats and run server always visible
 
 ### Menus
+- "Mods" (stock game mod switcher) is hidden from the main menu unless `df_ui_showMods 1`
 - Credits moved from the main menu list to a small dim link at the bottom of the screen
 - Smooth menu mouse cursor: one pixel per mouse count (`df_ui_mouseSpeed` to adjust)
 - Update check in the main menu (oDFe only): shows a new release, click to download it, installed at the next start (`odfs_update_check 0` disables)

@@ -373,6 +373,9 @@ void UI_MainMenu( void ) {
 
 	y = MAIN_MENU_Y;
 	for ( i = 0; i < (int)MAIN_BUTTONS; i++ ) {
+		if ( mainButtons[i].id == ID_DF_MODS && !df_ui_showMods.integer ) {
+			continue;		// oDFs: hidden unless df_ui_showMods is set
+		}
 		y += mainButtons[i].gap;
 		s_main.button[i].generic.type		= MTYPE_PTEXT;
 		s_main.button[i].generic.flags		= QMF_LEFT_JUSTIFY;

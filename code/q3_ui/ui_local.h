@@ -572,6 +572,7 @@ typedef struct {
 } uiStatic_t;
 
 extern vmCvar_t		df_ui_mouseSpeed;
+extern vmCvar_t		df_ui_showMods;
 
 extern void			UI_Init( void );
 extern void			UI_Shutdown( void );

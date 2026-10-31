@@ -22,6 +22,7 @@ vmCvar_t	df_ui_ListbarColor;
 vmCvar_t	df_ui_StatusColor;
 vmCvar_t	df_ui_CursorColor;
 vmCvar_t	df_ui_mouseSpeed;
+vmCvar_t	df_ui_showMods;
 vmCvar_t	df_ui_mapsMode;
 vmCvar_t	df_ui_mapsType;
 vmCvar_t	df_ui_mapsLast;
@@ -56,6 +57,7 @@ static uiDfCvar_t uiDfCvarTable[] = {
 	{ &df_ui_ListbarColor, "df_ui_ListbarColor", "1.00 0.00 0.00 0.30", CVAR_ARCHIVE },
 	{ &df_ui_StatusColor, "df_ui_StatusColor", "1.00 1.00 1.00 1.00", CVAR_ARCHIVE },
 	{ &df_ui_CursorColor, "df_ui_CursorColor", "0.50 0.80 1.00 1.00", CVAR_ARCHIVE },
+	{ &df_ui_showMods, "df_ui_showMods", "0", CVAR_ARCHIVE },	// oDFs: 1 shows the stock "Mods" entry (game mod switcher) in the main menu
 	{ &df_ui_mouseSpeed, "df_ui_mouseSpeed", "1", CVAR_ARCHIVE },	// oDFs: menu cursor speed, 1 = one pixel per mouse count (UI_MouseEvent)
 	{ &df_ui_mapsMode, "df_ui_mapsMode", "0", CVAR_ARCHIVE },	// oDFs: map browser: mode chip (0 All, 1 VQ3, 2 CPM, 3 Tricks, 4 Fast Caps)
 	{ &df_ui_mapsType, "df_ui_mapsType", "0", CVAR_ARCHIVE },	// oDFs: map browser: type filter (0 any, 1 run, 2 training, 3 level, 4 accuracy)
