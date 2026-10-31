@@ -133,7 +133,15 @@ typedef enum {
 	UI_ATAN2,
 	UI_SQRT,
 	UI_FLOOR,
-	UI_CEIL
+	UI_CEIL,
+
+	// oDFe engine extensions, found by name with trap_GetValue. Call them only after UI_PluginsSupported(): on any other
+	// engine they are unknown syscalls and a fatal "bad ui system trap".
+	UI_TRAP_GETVALUE = 700,			// qboolean ( char *value, int valueSize, const char *key ): looks an extension up by name
+	UI_ODF_PLUGIN_COUNT = 720,		// int ( void ): the client plugins the engine found
+	UI_ODF_PLUGIN_INFO,				// int ( int index, int field, char *buf, int size ): field 0 name, 1 version, 2 note, 3 "1" when off; the state
+	UI_ODF_PLUGIN_SET_ENABLED,		// int ( const char *name, int enable ): now, and for the next start
+	UI_ODF_PLUGIN_RESCAN			// void ( void ): libraries put into the folder since
 } uiImport_t;
 
 typedef enum {

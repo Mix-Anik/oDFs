@@ -402,3 +402,23 @@ qboolean trap_VerifyCDKey( const char *key, const char *chksum) {
 void trap_SetPbClStatus( int status ) {
 	syscall( UI_SET_PBCLSTATUS, status );
 }
+
+qboolean trap_GetValue( char *value, int valueSize, const char *key ) {
+	return syscall( UI_TRAP_GETVALUE, value, valueSize, key );
+}
+
+int trap_ODF_PluginCount( void ) {
+	return syscall( UI_ODF_PLUGIN_COUNT );
+}
+
+int trap_ODF_PluginInfo( int index, int field, char *buf, int size ) {
+	return syscall( UI_ODF_PLUGIN_INFO, index, field, buf, size );
+}
+
+int trap_ODF_PluginSetEnabled( const char *name, int enable ) {
+	return syscall( UI_ODF_PLUGIN_SET_ENABLED, name, enable );
+}
+
+void trap_ODF_PluginRescan( void ) {
+	syscall( UI_ODF_PLUGIN_RESCAN );
+}

@@ -90,6 +90,12 @@ equ trap_FS_Seek		-87
 equ trap_SetPbClStatus -88
 equ trap_SnapVector						-89
 
+equ trap_GetValue						-701
+equ trap_ODF_PluginCount				-721
+equ trap_ODF_PluginInfo					-722
+equ trap_ODF_PluginSetEnabled			-723
+equ trap_ODF_PluginRescan				-724
+
 equ	memset						-101
 equ	memcpy						-102
 equ	strncpy						-103

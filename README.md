@@ -23,6 +23,7 @@ Opensource DeFRaG server runtime
 ### Menus
 - "Mods" (stock game mod switcher) is hidden from the main menu unless `df_ui_showMods 1`
 - Credits moved from the main menu list to a small dim link at the bottom of the screen
+- "Plugins" in the main menu: lists the client plugins of the plugins folder with version and state (ON / OFF / FAILED / CRASHED) and switches them on and off, also in a running game; the choice is kept in `plugins/disabled`
 - Smooth menu mouse cursor: one pixel per mouse count (`df_ui_mouseSpeed` to adjust)
 - Update check in the main menu (oDFe only): shows a new release, click to download it, installed at the next start (`odfs_update_check 0` disables)
 - Engine version and update line in the main menu (oDFe only): click to download the oDFe release for your platform and replace all oDFe files in the game folder (OpenGL, Vulkan and server exe), used after a restart (`odfe_update_check 0` disables)

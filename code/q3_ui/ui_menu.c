@@ -48,6 +48,7 @@ start-map menu (ui 0x3825, ui_startmap.c), whose mode chips are those four.
 #define ID_DF_CREDITS			13
 #define ID_DF_MODS				14
 #define ID_DF_EXIT				15
+#define ID_DF_PLUGINS			16
 
 #define MAIN_MENU_X				170
 #define MAIN_MENU_Y				100
@@ -65,6 +66,7 @@ static const mainButton_t mainButtons[] = {
 	{ ID_DF_DEMOS,		"Demos",			8 },
 	{ ID_DF_SETUP,		"Setup",			0 },
 	{ ID_DF_DEFRAGSETUP,"Defrag Setup",		0 },
+	{ ID_DF_PLUGINS,	"Plugins",			0 },
 	{ ID_DF_MODS,		"Mods",				0 },
 	{ ID_DF_EXIT,		"Exit",				8 }
 };
@@ -136,6 +138,10 @@ void Main_MenuEvent (void* ptr, int event) {
 
 	case ID_DF_CREDITS:
 		UI_CreditMenu();
+		break;
+
+	case ID_DF_PLUGINS:
+		UI_PluginsMenu();
 		break;
 
 	case ID_DF_MODS:
@@ -375,6 +381,9 @@ void UI_MainMenu( void ) {
 	for ( i = 0; i < (int)MAIN_BUTTONS; i++ ) {
 		if ( mainButtons[i].id == ID_DF_MODS && !df_ui_showMods.integer ) {
 			continue;		// oDFs: hidden unless df_ui_showMods is set
+		}
+		if ( mainButtons[i].id == ID_DF_PLUGINS && !UI_PluginsSupported() ) {
+			continue;		// oDFs: the engine has no client plugins
 		}
 		y += mainButtons[i].gap;
 		s_main.button[i].generic.type		= MTYPE_PTEXT;

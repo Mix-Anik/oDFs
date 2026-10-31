@@ -707,6 +707,13 @@ qboolean               trap_VerifyCDKey( const char *key, const char *chksum);
 
 void			trap_SetPbClStatus( int status );
 
+// oDFe engine extensions (see UI_PluginsSupported)
+qboolean		trap_GetValue( char *value, int valueSize, const char *key );
+int				trap_ODF_PluginCount( void );
+int				trap_ODF_PluginInfo( int index, int field, char *buf, int size );
+int				trap_ODF_PluginSetEnabled( const char *name, int enable );
+void			trap_ODF_PluginRescan( void );
+
 //
 // ui_addbots.c
 //
@@ -849,6 +856,13 @@ void UI_DF_DemoQueueClear( void );
 #define UIDF_MAP_CTF		64
 struct uiDfMapEntry_s;
 void UI_DF_MapsMenu( void );
+
+//
+// ui_plugins.c
+//
+qboolean UI_PluginsSupported( void );
+void UI_PluginsMenu( void );
+
 qboolean UI_DF_MapsReturnAfterPlayback( void );
 // ui_dfbest.c -- the player's best times (from the demo names)
 void UI_DF_BestLoad( void );
