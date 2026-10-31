@@ -46,7 +46,12 @@ static char			bestPrefix[96];			// the folder (below demos/) the pass list is of
 static int			bestPass;				// 0 the index / recursive list, 1 demos/, 2 the autorecord folder
 static int			bestListCount, bestListPos;
 static const char	*bestListPtr;
-static int			bestState;					// 0 nothing read yet, 1 parsing the index, 3 parsing a folder, 2 done
+// 0 nothing read yet, 1 parsing the index, 3 parsing a folder, 2 done; 5 the index (or the recursive list) is to be read, 4 a folder
+// is to be listed (bestAfter: the pass done last).  Every step that asks the engine for a big list is a call of UI_DF_BestRun of its
+// own, so a frame never has more than one of them (a listing of demos/ with ~14000 files takes a while) and the parsing between.
+static int			bestState;
+static int			bestAfter;
+static int			bestStartTime;
 #define BEST_MAXNAMES	8
 static char			bestNames[BEST_MAXNAMES][BEST_NAMESIZE];	// the names that are "you", Best_Norm'd: `name`, then df_ui_maps_playerNames
 static int			bestNumNames;
@@ -350,7 +355,7 @@ new demos appear.  Nothing happens while a read is going on.
 void UI_DF_BestLoad( void ) {
 	char raw[BEST_NAMESIZE], extra[256], key[sizeof( bestKey )], tok[BEST_NAMESIZE];
 	const char *p;
-	int  count, n;
+	int  n;
 
 	trap_Cvar_VariableStringBuffer( "name", raw, sizeof( raw ) );
 	Q_CleanStr( raw );
@@ -358,10 +363,13 @@ void UI_DF_BestLoad( void ) {
 	Com_sprintf( key, sizeof( key ), "%s|%s", raw, extra );
 	if ( bestState && !strcmp( key, bestKey ) ) {
 		if ( bestState == 2 ) {
-			Best_NextPass( 0 );
+			bestAfter = 0;
+			bestState = 4;			// the folders again, for new demos
+			bestStartTime = trap_Milliseconds();
 		}
 		return;
 	}
+	bestStartTime = trap_Milliseconds();
 	bestCount = 0;
 	Com_Memset( bestHash, 0, sizeof( bestHash ) );
 	bestPoolUsed = 0;
@@ -396,12 +404,20 @@ void UI_DF_BestLoad( void ) {
 	if ( !bestNumNames ) {
 		return;
 	}
+	bestState = 5;
+}
+
+// the first read: the index of the demo browser, else the recursive listing of demos/
+static void Best_StartRead( void ) {
+	int count;
+
 	count = Best_ReadIndex();
 	if ( count <= 0 ) {
 		count = Best_ListFolder( "demos", "**/", bestList, sizeof( bestList ) );
 	}
 	if ( count <= 0 ) {
-		Best_NextPass( 0 );		// no index, and an engine without the recursive listing: only the folders
+		bestAfter = 0;
+		bestState = 4;			// no index, and an engine without the recursive listing: only the folders
 		return;
 	}
 	bestPass = 0;
@@ -413,7 +429,7 @@ void UI_DF_BestLoad( void ) {
 }
 
 qboolean UI_DF_BestLoading( void ) {
-	return bestState == 1 || bestState == 3;
+	return bestState == 1 || bestState == 3 || bestState == 4 || bestState == 5;
 }
 
 // parses the demo list for about budgetMs milliseconds
@@ -421,6 +437,17 @@ void UI_DF_BestRun( int budgetMs ) {
 	char full[200];
 	int  begin, n = 0;
 
+	if ( bestState == 5 ) {
+		Best_StartRead();
+		return;
+	}
+	if ( bestState == 4 ) {
+		Best_NextPass( bestAfter );
+		if ( bestState == 2 ) {
+			Com_Printf( "Best times: %i maps with a demo of yours, read in %i ms (over several frames).\n", bestCount, trap_Milliseconds() - bestStartTime );
+		}
+		return;
+	}
 	if ( bestState != 1 && bestState != 3 ) {
 		return;
 	}
@@ -438,7 +465,8 @@ void UI_DF_BestRun( int budgetMs ) {
 			return;
 		}
 	}
-	Best_NextPass( bestState == 1 ? 0 : bestPass );
+	bestAfter = bestState == 1 ? 0 : bestPass;
+	bestState = 4;			// the next listing waits for the next frame
 }
 
 /*

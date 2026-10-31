@@ -871,6 +871,8 @@ qboolean UI_DF_BestLoading( void );
 int UI_DF_BestFor( const char *map, int mode, const char **path );
 void UI_DF_BestFormat( int ms, char *buf, int size );
 qboolean UI_DF_BestDemo( const char *map, int mode, char *out, int size );
+qboolean UI_DF_MapsLoadStep( int budgetMs );
+int UI_DF_MapsLoaded( void );
 const struct uiDfMapEntry_s *UI_DF_MapNext( int type, int maskA, int maskB, const struct uiDfMapEntry_s *prev );
 void UI_DF_Q3ExtrasMenu( void );
 void UI_DF_HudMenu( void );

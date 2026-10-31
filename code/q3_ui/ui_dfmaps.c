@@ -54,28 +54,38 @@ static uiDfMapDb_t *UI_DF_MapDbFind( int type ) {		// 0x1378
 	return NULL;
 }
 
-static void UI_DF_MapInsert( uiDfMapDb_t *db, uiDfMapEntry_t *e ) {		// 0x13a0: sorted insert, case-insensitive
-	uiDfMapEntry_t *p;
-
+// The entry is kept (the array slot it was read into is count): linking in name order is done once per database, by
+// UI_DF_MapSort -- a sorted insert of every entry is quadratic and was the slowest part of reading a few thousand maps.
+static void UI_DF_MapInsert( uiDfMapDb_t *db, uiDfMapEntry_t *e ) {		// 0x13a0
 	if ( db->list->count >= db->max ) {
 		return;
 	}
-	p = db->list->head;
-	if ( !p || Q_stricmp( p->map, e->map ) >= 0 ) {
-		e->next = p;
-		db->list->head = e;
-		db->list->count++;
-		return;
-	}
-	for ( ;; ) {
-		if ( !p->next || Q_stricmp( p->next->map, e->map ) >= 0 ) {
-			e->next = p->next;
-			p->next = e;
-			break;
-		}
-		p = p->next;
-	}
+	e->next = NULL;
 	db->list->count++;
+}
+
+// name order, case-insensitive; of equal names the entry read later comes first (as when every entry was inserted before the first
+// one that is not smaller)
+static int UI_DF_MapCompare( const void *a, const void *b ) {
+	const uiDfMapEntry_t *x = *(uiDfMapEntry_t * const *)a;
+	const uiDfMapEntry_t *y = *(uiDfMapEntry_t * const *)b;
+	int c = Q_stricmp( x->map, y->map );
+
+	return c ? c : (int)( y - x );
+}
+
+static void UI_DF_MapSort( uiDfMapDb_t *db ) {
+	static uiDfMapEntry_t *sorted[DFMAP_MAX];
+	int i, n = db->list->count;
+
+	for ( i = 0; i < n; i++ ) {
+		sorted[i] = &db->entries[i];
+	}
+	qsort( sorted, n, sizeof( sorted[0] ), UI_DF_MapCompare );
+	db->list->head = n ? sorted[0] : NULL;
+	for ( i = 0; i < n; i++ ) {
+		sorted[i]->next = i + 1 < n ? sorted[i + 1] : NULL;
+	}
 }
 
 static qboolean UI_DF_MapBspExists( const char *name ) {	// 0x58a with "maps", "%s.bsp"
@@ -173,25 +183,77 @@ static void UI_DF_MapReadFile( const char *filename, uiDfMapDb_t *db ) {		// 0x1
 	} while ( tok[0] );
 }
 
-static void UI_DF_MapDbLoad( uiDfMapDb_t *db ) {		// 0x1716
-	static char	buf[DFMAP_LISTSIZE];
-	char	name[128];
-	char	*s;
-	int		count, i, len;
+/*
+===============
+UI_DF_MapsLoadStep (0x1716, in slices)
 
-	if ( db->file ) {
-		UI_DF_MapReadFile( db->file, db );
+Reads the map files of both databases for about budgetMs milliseconds, then returns: qtrue when everything is in. The map browser
+calls it once per frame, so it can show itself (and stay usable) while a few thousand small files are read.
+===============
+*/
+static struct {
+	qboolean	started;
+	int			dbIndex;			// the database being read, 2 = both done
+	qboolean	reading;			// the file list of dbIndex is made
+	int			fileCount, filePos;
+	const char	*filePtr;
+	int			startTime;
+	char		names[DFMAP_LISTSIZE];
+} dfmapLoad;
+
+qboolean UI_DF_MapsLoadStep( int budgetMs ) {
+	int begin = trap_Milliseconds(), n = 0;
+
+	if ( !dfmapLoad.started ) {
+		dfmapLoad.started = qtrue;
+		dfmapLoad.startTime = begin;
 	}
-	count = trap_FS_GetFileList( "scripts", db->ext, buf, sizeof( buf ) );
-	s = buf;
-	for ( i = 0; i < count && db->list->count < db->max; i++ ) {
-		len = strlen( s );
-		Com_sprintf( name, sizeof( name ), "scripts/%s", s );
-		UI_DF_MapReadFile( name, db );
-		s += len + 1;
+	while ( dfmapLoad.dbIndex < 2 ) {
+		uiDfMapDb_t	*db = &dfmapDb[dfmapLoad.dbIndex];
+
+		if ( !dfmapLoad.reading ) {
+			if ( db->file ) {
+				UI_DF_MapReadFile( db->file, db );
+			}
+			dfmapLoad.fileCount = trap_FS_GetFileList( "scripts", db->ext, dfmapLoad.names, sizeof( dfmapLoad.names ) );
+			dfmapLoad.filePos = 0;
+			dfmapLoad.filePtr = dfmapLoad.names;
+			dfmapLoad.reading = qtrue;
+		}
+		while ( dfmapLoad.filePos < dfmapLoad.fileCount && db->list->count < db->max ) {
+			char name[128];
+			int len = strlen( dfmapLoad.filePtr );
+
+			Com_sprintf( name, sizeof( name ), "scripts/%s", dfmapLoad.filePtr );
+			UI_DF_MapReadFile( name, db );
+			dfmapLoad.filePtr += len + 1;
+			dfmapLoad.filePos++;
+			if ( ( ++n & 3 ) == 0 && trap_Milliseconds() - begin >= budgetMs ) {
+				return qfalse;
+			}
+		}
+		UI_DF_MapSort( db );
+		Com_Printf( "Found %i %s maps.\n", db->list->count, db->name );
+		db->list->loaded = 1;
+		dfmapLoad.reading = qfalse;
+		dfmapLoad.dbIndex++;
+		if ( trap_Milliseconds() - begin >= budgetMs ) {
+			break;
+		}
 	}
-	Com_Printf( "Found %i %s maps.\n", db->list->count, db->name );
-	db->list->loaded = 1;
+	if ( dfmapLoad.dbIndex < 2 ) {
+		return qfalse;
+	}
+	if ( dfmapLoad.startTime ) {
+		Com_Printf( "Map files read in %i ms (over several frames).\n", trap_Milliseconds() - dfmapLoad.startTime );
+		dfmapLoad.startTime = 0;
+	}
+	return qtrue;
+}
+
+// how many maps are in so far, for the progress text
+int UI_DF_MapsLoaded( void ) {
+	return dfmapDefragList.count + dfmapArenaList.count;
 }
 
 // Iterates a map database (0x17b8): returns the first/next entry after `prev` whose flags match both masks
@@ -205,7 +267,8 @@ const uiDfMapEntry_t *UI_DF_MapNext( int type, int maskA, int maskB, const uiDfM
 		return NULL;
 	}
 	if ( !db->list->loaded ) {
-		UI_DF_MapDbLoad( db );
+		while ( !UI_DF_MapsLoadStep( 1000000 ) ) {
+		}
 	}
 	e = prev ? prev->next : db->list->head;
 	for ( ; e; e = e->next ) {

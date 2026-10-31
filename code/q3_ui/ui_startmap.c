@@ -42,6 +42,7 @@ typedef struct dfEntry_s {
 #define DFS_MAXWORDS	4
 #define DFS_SEARCHMAX	64
 #define DFS_DOUBLECLICK	600
+#define DFS_LOAD_BUDGET	12		// ms of map files read per frame
 
 // geometry: the browser on the left (as wide as 340 pixels), the panel on the right
 #define DFS_LX			10
@@ -163,6 +164,9 @@ typedef struct {
 	qboolean		sbDrag;
 	int				sbGrab;
 	int				clickIndex, clickTime;
+	qboolean		loading;		// the map files are still being read (a little every frame)
+	qboolean		restore;		// the menu comes back from a demo: the search text is put back
+	int				bestDelay;		// frames to wait, with the maps on the screen, before the demos are read
 	char			timerShadow[3];
 } dfStart_t;
 
@@ -171,6 +175,7 @@ static dfStart_t	s_ds;
 // the records live as long as the ui (the databases are read once)
 static dfRec_t		dfsRecs[DFS_MAXMAPS];
 static int			dfsNumRecs;
+static qboolean		dfsBuilt;		// the records are made from both databases (once)
 static const char	*dfsBlank[DFS_MAXMAPS];		// the scroll list's item names (it is drawn by DFS_ListDraw)
 static dfEntry_t	dfsExtras[DFS_MAXEXTRA];	// the unlisted maps
 static char			dfsBspList[DFS_BSPLISTSIZE];
@@ -359,13 +364,9 @@ static void DFS_AddBsps( void ) {
 // both databases are name sorted: merge them into one list, then add the maps no map file lists
 static void DFS_BuildRecs( void ) {
 	const dfEntry_t *a, *b;
-	int i;
 
-	if ( dfsNumRecs ) {
+	if ( dfsBuilt ) {
 		return;
-	}
-	for ( i = 0; i < DFS_MAXMAPS; i++ ) {
-		dfsBlank[i] = "";
 	}
 	a = (const dfEntry_t *)UI_DF_MapNext( UIDF_MAPDB_DEFRAG, DFS_ALLFLAGS, DFS_ALLFLAGS, NULL );
 	b = (const dfEntry_t *)UI_DF_MapNext( UIDF_MAPDB_QUAKE3, DFS_ALLFLAGS, DFS_ALLFLAGS, NULL );
@@ -385,6 +386,7 @@ static void DFS_BuildRecs( void ) {
 		}
 	}
 	DFS_AddBsps();
+	dfsBuilt = qtrue;
 }
 
 static qboolean DFS_HasWord( const char *hay, const char *w, int len ) {
@@ -1482,6 +1484,8 @@ static sfxHandle_t DFS_Key( int key ) {
 	return sound;
 }
 
+static void DFS_FinishLoading( void );
+
 static void DFS_MenuDraw( void ) {
 	if ( uis.cursorx != s_ds.lastCursorX || uis.cursory != s_ds.lastCursorY ) {
 		s_ds.lastCursorX = uis.cursorx;
@@ -1495,6 +1499,9 @@ static void DFS_MenuDraw( void ) {
 			s_ds.sbDrag = qfalse;
 		}
 	}
+	if ( s_ds.loading && UI_DF_MapsLoadStep( DFS_LOAD_BUDGET ) ) {
+		DFS_FinishLoading();
+	}
 	UI_DF_BestRun( 6 );		// your times: the demo lists are parsed a little every frame
 	if ( s_ds.sel && UI_DF_BestFor( s_ds.sel->e->map, s_ds.mode, NULL ) ) {
 		s_ds.watch.generic.flags &= ~QMF_GRAYED;
@@ -1503,8 +1510,13 @@ static void DFS_MenuDraw( void ) {
 	}
 	Menu_Draw( &s_ds.menu );
 	DFS_ScrollbarDraw();
+	if ( s_ds.bestDelay > 0 && --s_ds.bestDelay == 0 ) {
+		UI_DF_BestLoad();		// after the maps were on the screen for a few frames: your demos fill in the times as they are read
+	}
 	UI_DrawString( DFS_LX + DFS_LW / 2, DFS_LIST_Y + DFS_LIST_ROWS * SMALLCHAR_HEIGHT + 6, s_ds.countText, UI_CENTER | UI_SMALLFONT, dfsColorWhite );
-	if ( !s_ds.list.numitems ) {
+	if ( s_ds.loading ) {
+		UI_DrawString( DFS_LX + DFS_LW / 2, DFS_LIST_Y + 40, va( "Reading the map files... %i maps", UI_DF_MapsLoaded() ), UI_CENTER | UI_SMALLFONT, dfsColorWhite );
+	} else if ( !s_ds.list.numitems ) {
 		// say where the search does find maps
 		int m, y = DFS_LIST_Y + 40;
 
@@ -1568,13 +1580,39 @@ static void DFS_InitRunSpin( menulist_s *s, const char *label, int id, int y, co
 	Menu_AddItem( &s_ds.menu, s );
 }
 
+// the maps are in: the list, the selection of last time and, a few frames later, your demos
+static void DFS_Populate( void ) {
+	char last[MAX_QPATH];
+
+	DFS_SetFilter( s_ds.filter );
+	if ( s_ds.restore ) {
+		s_ds.restore = qfalse;
+		trap_Cvar_VariableStringBuffer( "df_ui_mapsSearch", s_ds.search.field.buffer, DFS_SEARCHMAX + 1 );
+		s_ds.search.field.cursor = strlen( s_ds.search.field.buffer );
+		DFS_Refilter( qfalse );
+	}
+	trap_Cvar_VariableStringBuffer( "df_ui_mapsLast", last, sizeof( last ) );
+	if ( last[0] ) {
+		DFS_SelectByName( last );
+	}
+	s_ds.bestDelay = 3;
+}
+
+static void DFS_FinishLoading( void ) {
+	int begin = trap_Milliseconds();
+
+	DFS_BuildRecs();
+	s_ds.loading = qfalse;
+	DFS_Populate();
+	Com_Printf( "Map browser: list made in %i ms.\n", trap_Milliseconds() - begin );
+}
+
 /*
 ===============
 UI_DF_MapsMenu (ui 0x3825)
 ===============
 */
 void UI_DF_MapsMenu( void ) {
-	char last[MAX_QPATH];
 	int i, x;
 
 	Com_Memset( &s_ds, 0, sizeof( s_ds ) );
@@ -1588,8 +1626,13 @@ void UI_DF_MapsMenu( void ) {
 	s_ds.appliedMode = -1;
 	s_ds.type = DFS_ClampCvar( "df_ui_mapsType", 4 );
 
-	DFS_BuildRecs();
-	UI_DF_BestLoad();
+	if ( !dfsBlank[0] ) {
+		for ( i = 0; i < DFS_MAXMAPS; i++ ) {
+			dfsBlank[i] = "";
+		}
+	}
+	s_ds.restore = dfsRestore;
+	dfsRestore = qfalse;
 
 	s_ds.search.generic.type = MTYPE_FIELD;
 	s_ds.search.generic.flags = QMF_SMALLFONT | QMF_LEFT_JUSTIFY | QMF_PULSEIFFOCUS;
@@ -1651,16 +1694,10 @@ void UI_DF_MapsMenu( void ) {
 	s_ds.watch.generic.flags |= QMF_GRAYED;
 	DFS_InitButton( &s_ds.go, ID_GO, "START", 640 - DFS_BUTTON_MARGIN - DFS_BUTTON_W );
 
-	DFS_SetFilter( s_ds.filter );
-	if ( dfsRestore ) {
-		dfsRestore = qfalse;
-		trap_Cvar_VariableStringBuffer( "df_ui_mapsSearch", s_ds.search.field.buffer, DFS_SEARCHMAX + 1 );
-		s_ds.search.field.cursor = strlen( s_ds.search.field.buffer );
-		DFS_Refilter( qfalse );
-	}
-	trap_Cvar_VariableStringBuffer( "df_ui_mapsLast", last, sizeof( last ) );
-	if ( last[0] ) {
-		DFS_SelectByName( last );
+	if ( dfsBuilt ) {
+		DFS_Populate();
+	} else {
+		s_ds.loading = qtrue;		// DFS_MenuDraw reads the map files, then DFS_FinishLoading
 	}
 	UI_PushMenu( &s_ds.menu );
 }
