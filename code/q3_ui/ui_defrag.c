@@ -22,6 +22,13 @@ vmCvar_t	df_ui_ListbarColor;
 vmCvar_t	df_ui_StatusColor;
 vmCvar_t	df_ui_CursorColor;
 vmCvar_t	df_ui_mouseSpeed;
+vmCvar_t	df_ui_mapsMode;
+vmCvar_t	df_ui_mapsType;
+vmCvar_t	df_ui_mapsLast;
+vmCvar_t	df_ui_mapsPlay;
+vmCvar_t	df_ui_mapsReturn;
+vmCvar_t	df_ui_mapsSearch;
+vmCvar_t	df_ui_maps_playerNames;
 
 typedef struct {
 	vmCvar_t	*vmCvar;
@@ -50,6 +57,13 @@ static uiDfCvar_t uiDfCvarTable[] = {
 	{ &df_ui_StatusColor, "df_ui_StatusColor", "1.00 1.00 1.00 1.00", CVAR_ARCHIVE },
 	{ &df_ui_CursorColor, "df_ui_CursorColor", "0.50 0.80 1.00 1.00", CVAR_ARCHIVE },
 	{ &df_ui_mouseSpeed, "df_ui_mouseSpeed", "1", CVAR_ARCHIVE },	// oDFs: menu cursor speed, 1 = one pixel per mouse count (UI_MouseEvent)
+	{ &df_ui_mapsMode, "df_ui_mapsMode", "0", CVAR_ARCHIVE },	// oDFs: map browser: mode chip (0 All, 1 VQ3, 2 CPM, 3 Tricks, 4 Fast Caps)
+	{ &df_ui_mapsType, "df_ui_mapsType", "0", CVAR_ARCHIVE },	// oDFs: map browser: type filter (0 any, 1 run, 2 training, 3 level, 4 accuracy)
+	{ &df_ui_mapsLast, "df_ui_mapsLast", "", CVAR_ARCHIVE },	// oDFs: map browser: the map that was started last
+	{ &df_ui_mapsPlay, "df_ui_mapsPlay", "0", CVAR_ARCHIVE },	// oDFs: map browser: the mode ALL starts a map in (0 VQ3, 1 CPM, 2 Tricks, 3 Fast Caps)
+	{ &df_ui_mapsReturn, "df_ui_mapsReturn", "", CVAR_TEMP },	// oDFs: map browser: name of the demo WATCH started (UI_DF_MapsReturnAfterPlayback)
+	{ &df_ui_mapsSearch, "df_ui_mapsSearch", "", CVAR_TEMP },	// oDFs: map browser: search text kept while that demo plays
+	{ &df_ui_maps_playerNames, "df_ui_maps_playerNames", "", CVAR_ARCHIVE },	// oDFs: map browser: more player names that count as you for the best times, comma separated
 };
 
 static int uiDfCvarTableSize = ARRAY_LEN( uiDfCvarTable );

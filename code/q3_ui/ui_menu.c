@@ -36,13 +36,11 @@ DeFRaG main menu (ui 0x1e6f build, 0x1d97 event, 0x1e2a draw): a plain left-alig
 buttons (no 3D banner model, no Single Player / Cinematics / Team Arena), drawn in the light blue 0.53 0.77 1.00 1.00 and
 turning white while focused (UI_FOCUSCOLOR).  "Exit" quits at once.  The right bottom corner shows the DeFRaG client version.
 
-The four game type buttons (Defrag VQ3 / CPM / Tricks Mode / Fast Caps) open DeFRaG's start-map menu (ui 0x3825, ui_startmap.c).
+DeFRaG's four game type buttons (Defrag VQ3 / CPM / Tricks Mode / Fast Caps) are one "Maps" button here: it opens the
+start-map menu (ui 0x3825, ui_startmap.c), whose mode chips are those four.
 */
 
-#define ID_DF_VQ3				1
-#define ID_DF_CPM				2
-#define ID_DF_TRICKS			3
-#define ID_DF_FASTCAPS			5
+#define ID_DF_MAPS				1
 #define ID_DF_SERVERS			7
 #define ID_DF_DEMOS				10
 #define ID_DF_SETUP				11
@@ -62,15 +60,11 @@ typedef struct {
 } mainButton_t;
 
 static const mainButton_t mainButtons[] = {
-	{ ID_DF_VQ3,		"Defrag VQ3",		0 },
-	{ ID_DF_CPM,		"Defrag CPM",		0 },
-	{ ID_DF_TRICKS,		"Tricks Mode",		0 },
-	{ ID_DF_FASTCAPS,	"Fast Caps",		0 },
+	{ ID_DF_MAPS,		"Maps",				0 },
 	{ ID_DF_SERVERS,	"Server Browser",	0 },
 	{ ID_DF_DEMOS,		"Demos",			8 },
 	{ ID_DF_SETUP,		"Setup",			0 },
 	{ ID_DF_DEFRAGSETUP,"Defrag Setup",		0 },
-	{ ID_DF_CREDITS,	"Credits",			0 },
 	{ ID_DF_MODS,		"Mods",				0 },
 	{ ID_DF_EXIT,		"Exit",				8 }
 };
@@ -80,6 +74,9 @@ static const mainButton_t mainButtons[] = {
 typedef struct {
 	menuframework_s	menu;
 	menutext_s		button[MAIN_BUTTONS];
+	menutext_s		credits;			// oDFs: not in the list, a small dim link at the bottom, in the middle
+	qboolean		keyNav;				// the last input was a navigation key: the focused link is lit
+	int				lastCursorX, lastCursorY;
 } mainmenu_t;
 
 static mainmenu_t s_main;
@@ -92,6 +89,19 @@ typedef struct {
 static errorMessage_t s_errorMessage;
 
 static vec4_t	mainButtonColor = { 0.53f, 0.77f, 1.00f, 1.00f };
+static vec4_t	mainCreditsColor = { 0.45f, 0.55f, 0.65f, 0.40f };
+static vec4_t	mainCreditsLit = { 1.00f, 1.00f, 1.00f, 0.90f };
+
+#define CREDITS_CHARW	7
+#define CREDITS_CHARH	14
+
+// the Credits link: 7x14 capital letters, faint; lit while the pointer is on it, or after a navigation key moved the focus to it
+static void Main_CreditsDraw( void *self ) {
+	menutext_s	*t = (menutext_s *)self;
+	qboolean	lit = ( t->generic.flags & QMF_HASMOUSEFOCUS ) || ( s_main.keyNav && Menu_ItemAtCursor( t->generic.parent ) == self );
+
+	UI_DrawString2( t->generic.x, t->generic.y, t->string, lit ? mainCreditsLit : mainCreditsColor, CREDITS_CHARW, CREDITS_CHARH );
+}
 
 /*
 =================
@@ -104,20 +114,8 @@ void Main_MenuEvent (void* ptr, int event) {
 	}
 
 	switch( ((menucommon_s*)ptr)->id ) {
-	case ID_DF_VQ3:
-		UI_DF_StartMapMenu( 1, 0 );
-		break;
-
-	case ID_DF_CPM:
-		UI_DF_StartMapMenu( 1, 1 );
-		break;
-
-	case ID_DF_TRICKS:
-		UI_DF_StartMapMenu( 2, 0 );
-		break;
-
-	case ID_DF_FASTCAPS:
-		UI_DF_StartMapMenu( 3, 0 );
+	case ID_DF_MAPS:
+		UI_DF_MapsMenu();
 		break;
 
 	case ID_DF_SERVERS:
@@ -275,6 +273,9 @@ static void Main_DrawUpdate( void ) {
 }
 
 static sfxHandle_t Main_MenuKey( int key ) {
+	if ( key == K_TAB || key == K_UPARROW || key == K_DOWNARROW || key == K_ENTER || key == K_KP_ENTER ) {
+		s_main.keyNav = qtrue;
+	}
 	if ( key == K_MOUSE1 ) {
 		int		i;
 
@@ -306,6 +307,11 @@ static void Main_MenuDraw( void ) {
 	}
 	else
 	{
+		if ( uis.cursorx != s_main.lastCursorX || uis.cursory != s_main.lastCursorY ) {
+			s_main.lastCursorX = uis.cursorx;
+			s_main.lastCursorY = uis.cursory;
+			s_main.keyNav = qfalse;		// the mouse is in charge again
+		}
 		// standard menu drawing, version text bottom right
 		UI_DrawString( 640, 460, DF_VERSION_STRING DF_VERSION_TAG, UI_RIGHT|UI_SMALLFONT, uiDfColorBig );
 		Main_DrawUpdate();
@@ -381,6 +387,25 @@ void UI_MainMenu( void ) {
 		Menu_AddItem( &s_main.menu, &s_main.button[i] );
 		y += MAIN_MENU_STEP;
 	}
+
+	// oDFs: Credits stays on the main menu but out of the way: a small dim link bottom centre, white when the pointer is on it
+	s_main.credits.generic.type		= MTYPE_PTEXT;
+	s_main.credits.generic.flags	= QMF_LEFT_JUSTIFY;
+	s_main.credits.generic.x		= 320 - 7 * CREDITS_CHARW / 2;
+	s_main.credits.generic.y		= 462;
+	s_main.credits.generic.ownerdraw	= Main_CreditsDraw;
+	s_main.credits.generic.id		= ID_DF_CREDITS;
+	s_main.credits.generic.callback	= Main_MenuEvent;
+	s_main.credits.string			= "CREDITS";
+	s_main.credits.color			= mainCreditsColor;
+	s_main.credits.focusColor		= color_white;
+	s_main.credits.style			= UI_SMALLFONT|UI_FOCUSCOLOR;
+	Menu_AddItem( &s_main.menu, &s_main.credits );
+	// the widget worked out its mouse area from the proportional text: use the characters
+	s_main.credits.generic.left		= s_main.credits.generic.x;
+	s_main.credits.generic.right	= s_main.credits.generic.x + 7 * CREDITS_CHARW;
+	s_main.credits.generic.top		= 462;
+	s_main.credits.generic.bottom	= 462 + CREDITS_CHARH;
 
 	// oDFs: look for a newer release once per run (the engine ignores this when odfs_update_check is 0)
 	{

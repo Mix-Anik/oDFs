@@ -593,6 +593,7 @@ extern void			UI_DrawProportionalString( int x, int y, const char* str, int styl
 extern void			UI_DrawProportionalString_AutoWrapped( int x, int ystart, int xmax, int ystep, const char* str, int style, vec4_t color );
 extern int			UI_ProportionalStringWidth( const char* str );
 extern void			UI_DrawString( int x, int y, const char* str, int style, vec4_t color );
+extern void			UI_DrawString2( int x, int y, const char* str, vec4_t color, int charw, int charh );
 extern void			UI_DrawChar( int x, int y, int ch, int style, vec4_t color );
 extern qboolean 	UI_CursorInRect (int x, int y, int width, int height);
 extern void			UI_AdjustFrom640( float *x, float *y, float *w, float *h );
@@ -846,7 +847,15 @@ void UI_DF_DemoQueueClear( void );
 #define UIDF_MAP_ACCURACY	32
 #define UIDF_MAP_CTF		64
 struct uiDfMapEntry_s;
-void UI_DF_StartMapMenu( int type, int variant );
+void UI_DF_MapsMenu( void );
+qboolean UI_DF_MapsReturnAfterPlayback( void );
+// ui_dfbest.c -- the player's best times (from the demo names)
+void UI_DF_BestLoad( void );
+void UI_DF_BestRun( int budgetMs );
+qboolean UI_DF_BestLoading( void );
+int UI_DF_BestFor( const char *map, int mode, const char **path );
+void UI_DF_BestFormat( int ms, char *buf, int size );
+qboolean UI_DF_BestDemo( const char *map, int mode, char *out, int size );
 const struct uiDfMapEntry_s *UI_DF_MapNext( int type, int maskA, int maskB, const struct uiDfMapEntry_s *prev );
 void UI_DF_Q3ExtrasMenu( void );
 void UI_DF_HudMenu( void );

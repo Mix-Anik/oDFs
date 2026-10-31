@@ -5,19 +5,19 @@
 #define __DF_VERSION_H
 
 #define DF_VERSION_MAJOR	2
-#define DF_VERSION_MINOR	1
+#define DF_VERSION_MINOR	2
 #define DF_VERSION_PATCH	0
 
 #define DF_STR_( x )		#x
 #define DF_STR( x )			DF_STR_( x )
 
-// "2.1.0": printed by the menu, scoreboard, console banner, time messages and the defrag_version_* cvars
+// "2.2.0": printed by the menu, scoreboard, console banner, time messages and the defrag_version_* cvars
 #define DF_VERSION_STRING	DF_STR( DF_VERSION_MAJOR ) "." DF_STR( DF_VERSION_MINOR ) "." DF_STR( DF_VERSION_PATCH )
 
-// 20100: the serverinfo cvar defrag_vers (major * 10000 + minor * 100 + patch). DeFRaG clients parse it as a number and
+// 20200: the serverinfo cvar defrag_vers (major * 10000 + minor * 100 + patch). DeFRaG clients parse it as a number and
 // compare it with 18100 / 19114 (cg_defrag.c), so it must stay numeric and not drop below 19114.
 // (written out because the preprocessor cannot compute the string; the typedef below stops the two from disagreeing)
-#define DF_VERSION_NUMBER	20100
+#define DF_VERSION_NUMBER	20200
 #define DF_VERSION_NUMBER_STRING	DF_STR( DF_VERSION_NUMBER )
 typedef char df_version_number_matches[ ( DF_VERSION_NUMBER == DF_VERSION_MAJOR * 10000 + DF_VERSION_MINOR * 100 + DF_VERSION_PATCH ) ? 1 : -1 ];
 

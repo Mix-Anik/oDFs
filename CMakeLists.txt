@@ -198,6 +198,7 @@ if(BUILD_QVM)
             code/q3_ui/ui_controls2.c
             code/q3_ui/ui_credits.c
             code/q3_ui/ui_defrag.c
+            code/q3_ui/ui_dfbest.c
             code/q3_ui/ui_dfmaps.c
             code/q3_ui/ui_startmap.c
             code/q3_ui/ui_dfmenu.c

@@ -4,7 +4,8 @@
 
 #include "ui_local.h"
 
-#define DFMAP_MAXFILE	8192
+#define DFMAP_MAXFILE	65536		// oDFs: DeFRaG 8192; a map pack's file can list many maps
+#define DFMAP_LISTSIZE	262144		// oDFs: DeFRaG 16384, which held about 1000 file names: the rest of scripts/*.defi was never read
 
 typedef struct uiDfMapEntry_s {
 	char					map[32];		// +0
@@ -30,7 +31,7 @@ typedef struct {
 	const char		*ext;		// extension scanned in scripts/
 } uiDfMapDb_t;
 
-#define DFMAP_MAX	4096
+#define DFMAP_MAX	8192		// oDFs: DeFRaG 4096
 
 static uiDfMapEntry_t	dfmapDefragEntries[DFMAP_MAX];
 static uiDfMapEntry_t	dfmapArenaEntries[DFMAP_MAX];
@@ -173,7 +174,7 @@ static void UI_DF_MapReadFile( const char *filename, uiDfMapDb_t *db ) {		// 0x1
 }
 
 static void UI_DF_MapDbLoad( uiDfMapDb_t *db ) {		// 0x1716
-	char	buf[16384];
+	static char	buf[DFMAP_LISTSIZE];
 	char	name[128];
 	char	*s;
 	int		count, i, len;

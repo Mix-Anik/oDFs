@@ -626,7 +626,7 @@ void UI_DrawProportionalString_AutoWrapped( int x, int y, int xmax, int ystep, c
 UI_DrawString2
 =================
 */
-static void UI_DrawString2( int x, int y, const char* str, vec4_t color, int charw, int charh )
+void UI_DrawString2( int x, int y, const char* str, vec4_t color, int charw, int charh )
 {
 	const char* s;
 	char	ch;
@@ -808,7 +808,9 @@ void UI_SetActiveMenu( uiMenuCommand_t menu ) {
 		// DeFRaG 0xcadd: a queued demo (dmq_play) is started before the main menu is shown
 		if ( !UI_DF_DemoQueueNext() ) {
 			UI_MainMenu();
-			UI_DemosReturnAfterPlayback();		// oDFs: a demo started from the demo browser returns to it
+			if ( !UI_DemosReturnAfterPlayback() ) {		// oDFs: a demo started from the demo browser returns to it
+				UI_DF_MapsReturnAfterPlayback();		// ... and one started from the map browser to that
+			}
 		}
 		return;
 	case UIMENU_NEED_CD:
