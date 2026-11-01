@@ -73,14 +73,9 @@ typedef struct {
 static ingamemenu_t	s_ingame;
 
 static vec4_t	igDim = { 0.0f, 0.0f, 0.0f, 0.35f };
-static vec4_t	igPanel = { 0.05f, 0.03f, 0.04f, 0.62f };
-static vec4_t	igAccent = { 1.0f, 0.38f, 0.22f, 1.0f };
-static vec4_t	igRule = { 1.0f, 1.0f, 1.0f, 0.12f };
 static vec4_t	igLabel = { 0.92f, 0.86f, 0.84f, 1.0f };
 static vec4_t	igLeave = { 1.0f, 0.55f, 0.50f, 1.0f };
 static vec4_t	igWhite = { 1.0f, 1.0f, 1.0f, 1.0f };
-static vec4_t	igHover = { 1.0f, 1.0f, 1.0f, 0.10f };
-static vec4_t	igHoverLeave = { 0.90f, 0.15f, 0.10f, 0.22f };
 static vec4_t	igRed = { 1.0f, 0.35f, 0.30f, 1.0f };
 static vec4_t	igBlue = { 0.45f, 0.65f, 1.0f, 1.0f };
 static vec4_t	igGreen = { 0.55f, 1.0f, 0.55f, 1.0f };
@@ -156,11 +151,7 @@ static void InGame_RowDraw( void *self ) {
 	int			x = t->generic.left, y = t->generic.top, w = t->generic.right - t->generic.left, h = t->generic.bottom - t->generic.top;
 	vec4_t		c;
 
-	if ( lit ) {
-		UI_FillRect( x, y, w, h, InGame_Fade( leave ? igHoverLeave : igHover, c ) );
-		UI_FillRect( x, y, 3, h, InGame_Fade( leave ? igLeave : igAccent, c ) );
-		UI_FillRect( x + w - 3, y, 3, h, InGame_Fade( leave ? igLeave : igAccent, c ) );
-	}
+	UI_SoftRow( x, y, w, h, lit ? SOFT_HOVER|SOFT_BOTHBARS : 0, leave ? igLeave : NULL );
 	UI_DrawProportionalString( 320, y + ( h - 20 ) / 2, t->string, UI_CENTER|UI_SMALLFONT,
 		InGame_Fade( lit ? igWhite : leave ? igLeave : igLabel, c ) );
 }
@@ -210,8 +201,8 @@ static void InGame_MenuDraw( void ) {
 	}
 
 	UI_FillRect( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, InGame_Fade( igDim, c ) );
-	UI_FillRect( x, y, PANEL_W, s_ingame.panelH, InGame_Fade( igPanel, c ) );
-	UI_FillRect( x, y, PANEL_W, 2, InGame_Fade( igAccent, c ) );
+	uiSoftFade = s_ingame.fade;
+	UI_SoftPanel( x, y, PANEL_W, s_ingame.panelH, 0, qtrue );
 
 	if ( s_ingame.map[0] ) {
 		UI_DrawProportionalString( 320, y + 14, s_ingame.map, UI_CENTER|UI_SMALLFONT|UI_DROPSHADOW, InGame_Fade( igWhite, c ) );
@@ -219,16 +210,17 @@ static void InGame_MenuDraw( void ) {
 	switch ( s_ingame.team ) {
 	case TEAM_RED:			status = "Red team";	color = igRed;		break;
 	case TEAM_BLUE:			status = "Blue team";	color = igBlue;		break;
-	case TEAM_SPECTATOR:	status = "Spectating";	color = igAccent;	break;
+	case TEAM_SPECTATOR:	status = "Spectating";	color = uiSoftAccent;	break;
 	default:				status = "Playing";		color = igGreen;	break;
 	}
 	// the dot and the status together in the middle
 	sx = 320 - ( 14 + (int)strlen( status ) * SMALLCHAR_WIDTH ) / 2;
 	UI_FillRect( sx, y + 44, 6, 6, InGame_Fade( color, c ) );
 	UI_DrawString( sx + 14, y + 40, status, UI_LEFT|UI_SMALLFONT, InGame_Fade( color, c ) );
-	UI_FillRect( x + PANEL_PAD, y + PANEL_HEAD_H - 8, PANEL_W - 2 * PANEL_PAD, 1, InGame_Fade( igRule, c ) );
+	UI_SoftRule( x + PANEL_PAD, y + PANEL_HEAD_H - 8, PANEL_W - 2 * PANEL_PAD );
 
 	Menu_Draw( &s_ingame.menu );
+	uiSoftFade = 1.0f;
 }
 
 

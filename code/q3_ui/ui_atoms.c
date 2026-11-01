@@ -1198,6 +1198,78 @@ void UI_DrawRect( float x, float y, float width, float height, const float *colo
 	trap_R_SetColor( NULL );
 }
 
+
+/*
+=================
+The soft look (Escape menu, Settings rail): see-through panels, rows that only show when hovered or selected, with
+an accent bar, hairline rules.  uiSoftFade is the alpha of everything while a menu fades in.
+=================
+*/
+float uiSoftFade = 1.0f;
+
+vec4_t	uiSoftAccent = { 1.0f, 0.38f, 0.22f, 1.0f };
+vec4_t	uiSoftRule = { 1.0f, 1.0f, 1.0f, 0.12f };
+static vec4_t	softPanel = { 0.05f, 0.03f, 0.04f, 0.62f };
+static vec4_t	softHover = { 1.0f, 1.0f, 1.0f, 0.10f };
+static vec4_t	softSelected = { 1.0f, 1.0f, 1.0f, 0.16f };
+
+static float *UI_SoftColor( const vec4_t c, float alpha, vec4_t out ) {
+	out[0] = c[0];
+	out[1] = c[1];
+	out[2] = c[2];
+	out[3] = alpha * uiSoftFade;
+	return out;
+}
+
+/*
+UI_SoftPanel
+
+A panel with a thin accent strip on top (accentTop) and the opacity given, 0: the default.
+*/
+void UI_SoftPanel( float x, float y, float w, float h, float alpha, qboolean accentTop ) {
+	vec4_t	c;
+
+	UI_FillRect( x, y, w, h, UI_SoftColor( softPanel, alpha > 0 ? alpha : softPanel[3], c ) );
+	if ( accentTop ) {
+		UI_FillRect( x, y, w, 2, UI_SoftColor( uiSoftAccent, 1.0f, c ) );
+	}
+}
+
+/*
+UI_SoftRule
+
+A hairline, horizontal.
+*/
+void UI_SoftRule( float x, float y, float w ) {
+	vec4_t	c;
+
+	UI_FillRect( x, y, w, 1, UI_SoftColor( uiSoftRule, uiSoftRule[3], c ) );
+}
+
+/*
+UI_SoftRow
+
+The highlight of a row: SOFT_HOVER a light fill and an accent bar, SOFT_SELECTED a stronger fill; SOFT_BOTHBARS puts a
+bar on the right too (centred text).  tint (may be NULL) replaces the accent.
+*/
+void UI_SoftRow( float x, float y, float w, float h, int flags, const float *tint ) {
+	vec4_t	c;
+	const float	*bar = tint ? tint : uiSoftAccent;
+
+	if ( !( flags & ( SOFT_HOVER | SOFT_SELECTED ) ) ) {
+		return;
+	}
+	if ( tint ) {
+		UI_FillRect( x, y, w, h, UI_SoftColor( tint, ( flags & SOFT_SELECTED ) ? 0.30f : 0.20f, c ) );
+	} else {
+		UI_FillRect( x, y, w, h, UI_SoftColor( ( flags & SOFT_SELECTED ) ? softSelected : softHover, ( flags & SOFT_SELECTED ) ? softSelected[3] : softHover[3], c ) );
+	}
+	UI_FillRect( x, y, 3, h, UI_SoftColor( bar, 1.0f, c ) );
+	if ( flags & SOFT_BOTHBARS ) {
+		UI_FillRect( x + w - 3, y, 3, h, UI_SoftColor( bar, 1.0f, c ) );
+	}
+}
+
 void UI_SetColor( const float *rgba ) {
 	trap_R_SetColor( rgba );
 }

@@ -612,6 +612,15 @@ extern void			UI_DrawNamedPic( float x, float y, float width, float height, cons
 extern void			UI_DrawHandlePic( float x, float y, float w, float h, qhandle_t hShader ); 
 extern void			UI_FillRect( float x, float y, float width, float height, const float *color );
 extern void			UI_DrawRect( float x, float y, float width, float height, const float *color );
+// the soft look: see-through panels, rows that show when hovered or selected, hairlines (ui_atoms.c)
+#define SOFT_HOVER			1
+#define SOFT_SELECTED		2
+#define SOFT_BOTHBARS		4
+extern float		uiSoftFade;
+extern vec4_t		uiSoftAccent, uiSoftRule;
+extern void			UI_SoftPanel( float x, float y, float w, float h, float alpha, qboolean accentTop );
+extern void			UI_SoftRule( float x, float y, float w );
+extern void			UI_SoftRow( float x, float y, float w, float h, int flags, const float *tint );
 extern void			UI_UpdateScreen( void );
 extern void			UI_SetColor( const float *rgba );
 extern void			UI_LerpColor(vec4_t a, vec4_t b, vec4_t c, float t);

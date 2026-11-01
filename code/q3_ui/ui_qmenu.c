@@ -1380,13 +1380,9 @@ void ScrollList_Draw( menulist_s *l )
 					u -= (l->width * SMALLCHAR_WIDTH) / 2 + 1;
 				}
 
-				UI_FillRect(u,y,l->width*SMALLCHAR_WIDTH,SMALLCHAR_HEIGHT+2,listbar_color);
-				color = text_color_highlight;
-
-				if (hasfocus)
-					style = UI_PULSE|UI_LEFT|UI_SMALLFONT;
-				else
-					style = UI_LEFT|UI_SMALLFONT;
+				UI_SoftRow( u - 2, y, l->width*SMALLCHAR_WIDTH, SMALLCHAR_HEIGHT+2, hasfocus ? SOFT_SELECTED : SOFT_HOVER, NULL );
+				color = color_white;
+				style = UI_LEFT|UI_SMALLFONT;
 			}
 			else
 			{

@@ -37,10 +37,11 @@ Opensource DeFRaG server runtime
 - "Mods" (stock game mod switcher) is hidden from the main menu unless `df_ui_showMods 1`
 - Credits moved from the main menu list to a small dim link at the bottom of the screen
 - One "Settings" entry (main and in-game menu) instead of Setup, Defrag Setup and Plugins: every settings page has the same category rail on the left (General: Player, Controls, Video, Audio, Network, Game; DeFRag: HUD, Crosshair, Replays, Gameplay, Advanced; Plugins), a page title, one column layout; reopens on the page you used last; the CD Key page is gone
-- Settings look: orange setting names, sliders you can drag with the value shown, Driver Info page redone
+- Settings look: see-through category rail, orange setting names, sliders you can drag with the value shown, Driver Info page redone
 - Player page redone: coloured name, handicap slider, bigger 3D preview you can rotate, login/records section
 - Player model picker redone: portrait grid with search and live preview on hover
 - In-game (Escape) menu redone: small see-through panel, Join game / Spectate in one click, Settings, Disconnect
+- Map, demo and server browsers in the same soft look: see-through panels, flat buttons, accent-bar rows, slim scroll bars
 - Settings pages merged: Video = Graphics + Display (brightness, screen size), Replays = Demos + Ghost, Gameplay = Misc + Multiplayer, Advanced = Quake 3 Extras; "Automatic Downloading" moved to Network
 - New menu colours (the dark red of the map and demo browsers): the `df_ui_*` colours that still have an old default are moved to them once (`df_ui_theme`), colours you changed stay
 - "Plugins" page in Settings: lists the client plugins of the plugins folder with version and state (ON / OFF / FAILED / CRASHED) and switches them on and off, also in a running game; the choice is kept in `plugins/disabled`

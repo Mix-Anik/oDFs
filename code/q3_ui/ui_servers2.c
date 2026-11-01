@@ -84,13 +84,13 @@ a time in the background.
 // the columns of the list, from its left edge
 #define SB_COL_STAR		4
 #define SB_COL_LOCK		12
-#define SB_COL_NAME		22		// 20 characters
-#define SB_COL_MAP		186		// 13 characters
-#define SB_COL_MODE		296		// 6 characters
-#define SB_COL_PLAYERS	386		// right edge
-#define SB_COL_PING		418		// right edge
-#define SB_NAME_CHARS	20
-#define SB_MAP_CHARS	13
+#define SB_COL_NAME		22		// 17 characters
+#define SB_COL_MAP		166		// 12 characters
+#define SB_COL_MODE		270		// 6 characters
+#define SB_COL_PLAYERS	376		// right edge
+#define SB_COL_PING		424		// right edge
+#define SB_NAME_CHARS	17
+#define SB_MAP_CHARS	12
 
 #define ID_SEARCH			1
 #define ID_ADDR				2
@@ -139,22 +139,17 @@ static const char *sbTypeShort[4] = { "-", "RUN", "TRICKS", "FCAPS" };
 static const char *sbColName[SB_COLUMNS] = { "NAME", "MAP", "MODE", "PLAYERS", "PING" };
 static const int sbColSort[SB_COLUMNS] = { SORT_HOST, SORT_MAP, SORT_MODE, SORT_CLIENTS, UISORT_PING };
 static const int sbColX[SB_COLUMNS] = { SB_COL_NAME, SB_COL_MAP, SB_COL_MODE, SB_COL_PLAYERS - 56, SB_COL_PING - 32 };
-static const int sbColW[SB_COLUMNS] = { 160, 104, 48, 56, 32 };
+static const int sbColW[SB_COLUMNS] = { 140, 100, 48, 56, 32 };
 
 static vec4_t	sbWhite = { 1.0f, 1.0f, 1.0f, 1.0f };
-static vec4_t	sbPlate = { 0.14f, 0.02f, 0.02f, 0.90f };
-static vec4_t	sbPlateFocus = { 0.26f, 0.04f, 0.03f, 0.95f };
-static vec4_t	sbPanel = { 0.10f, 0.01f, 0.01f, 0.62f };
-static vec4_t	sbBorder = { 0.62f, 0.10f, 0.08f, 1.0f };
-static vec4_t	sbBorderFocus = { 1.0f, 0.85f, 0.25f, 1.0f };
 static vec4_t	sbHint = { 0.62f, 0.38f, 0.34f, 1.0f };
-static vec4_t	sbLabel = { 1.0f, 0.82f, 0.76f, 1.0f };
-static vec4_t	sbChipFill = { 0.70f, 0.08f, 0.05f, 0.14f };
-static vec4_t	sbChipFillLit = { 0.85f, 0.15f, 0.08f, 0.32f };
-static vec4_t	sbChipFillSel = { 0.85f, 0.12f, 0.06f, 0.60f };
-static vec4_t	sbChipBorder = { 0.80f, 0.14f, 0.10f, 1.0f };
-static vec4_t	sbChipBorderSel = { 1.0f, 0.38f, 0.22f, 1.0f };
+static vec4_t	sbLabel = { 0.92f, 0.86f, 0.84f, 1.0f };
 static vec4_t	sbChipOff = { 0.45f, 0.35f, 0.33f, 1.0f };
+static vec4_t	sbHead = { 0.72f, 0.62f, 0.60f, 1.0f };		// column headings
+static vec4_t	sbIdle ={ 1.0f, 1.0f, 1.0f, 0.05f };		// the plate of a chip or button nothing is happening to
+static vec4_t	sbField = { 0.0f, 0.0f, 0.0f, 0.35f };
+static vec4_t	sbFieldFocus = { 1.0f, 1.0f, 1.0f, 0.10f };
+static vec4_t	sbPicture = { 1.0f, 1.0f, 1.0f, 0.30f };
 static vec4_t	sbGold = { 1.0f, 0.85f, 0.25f, 1.0f };
 static vec4_t	sbGood = { 0.55f, 0.85f, 0.55f, 1.0f };
 static vec4_t	sbWarn = { 1.0f, 0.85f, 0.25f, 1.0f };
@@ -452,6 +447,43 @@ static int SB_FavIndex( const char *adr ) {
 		}
 	}
 	return -1;
+}
+
+/*
+The engine answers a ping with the address it resolved ("1.2.3.4:27965"), so a favorite typed as a name ("q3df.ru:27965") or
+without the port would never be matched with its answer.  Such an address is resolved by pinging it once: the ping slot
+that is new afterwards holds the address as the engine reads it.
+*/
+static qboolean SB_PlainAddress( const char *adr ) {
+	int		colons = 0;
+
+	for ( ; *adr; adr++ ) {
+		if ( *adr == ':' ) {
+			colons++;
+		} else if ( *adr != '.' && ( *adr < '0' || *adr > '9' ) ) {
+			return colons >= 2;		// a name; an IPv6 address is left as it is
+		}
+	}
+	return colons == 1 || colons >= 2;
+}
+
+static qboolean SB_ResolveAddress( const char *adr, char *out, int size ) {
+	char	before[MAX_PINGREQUESTS][MAX_ADDRESSLENGTH], now[MAX_ADDRESSLENGTH];
+	int		i, time;
+
+	for ( i = 0; i < MAX_PINGREQUESTS; i++ ) {
+		trap_LAN_GetPing( i, before[i], MAX_ADDRESSLENGTH, &time );
+	}
+	trap_Cmd_ExecuteText( EXEC_NOW, va( "ping %s\n", adr ) );
+	for ( i = 0; i < MAX_PINGREQUESTS; i++ ) {
+		trap_LAN_GetPing( i, now, MAX_ADDRESSLENGTH, &time );
+		if ( now[0] && Q_stricmp( now, before[i] ) ) {
+			Q_strncpyz( out, now, size );
+			trap_LAN_ClearPing( i );
+			return qtrue;
+		}
+	}
+	return qfalse;
 }
 
 /*
@@ -1164,6 +1196,16 @@ static void ArenaServers_DoRefresh( void )
 
 		if (g_servertype == UIAS_FAVORITES) {
 		  strcpy( adrstr, g_arenaservers.favoriteaddresses[g_arenaservers.currentping] );
+		  if ( !SB_PlainAddress( adrstr ) ) {
+			// a name, or no port: the answer comes with the address the engine made of it, so that is what the favorite becomes
+			char	resolved[MAX_ADDRESSLENGTH];
+
+			if ( SB_ResolveAddress( adrstr, resolved, sizeof( resolved ) ) && SB_FavIndex( resolved ) < 0 ) {
+				Q_strncpyz( g_arenaservers.favoriteaddresses[g_arenaservers.currentping], resolved, MAX_ADDRESSLENGTH );
+				strcpy( adrstr, resolved );
+				ArenaServers_SaveChanges();
+			}
+		  }
 		} else {
 		  trap_LAN_GetServerAddressString(ArenaServers_SourceForLAN(), g_arenaservers.currentping, adrstr, MAX_ADDRESSLENGTH );
 		}
@@ -1362,6 +1404,15 @@ static void SB_Join( qboolean favorite ) {
 		return;
 	}
 	if ( favorite ) {
+		char	resolved[MAX_ADDRESSLENGTH];
+
+		if ( !SB_PlainAddress( s ) ) {
+			if ( !SB_ResolveAddress( s, resolved, sizeof( resolved ) ) ) {
+				SB_Notice( "Cannot find that address." );
+				return;
+			}
+			s = resolved;
+		}
 		SB_FavAdd( s, NULL );
 	} else {
 		trap_Cmd_ExecuteText( EXEC_APPEND, va( "connect %s\n", s ) );
@@ -1374,13 +1425,6 @@ static void SB_Join( qboolean favorite ) {
 Drawing
 =================
 */
-static void SB_DrawOutline( int x, int y, int w, int h, const float *border ) {
-	UI_FillRect( x, y, w, 1, border );
-	UI_FillRect( x, y + h - 1, w, 1, border );
-	UI_FillRect( x, y, 1, h, border );
-	UI_FillRect( x + w - 1, y, 1, h, border );
-}
-
 static qboolean SB_Lit( menucommon_s *c ) {
 	return ( c->flags & QMF_HASMOUSEFOCUS ) || ( g_arenaservers.keyNav && Menu_ItemAtCursor( c->parent ) == (void *)c );
 }
@@ -1391,14 +1435,13 @@ static qboolean SB_FieldFocused( void ) {
 	return item == (void *)&g_arenaservers.search || item == (void *)&g_arenaservers.addr;
 }
 
-// the source / mode / filter tabs: plain text, the selected one is filled, the pointer (or keyboard focus) outlines one in yellow
+// the source / mode / filter tabs: the selected one is lit with an accent bar, the pointer (or keyboard focus) lightens one
 static void SB_ChipDraw( void *self ) {
 	menutext_s	*c = (menutext_s *)self;
 	int			id = c->generic.id;
 	int			x = c->generic.left, y = c->generic.top;
 	int			w = c->generic.right - x + 1, h = c->generic.bottom - y + 1;
 	qboolean	selected, lit;
-	vec4_t		fill;
 
 	if ( id >= ID_SRC && id < ID_SRC + UIAS_NUM_SOURCES ) {
 		selected = g_servertype == id - ID_SRC;
@@ -1410,29 +1453,27 @@ static void SB_ChipDraw( void *self ) {
 		selected = g_emptyservers != 0;
 	}
 	lit = SB_Lit( &c->generic );
-	if ( selected || lit ) {
-		Vector4Copy( selected ? sbChipFillSel : sbChipFillLit, fill );
-		UI_FillRect( x, y, w, h, fill );
+	if ( !selected && !lit ) {
+		UI_FillRect( x, y, w, h, sbIdle );
 	}
-	if ( lit ) {
-		SB_DrawOutline( x, y, w, h, sbBorderFocus );
-	}
+	UI_SoftRow( x, y, w, h, selected ? SOFT_SELECTED : lit ? SOFT_HOVER : 0, NULL );
 	UI_DrawString( x + w / 2, y + ( h - SMALLCHAR_HEIGHT ) / 2, c->string, UI_CENTER | UI_SMALLFONT, ( selected || lit ) ? sbWhite : sbLabel );
 }
 
-// BACK / REFRESH / ...: a faint red fill and plain text; the pointer outlines one in yellow
+// BACK / REFRESH / ...: a faint plate and plain text; CONNECT is lit, the pointer adds an accent bar at both ends
 static void SB_ButtonDraw( void *self ) {
 	menutext_s	*b = (menutext_s *)self;
 	qboolean	off = ( b->generic.flags & QMF_GRAYED ) != 0;
 	qboolean	lit = !off && SB_Lit( &b->generic );
+	qboolean	primary = b->generic.id == ID_CONNECT && !off;
 	int			x = b->generic.left, y = b->generic.top;
 	int			w = b->generic.right - x + 1, h = b->generic.bottom - y + 1;
 
-	UI_FillRect( x, y, w, h, lit ? sbChipFillLit : b->generic.id == ID_CONNECT && !off ? sbChipFillSel : sbChipFill );
-	if ( lit ) {
-		SB_DrawOutline( x, y, w, h, sbBorderFocus );
+	if ( !lit && !primary ) {
+		UI_FillRect( x, y, w, h, sbIdle );
 	}
-	UI_DrawString( x + w / 2, y + ( h - SMALLCHAR_HEIGHT ) / 2, b->string, UI_CENTER | UI_SMALLFONT, off ? sbChipOff : ( lit || b->generic.id == ID_CONNECT ) ? sbWhite : sbLabel );
+	UI_SoftRow( x, y, w, h, lit ? SOFT_HOVER | SOFT_BOTHBARS : primary ? SOFT_SELECTED | SOFT_BOTHBARS : 0, NULL );
+	UI_DrawString( x + w / 2, y + ( h - SMALLCHAR_HEIGHT ) / 2, b->string, UI_CENTER | UI_SMALLFONT, off ? sbChipOff : ( lit || primary ) ? sbWhite : sbLabel );
 }
 
 // the column headings: the sorted one is white with a triangle
@@ -1442,18 +1483,18 @@ static void SB_HeadDraw( void *self ) {
 	int			x = c->generic.left, y = c->generic.top;
 	qboolean	sorted = g_sortkey == sbColSort[col];
 	qboolean	lit = SB_Lit( &c->generic );
-	float		*color = ( sorted || lit ) ? ( lit ? sbGold : sbWhite ) : sbLabel;
+	float		*color = ( sorted || lit ) ? sbWhite : sbHead;
 	int			w = strlen( c->string ) * SMALLCHAR_WIDTH;
-	int			tx, i, up;
+	int			tx, ax, i, up;
 
+	// the text is where the text of the rows is; the triangle goes on the side that has room (after the text of the
+	// columns that start at the left, before the numbers that end at the right)
 	if ( col >= 3 ) {
-		// the numbers are right aligned
 		tx = c->generic.right + 1 - w;
-		if ( sorted ) {
-			tx -= 10;
-		}
+		ax = tx - 10;
 	} else {
-		tx = x + 2;
+		tx = x;
+		ax = tx + w + 3;
 	}
 	UI_DrawString( tx, y, c->string, UI_SMALLFONT, color );
 	if ( sorted ) {
@@ -1462,7 +1503,7 @@ static void SB_HeadDraw( void *self ) {
 		if ( sbColSort[col] == SORT_CLIENTS ) {
 			up = g_sortrev;		// the most players first is the natural order here
 		}
-		tx += w + 3;
+		tx = ax;
 		for ( i = 0; i < 4; i++ ) {
 			int half = up ? i : 3 - i;
 
@@ -1505,9 +1546,8 @@ static void SB_ScrollbarDrag( void ) {
 }
 
 static void SB_ScrollbarDraw( void ) {
-	static vec4_t	trackColor = { 0.15f, 0.0f, 0.0f, 0.6f };
-	static vec4_t	thumbColor = { 0.70f, 0.08f, 0.08f, 0.95f };
-	static vec4_t	hotColor = { 1.0f, 0.30f, 0.15f, 1.0f };
+	static vec4_t	trackColor = { 1.0f, 1.0f, 1.0f, 0.06f };
+	static vec4_t	thumbColor = { 1.0f, 1.0f, 1.0f, 0.28f };
 	int				trackY, trackH, thumbY, thumbH;
 	qboolean		hot;
 
@@ -1515,8 +1555,8 @@ static void SB_ScrollbarDraw( void ) {
 		return;
 	}
 	hot = g_arenaservers.sbDrag || UI_CursorInRect( SB_SB_X, trackY, SB_SB_W, trackH );
-	UI_FillRect( SB_SB_X, trackY, SB_SB_W, trackH, trackColor );
-	UI_FillRect( SB_SB_X + 1, thumbY, SB_SB_W - 2, thumbH, hot ? hotColor : thumbColor );
+	UI_FillRect( SB_SB_X + 4, trackY, 4, trackH, trackColor );
+	UI_FillRect( SB_SB_X + ( hot ? 3 : 4 ), thumbY, hot ? 6 : 4, thumbH, hot ? uiSoftAccent : thumbColor );
 }
 
 // a search / address plate; empty and unfocused it shows what it is for
@@ -1526,9 +1566,9 @@ static void SB_FieldDraw( void *self ) {
 	int			x = f->generic.left, y = f->generic.y;
 	int			w = f->generic.right - x + 1;
 
-	UI_FillRect( x, y - 2, w, SMALLCHAR_HEIGHT + 4, focus ? sbPlateFocus : sbPlate );
+	UI_FillRect( x, y - 2, w, SMALLCHAR_HEIGHT + 4, focus ? sbFieldFocus : sbField );
 	if ( focus ) {
-		SB_DrawOutline( x, y - 2, w, SMALLCHAR_HEIGHT + 4, sbBorderFocus );
+		UI_FillRect( x, y + SMALLCHAR_HEIGHT, w, 2, uiSoftAccent );
 	}
 	if ( !f->field.buffer[0] && !focus ) {
 		UI_DrawString( x + 4, y, f->generic.id == ID_SEARCH ? "search servers / maps    F5 refresh" : "connect to an address    Ctrl+Enter: favorite", UI_SMALLFONT, sbHint );
@@ -1564,15 +1604,12 @@ static void SB_ListDraw( void *self ) {
 		const servernode_t	*n = g_arenaservers.view[i];
 		qboolean			sel = i == l->curvalue;
 		int					style = UI_LEFT | UI_SMALLFONT;
-		float				*color = n->responded ? text_color_normal : sbChipOff;
+		float				*color = n->responded ? sbLabel : sbChipOff;
 		float				*dim = sel ? sbWhite : sbHint;
 
 		if ( sel ) {
-			UI_FillRect( x - 2, y, l->width * SMALLCHAR_WIDTH, SMALLCHAR_HEIGHT + 2, listbar_color );
-			color = text_color_highlight;
-			if ( hasfocus ) {
-				style |= UI_PULSE;
-			}
+			UI_SoftRow( x - 4, y, l->width * SMALLCHAR_WIDTH, SMALLCHAR_HEIGHT + 2, hasfocus ? SOFT_SELECTED : SOFT_HOVER, NULL );
+			color = sbWhite;
 		}
 		if ( SB_FavIndex( n->adrstr ) >= 0 ) {
 			UI_DrawString( x + SB_COL_STAR, y, "*", UI_LEFT | UI_SMALLFONT, sbGold );
@@ -1624,6 +1661,7 @@ static void SB_DetailDraw( void ) {
 			g_arenaservers.previewShader = trap_R_RegisterShaderNoMip( ART_UNKNOWNMAP );
 		}
 	}
+	UI_FillRect( SB_RX + 11, SB_SRC_Y - 1, 146, 110, sbPicture );
 	UI_DrawHandlePic( SB_RX + 12, SB_SRC_Y, 144, 108, g_arenaservers.previewShader );
 
 	y = SB_SRC_Y + 114;
@@ -1732,8 +1770,10 @@ static void ArenaServers_MenuDraw( void )
 	}
 
 	// a line under the headings
-	UI_FillRect( SB_LX, SB_HEAD_Y + SB_HEAD_H, SB_SB_X + SB_SB_W - SB_LX, 1, sbBorder );
+	UI_SoftRule( SB_LX, SB_HEAD_Y + SB_HEAD_H, SB_SB_X + SB_SB_W - SB_LX );
 
+	UI_SoftPanel( 4, 3, 448, 430, 0.72f, qfalse );
+	UI_SoftPanel( 456, 3, 180, 430, 0.72f, qfalse );
 	Menu_Draw( &g_arenaservers.menu );
 	UI_DrawString( g_arenaservers.showfull.generic.left - 6, SB_TYPE_Y + ( SB_CHIP_H - SMALLCHAR_HEIGHT ) / 2, "show", UI_RIGHT | UI_SMALLFONT, sbHint );
 	SB_ScrollbarDraw();
@@ -1748,7 +1788,7 @@ static void ArenaServers_MenuDraw( void )
 	} else {
 		UI_DrawString( SB_LX + SB_LW / 2, SB_STATUS_Y, g_arenaservers.status, UI_CENTER | UI_SMALLFONT, sbWhite );
 	}
-	UI_DrawProportionalString( SB_RX, 5, "SERVERS", UI_LEFT | UI_SMALLFONT | UI_DROPSHADOW, sbLabel );
+	UI_DrawProportionalString( SB_RX, 5, "SERVERS", UI_LEFT | UI_SMALLFONT | UI_DROPSHADOW, uiSoftAccent );
 }
 
 

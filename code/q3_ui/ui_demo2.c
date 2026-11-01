@@ -1461,9 +1461,8 @@ static void Demos_ScrollbarDrag( void ) {
 }
 
 static void Demos_ScrollbarDraw( void ) {
-	static vec4_t	trackColor = { 0.15f, 0.0f, 0.0f, 0.6f };
-	static vec4_t	thumbColor = { 0.70f, 0.08f, 0.08f, 0.95f };
-	static vec4_t	hotColor = { 1.0f, 0.30f, 0.15f, 1.0f };
+	static vec4_t	trackColor = { 1.0f, 1.0f, 1.0f, 0.06f };
+	static vec4_t	thumbColor = { 1.0f, 1.0f, 1.0f, 0.28f };
 	int				trackY, trackH, thumbY, thumbH;
 	qboolean		hot;
 
@@ -1471,8 +1470,8 @@ static void Demos_ScrollbarDraw( void ) {
 		return;
 	}
 	hot = s_demos.sbDrag || UI_CursorInRect( SCROLLBAR_X, trackY, SCROLLBAR_W, trackH );
-	UI_FillRect( SCROLLBAR_X, trackY, SCROLLBAR_W, trackH, trackColor );
-	UI_FillRect( SCROLLBAR_X + 1, thumbY, SCROLLBAR_W - 2, thumbH, hot ? hotColor : thumbColor );
+	UI_FillRect( SCROLLBAR_X + 6, trackY, 4, trackH, trackColor );
+	UI_FillRect( SCROLLBAR_X + ( hot ? 5 : 6 ), thumbY, hot ? 6 : 4, thumbH, hot ? uiSoftAccent : thumbColor );
 }
 
 /*
@@ -1938,6 +1937,7 @@ static void Demos_MenuDraw( void ) {
 		}
 	}
 	Demos_SuggestRefresh();
+	UI_SoftPanel( 4, 3, 632, 430, 0.72f, qfalse );
 	Menu_Draw( &s_demos.menu );
 	Demos_ScrollbarDraw();
 	Demos_SuggestDraw();
@@ -1946,37 +1946,19 @@ static void Demos_MenuDraw( void ) {
 /*
 ===============
 Look of the controls (oDFs).  The stock widgets draw everything in the DeFRaG list colours (yellow labels, red values), so
-FOLDER / SEARCH / BACK / PLAY are drawn here: dark red plates with a red outline (the red of the old BACK / PLAY art), a
-yellow outline while focused, white labels.
+FOLDER / SEARCH / BACK / PLAY are drawn here in the soft look (UI_SoftPanel / UI_SoftRow in ui_atoms.c): flat plates, an
+accent bar when lit or focused.
 ===============
 */
-static vec4_t	demosPlate = { 0.14f, 0.02f, 0.02f, 0.90f };
-static vec4_t	demosPlateFocus = { 0.26f, 0.04f, 0.03f, 0.95f };
-static vec4_t	demosBorder = { 0.62f, 0.10f, 0.08f, 1.0f };
-static vec4_t	demosBorderFocus = { 1.0f, 0.85f, 0.25f, 1.0f };
 static vec4_t	demosLabel = { 1.0f, 1.0f, 1.0f, 1.0f };
 static vec4_t	demosFolderText = { 1.0f, 0.78f, 0.62f, 1.0f };
 static vec4_t	demosSearchText = { 1.0f, 1.0f, 1.0f, 1.0f };
 static vec4_t	demosHint = { 0.62f, 0.38f, 0.34f, 1.0f };
-static vec4_t	demosButtonFill = { 0.70f, 0.08f, 0.05f, 0.14f };
-static vec4_t	demosButtonFillLit = { 0.85f, 0.15f, 0.08f, 0.32f };
-static vec4_t	demosButtonBorder = { 0.80f, 0.14f, 0.10f, 1.0f };
-static vec4_t	demosButtonText = { 1.0f, 0.82f, 0.76f, 1.0f };
-
-static void Demos_DrawOutline( int x, int y, int w, int h, const float *border ) {
-	UI_FillRect( x, y, w, 1, border );
-	UI_FillRect( x, y + h - 1, w, 1, border );
-	UI_FillRect( x, y, 1, h, border );
-	UI_FillRect( x + w - 1, y, 1, h, border );
-}
-
-static void Demos_DrawFrame( int x, int y, int w, int h, const float *fill, const float *border ) {
-	UI_FillRect( x, y, w, h, fill );
-	Demos_DrawOutline( x, y, w, h, border );
-}
-
-static vec4_t	demosDropFill = { 0.10f, 0.015f, 0.015f, 1.0f };
-static vec4_t	demosDropSel = { 0.42f, 0.07f, 0.05f, 1.0f };
+static vec4_t	demosButtonText = { 0.92f, 0.86f, 0.84f, 1.0f };
+static vec4_t	demosIdle = { 1.0f, 1.0f, 1.0f, 0.05f };		// the plate of a button nothing is happening to
+static vec4_t	demosField = { 0.0f, 0.0f, 0.0f, 0.35f };
+static vec4_t	demosFieldFocus = { 1.0f, 1.0f, 1.0f, 0.10f };
+static vec4_t	demosDropFill = { 0.07f, 0.05f, 0.06f, 0.97f };
 
 // the completion list under the search box
 static void Demos_SuggestDraw( void ) {
@@ -1988,11 +1970,12 @@ static void Demos_SuggestDraw( void ) {
 	}
 	hot = Demos_SuggestRowAt();
 	sel = hot >= 0 ? hot : s_demos.sugSel;
-	Demos_DrawFrame( SUGGEST_X, SUGGEST_Y, SUGGEST_W, s_demos.numSug * SUGGEST_ROW_H + 2, demosDropFill, demosBorder );
+	UI_FillRect( SUGGEST_X, SUGGEST_Y, SUGGEST_W, s_demos.numSug * SUGGEST_ROW_H + 2, demosDropFill );
+	UI_FillRect( SUGGEST_X, SUGGEST_Y, SUGGEST_W, 2, uiSoftAccent );
 	for ( i = 0; i < s_demos.numSug; i++ ) {
 		y = SUGGEST_Y + 1 + i * SUGGEST_ROW_H;
 		if ( i == sel ) {
-			UI_FillRect( SUGGEST_X + 1, y, SUGGEST_W - 2, SUGGEST_ROW_H, demosDropSel );
+			UI_SoftRow( SUGGEST_X, y, SUGGEST_W, SUGGEST_ROW_H, SOFT_SELECTED, NULL );
 		}
 		UI_DrawString( SUGGEST_X + 4, y + 1, s_demos.words[s_demos.sug[i]], UI_SMALLFONT, i == sel ? demosLabel : demosFolderText );
 		Com_sprintf( num, sizeof( num ), "%i", s_demos.wordCount[s_demos.sug[i]] );
@@ -2034,8 +2017,10 @@ static void Demos_FieldDraw( void *self ) {
 	int			y = f->generic.y;
 
 	UI_DrawProportionalString( 12, y - 3, f->generic.name, UI_SMALLFONT | UI_DROPSHADOW, demosLabel );
-	Demos_DrawFrame( FIELD_PLATE_X, y - 2, FIELD_CHARS * SMALLCHAR_WIDTH + 8, SMALLCHAR_HEIGHT + 4,
-		focus ? demosPlateFocus : demosPlate, focus ? demosBorderFocus : demosBorder );
+	UI_FillRect( FIELD_PLATE_X, y - 2, FIELD_CHARS * SMALLCHAR_WIDTH + 8, SMALLCHAR_HEIGHT + 4, focus ? demosFieldFocus : demosField );
+	if ( focus ) {
+		UI_FillRect( FIELD_PLATE_X, y + SMALLCHAR_HEIGHT, FIELD_CHARS * SMALLCHAR_WIDTH + 8, 2, uiSoftAccent );
+	}
 	if ( isSearch && !f->field.buffer[0] && !focus ) {
 		UI_DrawString( FIELD_X, y, "type to search - wildcards * ? and ** for sub folders", UI_SMALLFONT, demosHint );
 	} else {
@@ -2046,23 +2031,16 @@ static void Demos_FieldDraw( void *self ) {
 	}
 }
 
-// BACK / PLAY: a faint red fill, a 2 pixel red outline and plain text.  Lit while the mouse is over it, or while it has
-// the keyboard focus after a navigation key (the menu keeps its focus when the pointer leaves an item, which must not
-// keep it lit): the outline turns yellow, the fill gets stronger and breathes a little
+// BACK / PLAY: a faint plate and plain text.  Lit while the mouse is over it, or while it has the keyboard focus after a
+// navigation key (the menu keeps its focus when the pointer leaves an item, which must not keep it lit): an accent bar
+// at both ends and a lighter plate
 static void Demos_ButtonDraw( void *self ) {
 	menutext_s	*b = (menutext_s *)self;
 	qboolean	lit = ( b->generic.flags & QMF_HASMOUSEFOCUS ) || ( s_demos.keyNav && Menu_ItemAtCursor( b->generic.parent ) == self );
 	int			x = b->generic.left, y = b->generic.top;
-	vec4_t		fill;
-	const float	*border = lit ? demosBorderFocus : demosButtonBorder;
 
-	Vector4Copy( lit ? demosButtonFillLit : demosButtonFill, fill );
-	if ( lit ) {
-		fill[3] *= 0.85f + 0.15f * sin( uis.realtime * 0.006f );
-	}
-	UI_FillRect( x, y, BUTTON_W, BUTTON_H, fill );
-	Demos_DrawOutline( x, y, BUTTON_W, BUTTON_H, border );
-	Demos_DrawOutline( x + 1, y + 1, BUTTON_W - 2, BUTTON_H - 2, border );
+	UI_FillRect( x, y, BUTTON_W, BUTTON_H, demosIdle );
+	UI_SoftRow( x, y, BUTTON_W, BUTTON_H, lit ? SOFT_HOVER | SOFT_BOTHBARS : 0, NULL );
 	UI_DrawProportionalString( x + BUTTON_W / 2, y + ( BUTTON_H - 20 ) / 2, b->string, UI_CENTER | UI_SMALLFONT, lit ? color_white : demosButtonText );
 }
 
@@ -2087,7 +2065,7 @@ static void Demos_MenuInit( void ) {
 	s_demos.banner.generic.x		= 632;
 	s_demos.banner.generic.y		= 8;
 	s_demos.banner.string			= "DEMOS";
-	s_demos.banner.color			= color_red;
+	s_demos.banner.color			= uiSoftAccent;
 	s_demos.banner.style			= UI_RIGHT|UI_SMALLFONT;
 
 	// BACK and PLAY: plates with text (the DeFRaG buttons were 128x64 bitmaps), bottom left and right

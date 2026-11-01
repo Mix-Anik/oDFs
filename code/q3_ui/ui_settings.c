@@ -90,17 +90,10 @@ static void				( *s_leave )( void );
 static void				( *s_pageDraw )( void );
 static menuframework_s	*s_menu;
 
-// the colours of the map and demo browsers (ui_startmap.c / ui_demo2.c)
-static vec4_t	railLabel = { 1.0f, 0.82f, 0.76f, 1.0f };
-static vec4_t	railHead = { 1.0f, 0.38f, 0.22f, 1.0f };
+// the soft look (UI_SoftPanel / UI_SoftRow in ui_atoms.c)
+static vec4_t	railLabel = { 0.92f, 0.86f, 0.84f, 1.0f };
 static vec4_t	railWhite = { 1.0f, 1.0f, 1.0f, 1.0f };
-static vec4_t	panelColor = { 0.14f, 0.02f, 0.02f, 0.88f };
-static vec4_t	panelEdge = { 0.62f, 0.10f, 0.08f, 1.0f };
-static vec4_t	rowFillLit = { 0.85f, 0.15f, 0.08f, 0.32f };
-static vec4_t	rowFillSel = { 0.85f, 0.12f, 0.06f, 0.60f };
-static vec4_t	rowBorder = { 0.80f, 0.14f, 0.10f, 1.0f };
-static vec4_t	rowBorderLit = { 1.0f, 0.85f, 0.25f, 1.0f };
-static vec4_t	rowBorderSel = { 1.0f, 0.38f, 0.22f, 1.0f };
+static vec4_t	panelRight = { 1.0f, 1.0f, 1.0f, 0.10f };
 
 
 static void Settings_Leave( void ) {
@@ -146,13 +139,8 @@ static void Settings_RailDraw( void *self ) {
 	int			x = RAIL_ROW_L, y = t->generic.top, w = RAIL_ROW_R - RAIL_ROW_L, h = t->generic.bottom - t->generic.top;
 	float		*color = railLabel;
 
-	if ( current ) {
-		UI_FillRect( x, y, w, h, rowFillSel );
-		UI_DrawRect( x, y, w, h, rowBorderSel );
-		color = railWhite;
-	} else if ( lit ) {
-		UI_FillRect( x, y, w, h, rowFillLit );
-		UI_DrawRect( x, y, w, h, rowBorderLit );
+	if ( current || lit ) {
+		UI_SoftRow( x, y, w, h, current ? SOFT_SELECTED : SOFT_HOVER, NULL );
 		color = railWhite;
 	}
 	UI_DrawString( t->generic.x, t->generic.y, t->string, UI_LEFT|UI_SMALLFONT, color );
@@ -187,20 +175,21 @@ The panel, the headings and the title go under the widgets of the page.
 static void Settings_MenuDraw( void ) {
 	int		i;
 
-	UI_FillRect( 0, 0, SETTINGS_PANEL_W, SCREEN_HEIGHT, panelColor );
-	UI_FillRect( SETTINGS_PANEL_W, 0, 2, SCREEN_HEIGHT, panelEdge );
+	UI_SoftPanel( 0, 0, SETTINGS_PANEL_W, SCREEN_HEIGHT, 0.80f, qfalse );
+	UI_FillRect( SETTINGS_PANEL_W, 0, 1, SCREEN_HEIGHT, panelRight );
 
-	// a heading is in the colour of the selected things of the map browser, with a rule under it, the pages are indented
+	// a heading is in the accent colour with a hairline under it, the pages are indented
 	for ( i = 0; i < SETP_COUNT; i++ ) {
 		if ( s_railY[i] && settingsPages[i].group ) {
-			UI_DrawString2( RAIL_X, s_headY[i], settingsPages[i].group, railHead, 7, 14 );
-			UI_FillRect( RAIL_X, s_headY[i] + 17, SETTINGS_PANEL_W - 2 * RAIL_X, 1, rowBorder );
+			UI_DrawString2( RAIL_X, s_headY[i], settingsPages[i].group, uiSoftAccent, 7, 14 );
+			UI_SoftRule( RAIL_X, s_headY[i] + 17, SETTINGS_PANEL_W - 2 * RAIL_X );
 		}
 	}
-	UI_FillRect( RAIL_X, RAIL_RULE_Y, SETTINGS_PANEL_W - 2 * RAIL_X, 1, rowBorder );
+	UI_SoftRule( RAIL_X, RAIL_RULE_Y, SETTINGS_PANEL_W - 2 * RAIL_X );
 
 	UI_DrawProportionalString( TITLE_X, TITLE_Y, settingsPages[s_current].label, UI_LEFT|UI_SMALLFONT|UI_DROPSHADOW, railWhite );
-	UI_FillRect( TITLE_X, SETTINGS_TITLE_H - 4, SCREEN_WIDTH - TITLE_X - 10, 2, panelEdge );
+	UI_SoftRule( TITLE_X, SETTINGS_TITLE_H - 4, SCREEN_WIDTH - TITLE_X - 10 );
+	UI_FillRect( TITLE_X, SETTINGS_TITLE_H - 5, UI_ProportionalStringWidth( settingsPages[s_current].label ) * PROP_SMALL_SIZE_SCALE, 2, uiSoftAccent );
 
 	if ( s_pageDraw ) {
 		s_pageDraw();

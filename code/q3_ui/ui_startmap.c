@@ -181,19 +181,14 @@ static dfEntry_t	dfsExtras[DFS_MAXEXTRA];	// the unlisted maps
 static char			dfsBspList[DFS_BSPLISTSIZE];
 
 static vec4_t	dfsColorWhite = { 1.0f, 1.0f, 1.0f, 1.0f };
-static vec4_t	dfsPlate = { 0.14f, 0.02f, 0.02f, 0.90f };
-static vec4_t	dfsPlateFocus = { 0.26f, 0.04f, 0.03f, 0.95f };
-static vec4_t	dfsBorder = { 0.62f, 0.10f, 0.08f, 1.0f };
-static vec4_t	dfsBorderFocus = { 1.0f, 0.85f, 0.25f, 1.0f };
 static vec4_t	dfsTime = { 0.55f, 0.85f, 0.55f, 1.0f };
 static vec4_t	dfsHint = { 0.62f, 0.38f, 0.34f, 1.0f };
-static vec4_t	dfsLabel = { 1.0f, 0.82f, 0.76f, 1.0f };
-static vec4_t	dfsChipFill = { 0.70f, 0.08f, 0.05f, 0.14f };
-static vec4_t	dfsChipFillLit = { 0.85f, 0.15f, 0.08f, 0.32f };
-static vec4_t	dfsChipFillSel = { 0.85f, 0.12f, 0.06f, 0.60f };
-static vec4_t	dfsChipBorder = { 0.80f, 0.14f, 0.10f, 1.0f };
-static vec4_t	dfsChipBorderSel = { 1.0f, 0.38f, 0.22f, 1.0f };
+static vec4_t	dfsLabel = { 0.92f, 0.86f, 0.84f, 1.0f };
 static vec4_t	dfsChipOff = { 0.45f, 0.35f, 0.33f, 1.0f };
+static vec4_t	dfsIdle = { 1.0f, 1.0f, 1.0f, 0.05f };		// the plate of a chip or button nothing is happening to
+static vec4_t	dfsField = { 0.0f, 0.0f, 0.0f, 0.35f };
+static vec4_t	dfsFieldFocus = { 1.0f, 1.0f, 1.0f, 0.10f };
+static vec4_t	dfsPicture = { 1.0f, 1.0f, 1.0f, 0.30f };
 
 static const char *dfsListOffOn[] = { "off", "on", 0 };
 static const char *dfsListOnOff[] = { "on", "off", 0 };
@@ -543,26 +538,17 @@ static void DFS_ListEvent( void *ptr, int event ) {
 // ---------------------------------------------------------------------------------------------------------------
 // drawing helpers
 
-static void DFS_DrawOutline( int x, int y, int w, int h, const float *border ) {
-	UI_FillRect( x, y, w, 1, border );
-	UI_FillRect( x, y + h - 1, w, 1, border );
-	UI_FillRect( x, y, 1, h, border );
-	UI_FillRect( x + w - 1, y, 1, h, border );
-}
-
 static qboolean DFS_Lit( menucommon_s *c ) {
 	return ( c->flags & QMF_HASMOUSEFOCUS ) || ( s_ds.keyNav && Menu_ItemAtCursor( c->parent ) == (void *)c );
 }
 
-// mode chips, type chips, tabs: the selected one is filled, the pointer (or keyboard focus) turns the outline yellow
+// mode chips, type chips, tabs: the selected one is lit with an accent bar, the pointer (or keyboard focus) lightens the plate
 static void DFS_ChipDraw( void *self ) {
 	menutext_s	*c = (menutext_s *)self;
 	int			id = c->generic.id;
 	int			x = c->generic.left, y = c->generic.top;
 	int			w = c->generic.right - x + 1, h = c->generic.bottom - y + 1;
 	qboolean	selected, off = ( c->generic.flags & QMF_GRAYED ) != 0, lit;
-	vec4_t		fill;
-	const float	*border;
 	float		*color;
 
 	if ( id >= ID_MODE && id < ID_MODE + FILTER_COUNT ) {
@@ -573,39 +559,29 @@ static void DFS_ChipDraw( void *self ) {
 		selected = s_ds.curPanel == id - ID_TAB;
 	}
 	lit = !off && DFS_Lit( &c->generic );
-	Vector4Copy( selected ? dfsChipFillSel : lit ? dfsChipFillLit : dfsChipFill, fill );
-	if ( lit ) {
-		fill[3] *= 0.85f + 0.15f * sin( uis.realtime * 0.006f );
-	}
-	border = lit ? dfsBorderFocus : selected ? dfsChipBorderSel : dfsChipBorder;
 	color = off ? dfsChipOff : ( selected || lit ) ? dfsColorWhite : dfsLabel;
-	UI_FillRect( x, y, w, h, fill );
-	DFS_DrawOutline( x, y, w, h, border );
+	if ( !selected && !lit ) {
+		UI_FillRect( x, y, w, h, dfsIdle );
+	}
+	UI_SoftRow( x, y, w, h, selected ? SOFT_SELECTED : lit ? SOFT_HOVER : 0, NULL );
 	if ( id >= ID_MODE && id < ID_MODE + FILTER_COUNT ) {
 		// the label, and under it how many maps match the search
 		UI_DrawString( x + w / 2, y + 2, c->string, UI_CENTER | UI_SMALLFONT, color );
 		UI_DrawString( x + w / 2, y + 2 + SMALLCHAR_HEIGHT, va( "%i", s_ds.counts[id - ID_MODE] ), UI_CENTER | UI_SMALLFONT, selected ? dfsColorWhite : dfsHint );
 		return;
 	}
-	UI_DrawString( x + 4, y + ( h - SMALLCHAR_HEIGHT ) / 2, c->string, UI_SMALLFONT, color );
+	UI_DrawString( x + 8, y + ( h - SMALLCHAR_HEIGHT ) / 2, c->string, UI_SMALLFONT, color );
 }
 
-// BACK / START: a faint red fill, a 2 pixel outline and plain text, as the demo browser's buttons
+// BACK / WATCH / START: a faint plate, an accent bar at both ends when lit, plain text
 static void DFS_ButtonDraw( void *self ) {
 	menutext_s	*b = (menutext_s *)self;
 	qboolean	off = ( b->generic.flags & QMF_GRAYED ) != 0;
 	qboolean	lit = !off && DFS_Lit( &b->generic );
 	int			x = b->generic.left, y = b->generic.top;
-	vec4_t		fill;
-	const float	*border = lit ? dfsBorderFocus : dfsChipBorder;
 
-	Vector4Copy( lit ? dfsChipFillLit : dfsChipFill, fill );
-	if ( lit ) {
-		fill[3] *= 0.85f + 0.15f * sin( uis.realtime * 0.006f );
-	}
-	UI_FillRect( x, y, DFS_BUTTON_W, DFS_BUTTON_H, fill );
-	DFS_DrawOutline( x, y, DFS_BUTTON_W, DFS_BUTTON_H, border );
-	DFS_DrawOutline( x + 1, y + 1, DFS_BUTTON_W - 2, DFS_BUTTON_H - 2, border );
+	UI_FillRect( x, y, DFS_BUTTON_W, DFS_BUTTON_H, dfsIdle );
+	UI_SoftRow( x, y, DFS_BUTTON_W, DFS_BUTTON_H, lit ? SOFT_HOVER | SOFT_BOTHBARS : 0, NULL );
 	UI_DrawProportionalString( x + DFS_BUTTON_W / 2, y + ( DFS_BUTTON_H - 20 ) / 2, b->string, UI_CENTER | UI_SMALLFONT, off ? dfsChipOff : lit ? color_white : dfsLabel );
 }
 
@@ -619,8 +595,10 @@ static void DFS_FieldDraw( void *self ) {
 	qboolean	focus = ( Menu_ItemAtCursor( f->generic.parent ) == self );
 	int			y = f->generic.y;
 
-	UI_FillRect( DFS_LX, y - 2, DFS_LW, SMALLCHAR_HEIGHT + 4, focus ? dfsPlateFocus : dfsPlate );
-	DFS_DrawOutline( DFS_LX, y - 2, DFS_LW, SMALLCHAR_HEIGHT + 4, focus ? dfsBorderFocus : dfsBorder );
+	UI_FillRect( DFS_LX, y - 2, DFS_LW, SMALLCHAR_HEIGHT + 4, focus ? dfsFieldFocus : dfsField );
+	if ( focus ) {
+		UI_FillRect( DFS_LX, y + SMALLCHAR_HEIGHT + 0, DFS_LW, 2, uiSoftAccent );
+	}
 	if ( !f->field.buffer[0] && !focus ) {
 		UI_DrawString( DFS_LX + 4, y, "search maps / authors    F1-F5 mode", UI_SMALLFONT, dfsHint );
 	} else {
@@ -640,7 +618,7 @@ static void DFS_ListDraw( void *self ) {
 		char			tag[16];
 		int				best = UI_DF_BestFor( r->e->map, DFS_RowMode( r ), NULL );
 		int				style = UI_LEFT | UI_SMALLFONT;
-		float			*color = text_color_normal;
+		float			*color = dfsLabel;
 
 		if ( best ) {
 			UI_DF_BestFormat( best, tag, sizeof( tag ) );
@@ -648,11 +626,8 @@ static void DFS_ListDraw( void *self ) {
 			tag[0] = 0;
 		}
 		if ( i == l->curvalue ) {
-			UI_FillRect( x - 2, y, l->width * SMALLCHAR_WIDTH, SMALLCHAR_HEIGHT + 2, listbar_color );
-			color = text_color_highlight;
-			if ( hasfocus ) {
-				style |= UI_PULSE;
-			}
+			UI_SoftRow( x - 4, y, l->width * SMALLCHAR_WIDTH, SMALLCHAR_HEIGHT + 2, hasfocus ? SOFT_SELECTED : SOFT_HOVER, NULL );
+			color = dfsColorWhite;
 			Vector4Copy( dfsColorWhite, tagColor );
 		} else {
 			Vector4Copy( dfsTime, tagColor );
@@ -702,9 +677,8 @@ static void DFS_ScrollbarDrag( void ) {
 }
 
 static void DFS_ScrollbarDraw( void ) {
-	static vec4_t	trackColor = { 0.15f, 0.0f, 0.0f, 0.6f };
-	static vec4_t	thumbColor = { 0.70f, 0.08f, 0.08f, 0.95f };
-	static vec4_t	hotColor = { 1.0f, 0.30f, 0.15f, 1.0f };
+	static vec4_t	trackColor = { 1.0f, 1.0f, 1.0f, 0.06f };
+	static vec4_t	thumbColor = { 1.0f, 1.0f, 1.0f, 0.28f };
 	int				trackY, trackH, thumbY, thumbH;
 	qboolean		hot;
 
@@ -712,8 +686,8 @@ static void DFS_ScrollbarDraw( void ) {
 		return;
 	}
 	hot = s_ds.sbDrag || UI_CursorInRect( DFS_SB_X, trackY, DFS_SB_W, trackH );
-	UI_FillRect( DFS_SB_X, trackY, DFS_SB_W, trackH, trackColor );
-	UI_FillRect( DFS_SB_X + 1, thumbY, DFS_SB_W - 2, thumbH, hot ? hotColor : thumbColor );
+	UI_FillRect( DFS_SB_X + 6, trackY, 4, trackH, trackColor );
+	UI_FillRect( DFS_SB_X + ( hot ? 5 : 6 ), thumbY, hot ? 6 : 4, thumbH, hot ? uiSoftAccent : thumbColor );
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -732,7 +706,7 @@ static void DFS_PreviewDraw( void *ptr ) {
 	if ( !s_ds.previewShader ) {
 		s_ds.previewShader = trap_R_RegisterShaderNoMip( "menu/art/unknownmap" );
 	}
-	UI_FillRect( x - w / 2 - 1, y - 1, w + 2, h + 2, dfsColorWhite );
+	UI_FillRect( x - w / 2 - 1, y - 1, w + 2, h + 2, dfsPicture );
 	UI_DrawHandlePic( x - w / 2, y, w, h, s_ds.previewShader );
 	ty = y + h + 6;
 	if ( !e ) {
@@ -1508,6 +1482,8 @@ static void DFS_MenuDraw( void ) {
 	} else {
 		s_ds.watch.generic.flags |= QMF_GRAYED;
 	}
+	UI_SoftPanel( 4, 3, 352, 430, 0.72f, qfalse );
+	UI_SoftPanel( 358, 3, 278, 430, 0.72f, qfalse );
 	Menu_Draw( &s_ds.menu );
 	DFS_ScrollbarDraw();
 	if ( s_ds.bestDelay > 0 && --s_ds.bestDelay == 0 ) {
