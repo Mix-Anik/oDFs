@@ -451,6 +451,31 @@ extern void UI_ArenaServersMenu( void );
 extern void ArenaServers_Cache( void );
 
 //
+// ui_mainservers.c
+//
+#define MAIN_SERVERS_SHOWN	12
+
+typedef struct {
+	char		adr[64];
+	char		host[41];
+	char		map[24];
+	int			clients, maxclients;
+	int			ping;
+	qboolean	needpass;
+	qboolean	fav;
+} mainServer_t;
+
+extern void MainServers_Frame( void );
+extern void MainServers_Refresh( void );
+extern void MainServers_Stop( void );
+extern int MainServers_Count( void );
+extern const mainServer_t *MainServers_Get( int i );
+extern qboolean MainServers_Busy( void );
+extern int MainServers_Favorites( void );
+extern int MainServers_Players( void );
+extern int MainServers_Age( void );
+
+//
 // ui_startserver.c
 //
 extern void UI_StartServerMenu( qboolean multiplayer );
@@ -600,6 +625,8 @@ typedef struct {
 
 extern vmCvar_t		df_ui_mouseSpeed;
 extern vmCvar_t		df_ui_showMods;
+extern vmCvar_t		df_ui_mainServers;
+extern vmCvar_t		df_ui_mainDim;
 
 extern void			UI_Init( void );
 extern void			UI_Shutdown( void );

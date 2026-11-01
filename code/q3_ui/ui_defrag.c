@@ -24,6 +24,8 @@ vmCvar_t	df_ui_StatusColor;
 vmCvar_t	df_ui_CursorColor;
 vmCvar_t	df_ui_mouseSpeed;
 vmCvar_t	df_ui_showMods;
+vmCvar_t	df_ui_mainServers;
+vmCvar_t	df_ui_mainDim;
 vmCvar_t	df_ui_mapsMode;
 vmCvar_t	df_ui_mapsType;
 vmCvar_t	df_ui_mapsLast;
@@ -60,6 +62,8 @@ static uiDfCvar_t uiDfCvarTable[] = {
 	{ &df_ui_CursorColor, "df_ui_CursorColor", "0.50 0.80 1.00 1.00", CVAR_ARCHIVE },
 	{ &df_ui_theme, "df_ui_theme", "0", CVAR_ARCHIVE },	// oDFs: 2 = the colours that were still an old default have been moved to the new ones (UI_DF_MigrateTheme)
 	{ &df_ui_showMods, "df_ui_showMods", "0", CVAR_ARCHIVE },	// oDFs: 1 shows the stock "Mods" entry (game mod switcher) in the main menu
+	{ &df_ui_mainServers, "df_ui_mainServers", "1", CVAR_ARCHIVE },	// oDFs: 1 shows a short server list in the main menu (and asks the favorites and the master server when it opens)
+	{ &df_ui_mainDim, "df_ui_mainDim", "0.45", CVAR_ARCHIVE },	// oDFs: how much the main menu background art is darkened, 0 (as it is) to 1 (black)
 	{ &df_ui_mouseSpeed, "df_ui_mouseSpeed", "1", CVAR_ARCHIVE },	// oDFs: menu cursor speed, 1 = one pixel per mouse count (UI_MouseEvent)
 	{ &df_ui_mapsMode, "df_ui_mapsMode", "0", CVAR_ARCHIVE },	// oDFs: map browser: mode chip (0 All, 1 VQ3, 2 CPM, 3 Tricks, 4 Fast Caps)
 	{ &df_ui_mapsType, "df_ui_mapsType", "0", CVAR_ARCHIVE },	// oDFs: map browser: type filter (0 any, 1 run, 2 training, 3 level, 4 accuracy)

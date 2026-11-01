@@ -218,6 +218,7 @@ if(BUILD_QVM)
             code/q3_ui/ui_removebots.c
             code/q3_ui/ui_saveconfig.c
             code/q3_ui/ui_serverinfo.c
+            code/q3_ui/ui_mainservers.c
             code/q3_ui/ui_servers2.c
             code/q3_ui/ui_settings.c
             code/q3_ui/ui_sound.c

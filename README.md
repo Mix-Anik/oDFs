@@ -36,6 +36,9 @@ Opensource DeFRaG server runtime
 ### Menus
 - "Mods" (stock game mod switcher) is hidden from the main menu unless `df_ui_showMods 1`
 - Credits moved from the main menu list to a small dim link at the bottom of the screen
+- Main menu redone in the soft look: highlighted button rows, oDFs / oDFe versions and updates as small chips in a bottom strip (yellow = click to install)
+- Main menu server list: your favorite servers with their players and ping, click to select, double click or JOIN to connect, REFRESH / F5; `df_ui_mainServers 0` turns it off
+- Main menu background darkened so the new look reads well: `df_ui_mainDim` (0 = art as it is, 1 = black, default 0.45)
 - One "Settings" entry (main and in-game menu) instead of Setup, Defrag Setup and Plugins: every settings page has the same category rail on the left (General: Player, Controls, Video, Audio, Network, Game; DeFRag: HUD, Crosshair, Replays, Gameplay, Advanced; Plugins), a page title, one column layout; reopens on the page you used last; the CD Key page is gone
 - Settings look: see-through category rail, orange setting names, sliders you can drag with the value shown, Driver Info page redone
 - Player page redone: coloured name, handicap slider, bigger 3D preview you can rotate, login/records section
