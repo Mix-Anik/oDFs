@@ -31,10 +31,6 @@ CONTROLS MENU
 
 #include "ui_local.h"
 
-#define ART_BACK0			"menu/art/back_0"
-#define ART_BACK1			"menu/art/back_1"
-#define ART_FRAMEL			"menu/art/frame2_l"
-#define ART_FRAMER			"menu/art/frame1_r"
 
 
 typedef struct {
@@ -72,7 +68,6 @@ typedef struct
 #define ID_WEAPONS		102
 #define ID_MISC			103
 #define ID_DEFAULTS		104
-#define ID_BACK			105
 #define ID_SAVEANDEXIT	106
 #define ID_EXIT			107
 
@@ -155,9 +150,6 @@ typedef struct
 {
 	menuframework_s		menu;
 
-	menutext_s			banner;
-	menubitmap_s		framel;
-	menubitmap_s		framer;
 	menubitmap_s		player;
 
 	menutext_s			movement;
@@ -221,7 +213,6 @@ typedef struct
 	weapon_t			playerWeapon;
 	qboolean			playerChat;
 
-	menubitmap_s		back;
 	menutext_s			name;
 } controls_t; 	
 
@@ -892,6 +883,19 @@ static void Controls_SetDefaults( void )
 
 /*
 =================
+Controls_Leave
+
+the settings rail is leaving the page
+=================
+*/
+static void Controls_Leave( void )
+{
+	if (s_controls.changesmade)
+		Controls_SetConfig();
+}
+
+/*
+=================
 Controls_MenuKey
 =================
 */
@@ -1085,15 +1089,6 @@ static void Controls_MenuEvent( void* ptr, int event )
 			}
 			break;
 
-		case ID_BACK:
-			if (event == QM_ACTIVATED)
-			{
-				if (s_controls.changesmade)
-					Controls_SetConfig();
-				UI_PopMenu();
-			}
-			break;
-
 		case ID_SAVEANDEXIT:
 			if (event == QM_ACTIVATED)
 			{
@@ -1195,80 +1190,65 @@ static void Controls_MenuInit( void )
 	s_controls.menu.wrapAround = qtrue;
 	s_controls.menu.fullscreen = qtrue;
 
-	s_controls.banner.generic.type	= MTYPE_BTEXT;
-	s_controls.banner.generic.flags	= QMF_CENTER_JUSTIFY;
-	s_controls.banner.generic.x		= 320;
-	s_controls.banner.generic.y		= 16;
-	s_controls.banner.string		= "CONTROLS";
-	s_controls.banner.color			= color_white;
-	s_controls.banner.style			= UI_CENTER;
-
-	s_controls.framel.generic.type  = MTYPE_BITMAP;
-	s_controls.framel.generic.name  = ART_FRAMEL;
-	s_controls.framel.generic.flags = QMF_LEFT_JUSTIFY|QMF_INACTIVE;
-	s_controls.framel.generic.x     = 0;
-	s_controls.framel.generic.y     = 78;
-	s_controls.framel.width  	    = 256;
-	s_controls.framel.height  	    = 329;
-
-	s_controls.framer.generic.type  = MTYPE_BITMAP;
-	s_controls.framer.generic.name  = ART_FRAMER;
-	s_controls.framer.generic.flags = QMF_LEFT_JUSTIFY|QMF_INACTIVE;
-	s_controls.framer.generic.x     = 376;
-	s_controls.framer.generic.y     = 76;
-	s_controls.framer.width  	    = 256;
-	s_controls.framer.height  	    = 334;
 
 	s_controls.looking.generic.type     = MTYPE_PTEXT;
 	s_controls.looking.generic.flags    = QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS;
 	s_controls.looking.generic.id	    = ID_LOOKING;
 	s_controls.looking.generic.callback	= Controls_MenuEvent;
-	s_controls.looking.generic.x	    = 152;
+	s_controls.looking.generic.x	    = 176;
 	s_controls.looking.generic.y	    = 240 - 2 * PROP_HEIGHT;
 	s_controls.looking.string			= "LOOK";
-	s_controls.looking.style			= UI_RIGHT;
-	s_controls.looking.color			= color_red;
+	s_controls.looking.style			= UI_RIGHT|UI_SMALLFONT;
+	s_controls.looking.color			= uiDfColorBig;
 
 	s_controls.movement.generic.type     = MTYPE_PTEXT;
 	s_controls.movement.generic.flags    = QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS;
 	s_controls.movement.generic.id	     = ID_MOVEMENT;
 	s_controls.movement.generic.callback = Controls_MenuEvent;
-	s_controls.movement.generic.x	     = 152;
+	s_controls.movement.generic.x	     = 176;
 	s_controls.movement.generic.y	     = 240 - PROP_HEIGHT;
 	s_controls.movement.string			= "MOVE";
-	s_controls.movement.style			= UI_RIGHT;
-	s_controls.movement.color			= color_red;
+	s_controls.movement.style			= UI_RIGHT|UI_SMALLFONT;
+	s_controls.movement.color			= uiDfColorBig;
 
 	s_controls.weapons.generic.type	    = MTYPE_PTEXT;
 	s_controls.weapons.generic.flags    = QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS;
 	s_controls.weapons.generic.id	    = ID_WEAPONS;
 	s_controls.weapons.generic.callback	= Controls_MenuEvent;
-	s_controls.weapons.generic.x	    = 152;
+	s_controls.weapons.generic.x	    = 176;
 	s_controls.weapons.generic.y	    = 240;
 	s_controls.weapons.string			= "SHOOT";
-	s_controls.weapons.style			= UI_RIGHT;
-	s_controls.weapons.color			= color_red;
+	s_controls.weapons.style			= UI_RIGHT|UI_SMALLFONT;
+	s_controls.weapons.color			= uiDfColorBig;
 
 	s_controls.misc.generic.type	 = MTYPE_PTEXT;
 	s_controls.misc.generic.flags    = QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS;
 	s_controls.misc.generic.id	     = ID_MISC;
 	s_controls.misc.generic.callback = Controls_MenuEvent;
-	s_controls.misc.generic.x		 = 152;
+	s_controls.misc.generic.x		 = 176;
 	s_controls.misc.generic.y		 = 240 + PROP_HEIGHT;
 	s_controls.misc.string			= "MISC";
-	s_controls.misc.style			= UI_RIGHT;
-	s_controls.misc.color			= color_red;
+	s_controls.misc.style			= UI_RIGHT|UI_SMALLFONT;
+	s_controls.misc.color			= uiDfColorBig;
 
-	s_controls.back.generic.type	 = MTYPE_BITMAP;
-	s_controls.back.generic.name     = ART_BACK0;
-	s_controls.back.generic.flags    = QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_controls.back.generic.x		 = 0;
-	s_controls.back.generic.y		 = 480-64;
-	s_controls.back.generic.id	     = ID_BACK;
-	s_controls.back.generic.callback = Controls_MenuEvent;
-	s_controls.back.width  		     = 128;
-	s_controls.back.height  		 = 64;
-	s_controls.back.focuspic         = ART_BACK1;
+
+	// the sections in a row under the page title, left to right
+	{
+		menutext_s	*tabs[4];
+		int			i, x = SETTINGS_PANEL_W + 18;
+
+		tabs[0] = &s_controls.looking;
+		tabs[1] = &s_controls.movement;
+		tabs[2] = &s_controls.weapons;
+		tabs[3] = &s_controls.misc;
+		for ( i = 0; i < 4; i++ ) {
+			tabs[i]->generic.flags	= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
+			tabs[i]->generic.x		= x;
+			tabs[i]->generic.y		= SETTINGS_TITLE_H + 4;
+			tabs[i]->style			= UI_LEFT|UI_SMALLFONT;
+			x += (int)( UI_ProportionalStringWidth( tabs[i]->string ) * UI_ProportionalSizeScale( tabs[i]->style ) ) + 30;
+		}
+	}
 
 	s_controls.player.generic.type      = MTYPE_BITMAP;
 	s_controls.player.generic.flags     = QMF_INACTIVE;
@@ -1570,9 +1550,6 @@ static void Controls_MenuInit( void )
 	s_controls.name.style			= UI_CENTER;
 	s_controls.name.color			= text_color_normal;
 
-	Menu_AddItem( &s_controls.menu, &s_controls.banner );
-	Menu_AddItem( &s_controls.menu, &s_controls.framel );
-	Menu_AddItem( &s_controls.menu, &s_controls.framer );
 	Menu_AddItem( &s_controls.menu, &s_controls.player );
 	Menu_AddItem( &s_controls.menu, &s_controls.name );
 
@@ -1628,8 +1605,8 @@ static void Controls_MenuInit( void )
 	Menu_AddItem( &s_controls.menu, &s_controls.chat4 );
 	Menu_AddItem( &s_controls.menu, &s_controls.hook );
 	Menu_AddItem( &s_controls.menu, &s_controls.togglemenu );
+	UI_Settings_AddRail( &s_controls.menu, SETP_CONTROLS, Controls_Leave );
 
-	Menu_AddItem( &s_controls.menu, &s_controls.back );
 
 	trap_Cvar_VariableStringBuffer( "name", s_controls.name.string, 16 );
 	Q_CleanStr( s_controls.name.string );
@@ -1660,10 +1637,6 @@ Controls_Cache
 =================
 */
 void Controls_Cache( void ) {
-	trap_R_RegisterShaderNoMip( ART_BACK0 );
-	trap_R_RegisterShaderNoMip( ART_BACK1 );
-	trap_R_RegisterShaderNoMip( ART_FRAMEL );
-	trap_R_RegisterShaderNoMip( ART_FRAMER );
 }
 
 

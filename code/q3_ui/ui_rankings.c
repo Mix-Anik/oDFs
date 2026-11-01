@@ -262,7 +262,7 @@ static void Rankings_MenuEvent( void* ptr, int event ) {
 		break;
 
 	case ID_SETUP:
-		UI_SetupMenu();
+		UI_SettingsMenu();
 		break;
 		
 	case ID_LEAVE:

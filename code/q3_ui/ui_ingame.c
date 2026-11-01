@@ -39,14 +39,13 @@ INGAME MENU
 #define ID_TEAM					10
 #define ID_ADDBOTS				11
 #define ID_REMOVEBOTS			12
-#define ID_SETUP				13
+#define ID_SETTINGS				13
 #define ID_SERVERINFO			14
 #define ID_LEAVEARENA			15
 #define ID_RESTART				16
 #define ID_QUIT					17
 #define ID_RESUME				18
 #define ID_TEAMORDERS			19
-#define ID_DEFRAGSETUP			20		// DeFRaG in-game button 12 (ui 0xfa08 -> 0x521f)
 
 
 typedef struct {
@@ -54,8 +53,7 @@ typedef struct {
 
 	menubitmap_s	frame;
 	menutext_s		team;
-	menutext_s		setup;
-	menutext_s		defragSetup;
+	menutext_s		settings;
 	menutext_s		server;
 	menutext_s		leave;
 	menutext_s		restart;
@@ -113,12 +111,8 @@ void InGame_Event( void *ptr, int notification ) {
 		UI_TeamMainMenu();
 		break;
 
-	case ID_SETUP:
-		UI_SetupMenu();
-		break;
-
-	case ID_DEFRAGSETUP:
-		UI_DF_HudMenu();
+	case ID_SETTINGS:
+		UI_SettingsMenu();
 		break;
 
 	case ID_LEAVEARENA:
@@ -180,7 +174,7 @@ void InGame_MenuInit( void ) {
 	s_ingame.frame.generic.x			= 87;		// DeFRaG 0xfa6d: frame 466x256 at (87,112), items from y 156 every 28
 	s_ingame.frame.generic.y			= 112;
 	s_ingame.frame.width				= 466;//359;
-	s_ingame.frame.height				= 256;
+	s_ingame.frame.height				= 228;
 
 	//y = 96;
 	y = 156;
@@ -245,26 +239,15 @@ void InGame_MenuInit( void ) {
 	}
 
 	y += INGAME_MENU_VERTICAL_SPACING;
-	s_ingame.setup.generic.type			= MTYPE_PTEXT;
-	s_ingame.setup.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_ingame.setup.generic.x			= 320;
-	s_ingame.setup.generic.y			= y;
-	s_ingame.setup.generic.id			= ID_SETUP;
-	s_ingame.setup.generic.callback		= InGame_Event; 
-	s_ingame.setup.string				= "SETUP";
-	s_ingame.setup.color				= uiDfColorBig;
-	s_ingame.setup.style				= UI_CENTER|UI_SMALLFONT;
-
-	y += INGAME_MENU_VERTICAL_SPACING;
-	s_ingame.defragSetup.generic.type		= MTYPE_PTEXT;
-	s_ingame.defragSetup.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_ingame.defragSetup.generic.x			= 320;
-	s_ingame.defragSetup.generic.y			= y;
-	s_ingame.defragSetup.generic.id			= ID_DEFRAGSETUP;
-	s_ingame.defragSetup.generic.callback	= InGame_Event; 
-	s_ingame.defragSetup.string				= "DEFRAG SETUP";
-	s_ingame.defragSetup.color				= uiDfColorBig;
-	s_ingame.defragSetup.style				= UI_CENTER|UI_SMALLFONT;
+	s_ingame.settings.generic.type		= MTYPE_PTEXT;
+	s_ingame.settings.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
+	s_ingame.settings.generic.x			= 320;
+	s_ingame.settings.generic.y			= y;
+	s_ingame.settings.generic.id		= ID_SETTINGS;
+	s_ingame.settings.generic.callback	= InGame_Event;
+	s_ingame.settings.string			= "SETTINGS";
+	s_ingame.settings.color				= uiDfColorBig;
+	s_ingame.settings.style				= UI_CENTER|UI_SMALLFONT;
 
 	y += INGAME_MENU_VERTICAL_SPACING;
 	s_ingame.server.generic.type		= MTYPE_PTEXT;
@@ -324,19 +307,18 @@ void InGame_MenuInit( void ) {
 	s_ingame.quit.color					= uiDfColorBig;
 	s_ingame.quit.style					= UI_CENTER|UI_SMALLFONT;
 
-	// DeFRaG lists only these seven entries (add bots / remove bots / team orders / server info are built but never added)
+	// DeFRaG lists only these entries (add bots / remove bots / team orders / server info are built but never added); oDFs
+	// has one Settings entry where DeFRaG has Setup and Defrag Setup
 	s_ingame.team.generic.y			= 156;
-	s_ingame.setup.generic.y			= 184;
-	s_ingame.defragSetup.generic.y		= 212;
-	s_ingame.restart.generic.y			= 240;
-	s_ingame.resume.generic.y			= 268;
-	s_ingame.leave.generic.y			= 296;
-	s_ingame.quit.generic.y				= 324;
+	s_ingame.settings.generic.y			= 184;
+	s_ingame.restart.generic.y			= 212;
+	s_ingame.resume.generic.y			= 240;
+	s_ingame.leave.generic.y			= 268;
+	s_ingame.quit.generic.y				= 296;
 
 	Menu_AddItem( &s_ingame.menu, &s_ingame.frame );
 	Menu_AddItem( &s_ingame.menu, &s_ingame.team );
-	Menu_AddItem( &s_ingame.menu, &s_ingame.setup );
-	Menu_AddItem( &s_ingame.menu, &s_ingame.defragSetup );
+	Menu_AddItem( &s_ingame.menu, &s_ingame.settings );
 	Menu_AddItem( &s_ingame.menu, &s_ingame.restart );
 	Menu_AddItem( &s_ingame.menu, &s_ingame.resume );
 	Menu_AddItem( &s_ingame.menu, &s_ingame.leave );

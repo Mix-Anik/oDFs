@@ -90,8 +90,6 @@ extern vmCvar_t	ui_server14;
 extern vmCvar_t	ui_server15;
 extern vmCvar_t	ui_server16;
 
-extern vmCvar_t	ui_cdkey;
-extern vmCvar_t	ui_cdkeychecked;
 extern vmCvar_t	ui_ioq3;
 
 
@@ -346,10 +344,35 @@ extern void UI_ConfirmMenu_Style( const char *question, int style, void (*draw)(
 extern void UI_Message( const char **lines );
 
 //
-// ui_setup.c
+// ui_settings.c
 //
-extern void UI_SetupMenu_Cache( void );
-extern void UI_SetupMenu(void);
+typedef enum {
+	SETP_PLAYER,
+	SETP_CONTROLS,
+	SETP_VIDEO,
+	SETP_AUDIO,
+	SETP_NETWORK,
+	SETP_GAME,
+	SETP_HUD,
+	SETP_CHS,
+	SETP_REPLAYS,
+	SETP_GAMEPLAY,
+	SETP_ADVANCED,
+	SETP_PLUGINS,
+	SETP_COUNT
+} uiSettingsPage_t;
+
+// the layout every settings page is drawn in (640x480): the rail panel on the left, the title row on top, the widgets of
+// a simple page in one column (labels end at SETTINGS_FORM_X, values start right of it) from SETTINGS_FORM_Y down
+#define SETTINGS_PANEL_W		118
+#define SETTINGS_TITLE_H		32		// the DeFRaG pages have column headings from y 30 on
+#define SETTINGS_FORM_X			350
+#define SETTINGS_FORM_Y			64
+#define SETTINGS_ROW_H			( SMALLCHAR_HEIGHT + 4 )
+
+extern void UI_SettingsMenu_Cache( void );
+extern void UI_SettingsMenu( void );
+extern void UI_Settings_AddRail( menuframework_s *menu, int current, void ( *leave )( void ) );
 
 //
 // ui_team.c
@@ -387,13 +410,6 @@ extern void UI_CinematicsMenu_Cache( void );
 //
 extern void UI_ModsMenu( void );
 extern void UI_ModsMenu_Cache( void );
-
-//
-// ui_cdkey.c
-//
-extern void UI_CDKeyMenu( void );
-extern void UI_CDKeyMenu_Cache( void );
-extern void UI_CDKeyMenu_f( void );
 
 //
 // ui_playermodel.c
@@ -700,10 +716,6 @@ void			trap_LAN_ClearPing( int n );
 void			trap_LAN_GetPing( int n, char *buf, int buflen, int *pingtime );
 void			trap_LAN_GetPingInfo( int n, char *buf, int buflen );
 int				trap_MemoryRemaining( void );
-void			trap_GetCDKey( char *buf, int buflen );
-void			trap_SetCDKey( char *buf );
-
-qboolean               trap_VerifyCDKey( const char *key, const char *chksum);
 
 void			trap_SetPbClStatus( int status );
 
@@ -745,11 +757,6 @@ void UI_LoadConfigMenu( void );
 void UI_SaveConfigMenu_Cache( void );
 void UI_SaveConfigMenu( void );
 
-//
-// ui_display.c
-//
-void UI_DisplayOptionsMenu_Cache( void );
-void UI_DisplayOptionsMenu( void );
 
 //
 // ui_sound.c
@@ -877,7 +884,5 @@ const struct uiDfMapEntry_s *UI_DF_MapNext( int type, int maskA, int maskB, cons
 void UI_DF_Q3ExtrasMenu( void );
 void UI_DF_HudMenu( void );
 void UI_DF_ChsMenu( void );
-void UI_DF_GhostMenu( void );
-void UI_DF_DemosMenu( void );
-void UI_DF_MiscMenu( void );
-void UI_DF_MpMenu( void );
+void UI_DF_ReplaysMenu( void );
+void UI_DF_GameplayMenu( void );

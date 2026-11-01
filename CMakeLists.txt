@@ -191,7 +191,6 @@ if(BUILD_QVM)
             code/game/bg_lib.c
             code/q3_ui/ui_addbots.c
             code/q3_ui/ui_atoms.c
-            code/q3_ui/ui_cdkey.c
             code/q3_ui/ui_cinematics.c
             code/q3_ui/ui_confirm.c
             code/q3_ui/ui_connect.c
@@ -204,7 +203,6 @@ if(BUILD_QVM)
             code/q3_ui/ui_startmap.c
             code/q3_ui/ui_dfmenu.c
             code/q3_ui/ui_demo2.c
-            code/q3_ui/ui_display.c
             code/q3_ui/ui_gameinfo.c
             code/q3_ui/ui_ingame.c
             code/q3_ui/ui_loadconfig.c
@@ -212,7 +210,6 @@ if(BUILD_QVM)
             code/q3_ui/ui_mfield.c
             code/q3_ui/ui_mods.c
             code/q3_ui/ui_network.c
-            code/q3_ui/ui_options.c
             code/q3_ui/ui_playermodel.c
             code/q3_ui/ui_players.c
             code/q3_ui/ui_playersettings.c
@@ -222,7 +219,7 @@ if(BUILD_QVM)
             code/q3_ui/ui_saveconfig.c
             code/q3_ui/ui_serverinfo.c
             code/q3_ui/ui_servers2.c
-            code/q3_ui/ui_setup.c
+            code/q3_ui/ui_settings.c
             code/q3_ui/ui_sound.c
             code/q3_ui/ui_sparena.c
             code/q3_ui/ui_specifyserver.c

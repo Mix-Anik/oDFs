@@ -1,8 +1,8 @@
 /*
-oDFs: the Plugins menu (main menu). Lists the client plugins of the oDFe engine (the native libraries in the plugins folder
+oDFs: the Plugins page of the settings menu. Lists the client plugins of the oDFe engine (the native libraries in the plugins folder
 of the home path), says which run, and switches them on and off. The engine does the work and remembers the choice: the
 extension syscalls trap_ODF_Plugin* (docs/plugins.md of the engine), found by name, so an engine without them just has no
-"Plugins" button (UI_PluginsSupported).
+"Plugins" page in the settings rail (UI_PluginsSupported).
 */
 
 #include "ui_local.h"
@@ -11,9 +11,9 @@ extension syscalls trap_ODF_Plugin* (docs/plugins.md of the engine), found by na
 #define PL_NAMELEN		256
 #define PL_ROWS			15
 #define PL_ROWH			SMALLCHAR_HEIGHT
-#define PL_X			60
+#define PL_X			120			// right of the settings rail
 #define PL_Y			84
-#define PL_W			520			// pixels; the scroll bar is inside
+#define PL_W			500			// pixels; the scroll bar is inside
 #define PL_CHARS		( PL_W / SMALLCHAR_WIDTH )
 #define PL_NAMECHARS	24
 #define PL_VERSIONX		( PL_X + 8 + ( PL_NAMECHARS + 1 ) * SMALLCHAR_WIDTH )
@@ -28,10 +28,9 @@ extension syscalls trap_ODF_Plugin* (docs/plugins.md of the engine), found by na
 #define PL_BUTTON_Y		438
 #define PL_BUTTON_MARGIN 12
 #define PL_NOTE_Y		( PL_Y + PL_ROWS * PL_ROWH + 12 )
-#define PL_NOTE_CHARS	68
+#define PL_NOTE_CHARS	58
 #define PL_NOTE_LINES	3
 
-#define ID_PL_BACK		1
 #define ID_PL_TOGGLE	2
 #define ID_PL_LIST		3
 
@@ -52,9 +51,7 @@ typedef struct {
 
 typedef struct {
 	menuframework_s	menu;
-	menutext_s		banner;
 	menulist_s		list;
-	menutext_s		back;
 	menutext_s		toggle;
 
 	plRow_t			rows[PL_MAX];
@@ -244,9 +241,6 @@ static void PL_ButtonEvent( void *ptr, int event ) {
 		return;
 	}
 	switch ( ( (menucommon_s *)ptr )->id ) {
-	case ID_PL_BACK:
-		UI_PopMenu();
-		break;
 	case ID_PL_TOGGLE:
 		PL_Toggle();
 		break;
@@ -468,13 +462,6 @@ void UI_PluginsMenu( void ) {
 	// libraries put into the folder since the game started
 	trap_ODF_PluginRescan();
 
-	s_pl.banner.generic.type = MTYPE_BTEXT;
-	s_pl.banner.generic.x = 320;
-	s_pl.banner.generic.y = 16;
-	s_pl.banner.string = "PLUGINS";
-	s_pl.banner.color = color_white;
-	s_pl.banner.style = UI_CENTER;
-
 	s_pl.list.generic.type = MTYPE_SCROLLLIST;
 	s_pl.list.generic.flags = QMF_PULSEIFFOCUS;
 	s_pl.list.generic.id = ID_PL_LIST;
@@ -487,10 +474,9 @@ void UI_PluginsMenu( void ) {
 	s_pl.list.columns = 1;
 	s_pl.list.itemnames = plBlank;
 
-	Menu_AddItem( &s_pl.menu, &s_pl.banner );
 	Menu_AddItem( &s_pl.menu, &s_pl.list );
-	PL_InitButton( &s_pl.back, ID_PL_BACK, "BACK", PL_BUTTON_MARGIN );
 	PL_InitButton( &s_pl.toggle, ID_PL_TOGGLE, "DISABLE", 640 - PL_BUTTON_MARGIN - PL_BUTTON_W );
+	UI_Settings_AddRail( &s_pl.menu, SETP_PLUGINS, NULL );
 
 	PL_Refresh();
 	UI_PushMenu( &s_pl.menu );

@@ -43,12 +43,10 @@ start-map menu (ui 0x3825, ui_startmap.c), whose mode chips are those four.
 #define ID_DF_MAPS				1
 #define ID_DF_SERVERS			7
 #define ID_DF_DEMOS				10
-#define ID_DF_SETUP				11
-#define ID_DF_DEFRAGSETUP		12
+#define ID_DF_SETTINGS			11
 #define ID_DF_CREDITS			13
 #define ID_DF_MODS				14
 #define ID_DF_EXIT				15
-#define ID_DF_PLUGINS			16
 
 #define MAIN_MENU_X				170
 #define MAIN_MENU_Y				100
@@ -64,9 +62,7 @@ static const mainButton_t mainButtons[] = {
 	{ ID_DF_MAPS,		"Maps",				0 },
 	{ ID_DF_SERVERS,	"Server Browser",	0 },
 	{ ID_DF_DEMOS,		"Demos",			8 },
-	{ ID_DF_SETUP,		"Setup",			0 },
-	{ ID_DF_DEFRAGSETUP,"Defrag Setup",		0 },
-	{ ID_DF_PLUGINS,	"Plugins",			0 },
+	{ ID_DF_SETTINGS,	"Settings",			0 },
 	{ ID_DF_MODS,		"Mods",				0 },
 	{ ID_DF_EXIT,		"Exit",				8 }
 };
@@ -128,20 +124,12 @@ void Main_MenuEvent (void* ptr, int event) {
 		UI_DemosMenu();
 		break;
 
-	case ID_DF_SETUP:
-		UI_SetupMenu();
-		break;
-
-	case ID_DF_DEFRAGSETUP:
-		UI_DF_HudMenu();
+	case ID_DF_SETTINGS:
+		UI_SettingsMenu();
 		break;
 
 	case ID_DF_CREDITS:
 		UI_CreditMenu();
-		break;
-
-	case ID_DF_PLUGINS:
-		UI_PluginsMenu();
 		break;
 
 	case ID_DF_MODS:
@@ -339,17 +327,6 @@ void UI_MainMenu( void ) {
 
 	trap_Cvar_Set( "sv_killserver", "1" );
 
-	// oDFs: DeFRaG needs no CD key; the ioq3 engine rejects an empty key, which would open the CD key menu at every start
-	if( 0 && !uis.demoversion && !ui_cdkeychecked.integer ) {
-		char	key[17];
-
-		trap_GetCDKey( key, sizeof(key) );
-		if( trap_VerifyCDKey( key, NULL ) == qfalse ) {
-			UI_CDKeyMenu();
-			return;
-		}
-	}
-
 	memset( &s_main, 0 ,sizeof(mainmenu_t) );
 	memset( &s_errorMessage, 0 ,sizeof(errorMessage_t) );
 
@@ -381,9 +358,6 @@ void UI_MainMenu( void ) {
 	for ( i = 0; i < (int)MAIN_BUTTONS; i++ ) {
 		if ( mainButtons[i].id == ID_DF_MODS && !df_ui_showMods.integer ) {
 			continue;		// oDFs: hidden unless df_ui_showMods is set
-		}
-		if ( mainButtons[i].id == ID_DF_PLUGINS && !UI_PluginsSupported() ) {
-			continue;		// oDFs: the engine has no client plugins
 		}
 		y += mainButtons[i].gap;
 		s_main.button[i].generic.type		= MTYPE_PTEXT;

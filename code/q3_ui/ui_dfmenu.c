@@ -2,9 +2,8 @@
 ===========================================================================
 DeFRaG settings menus (ui.qvm 0x46e4 / 0x474c / 0x468c / 0xb4fe .. 0xb59f, decoded in iteration 135).
 
-All DeFRaG settings pages share a column of buttons on the left (BACK, HUD, CHS, GHOST, DEMOS, MISC, MP, Q3), ids 10 and
-21..27 (UI_DF_NavInit / UI_DF_NavEvent).  The ported pages are HUD (0x521f) and Q3 ("Quake 3 Extras", 0xb4fe); the other
-buttons stay grayed until their page exists (see uiDfPageOpen[]).
+DeFRaG has a column of buttons on the left of all its settings pages (BACK, HUD, CHS, GHOST, DEMOS, MISC, MP, Q3; ui 0x474c
+and 0x46e4).  oDFs shows the settings rail of ui_settings.c there instead, which also leads to the Q3 and plugin pages.
 
 Every page has a spinner (id 100) that switches between pages of cvar widgets (Q3: Set 1 = ids 201..213, Set 2 = ids 101..136,
 Menu Display = ids 301..312; HUD: Hud / Misc / Video Capture).  Widget layout, cvar binding, value ranges and status bar
@@ -19,13 +18,10 @@ extern vmCvar_t	df_ui_CustomMenu;
 extern vmCvar_t	df_ui_DisplayCVarName;
 extern vec4_t	uiDfColorMedium, uiDfColorBig, text_color_status;
 
-#define UI_DF_NAVITEMS		8
 #define UI_DF_MODPAGES		3
-#define UI_DF_MAXITEMS		96
+#define UI_DF_MAXITEMS		128		// the biggest page: Quake 3 Extras (73), the Replays page (79)
+#define UI_DF_MAXSECTIONS	8
 
-#define ID_NAV_BACK			10
-#define ID_NAV_FIRST		21
-#define ID_NAV_LAST			27
 #define ID_MOD_PAGE			100
 
 #define DF_APPLY_NOEXIST_STR	1		// cvar missing: write "0.000000" instead of the field text  (0x4375)
@@ -66,7 +62,7 @@ typedef struct {
 	const int			*show;			// spinner value -> bit mask of table pages
 	const char			*spinLabel, *spinHelp;
 	const char			**pageNames;
-	int					navIndex;		// button that opens this page
+	int					railPage;		// the page in the settings rail (SETP_*)
 	qboolean			liveTheme;		// write the pg 2 widgets on every focus change (Q3 Menu Display)
 } uiDfPageDef_t;
 
@@ -83,31 +79,31 @@ static const int uiDfQ3Show[UI_DF_MODPAGES] = { 1 << 1, 1 << 0, 1 << 2 };
 
 static const uiDfPageDef_t uiDfQ3Page = {
 	uiDfQ3Items, sizeof( uiDfQ3Items ) / sizeof( uiDfQ3Items[0] ), uiDfQ3Show,
-	"> Quake 3 Extras:", "^1Click for ^7Quake 3 Extras^1 choices", uiDfPageNames, 7, qtrue
+	"Section:", "^1Click for ^7Quake 3 Extras^1 choices", uiDfPageNames, SETP_ADVANCED, qtrue
 };
 static const uiDfPageDef_t uiDfChsPage = {
 	uiDfChsItems, sizeof( uiDfChsItems ) / sizeof( uiDfChsItems[0] ), uiDfChsShow,
-	UIDF_CHS_SPINLABEL, UIDF_CHS_SPINHELP, uiDfChsPageNames, 2, qfalse
+	"Section:", UIDF_CHS_SPINHELP, uiDfChsPageNames, SETP_CHS, qfalse
 };
 static const uiDfPageDef_t uiDfGhostPage = {
 	uiDfGhostItems, sizeof( uiDfGhostItems ) / sizeof( uiDfGhostItems[0] ), uiDfGhostShow,
-	UIDF_GHOST_SPINLABEL, UIDF_GHOST_SPINHELP, uiDfGhostPageNames, 3, qfalse
+	"Section:", UIDF_GHOST_SPINHELP, uiDfGhostPageNames, SETP_REPLAYS, qfalse
 };
 static const uiDfPageDef_t uiDfDemosPage = {
 	uiDfDemosItems, sizeof( uiDfDemosItems ) / sizeof( uiDfDemosItems[0] ), uiDfDemosShow,
-	UIDF_DEMOS_SPINLABEL, UIDF_DEMOS_SPINHELP, uiDfDemosPageNames, 4, qfalse
+	"Section:", UIDF_DEMOS_SPINHELP, uiDfDemosPageNames, SETP_REPLAYS, qfalse
 };
 static const uiDfPageDef_t uiDfMiscPage = {
 	uiDfMiscItems, sizeof( uiDfMiscItems ) / sizeof( uiDfMiscItems[0] ), uiDfMiscShow,
-	UIDF_MISC_SPINLABEL, UIDF_MISC_SPINHELP, uiDfMiscPageNames, 5, qfalse
+	"Section:", UIDF_MISC_SPINHELP, uiDfMiscPageNames, SETP_GAMEPLAY, qfalse
 };
 static const uiDfPageDef_t uiDfMpPage = {
 	uiDfMpItems, sizeof( uiDfMpItems ) / sizeof( uiDfMpItems[0] ), uiDfMpShow,
-	UIDF_MP_SPINLABEL, UIDF_MP_SPINHELP, uiDfMpPageNames, 6, qfalse
+	"Section:", UIDF_MP_SPINHELP, uiDfMpPageNames, SETP_GAMEPLAY, qfalse
 };
 static const uiDfPageDef_t uiDfHudPage = {
 	uiDfHudItems, sizeof( uiDfHudItems ) / sizeof( uiDfHudItems[0] ), uiDfHudShow,
-	UIDF_HUD_SPINLABEL, UIDF_HUD_SPINHELP, uiDfHudPageNames, 1, qfalse
+	"Section:", UIDF_HUD_SPINHELP, uiDfHudPageNames, SETP_HUD, qfalse
 };
 
 typedef union {
@@ -118,28 +114,12 @@ typedef union {
 
 typedef struct {
 	menuframework_s	menu;
-	menutext_s		nav[UI_DF_NAVITEMS];
 	menulist_s		pageSpin;
 	uiDfModWidget_t	w[UI_DF_MAXITEMS];
 	const uiDfPageDef_t	*def;
 } uiDfMod_t;
 
 static uiDfMod_t	s_dfmod;
-
-// opening a settings page from the nav column; pages that are not ported yet stay NULL (button grayed)
-static void ( *uiDfPageOpen[UI_DF_NAVITEMS] )( void ) = { 0, UI_DF_HudMenu, UI_DF_ChsMenu, UI_DF_GhostMenu, UI_DF_DemosMenu, UI_DF_MiscMenu, UI_DF_MpMenu, UI_DF_Q3ExtrasMenu };
-
-static const char *uiDfNavText[UI_DF_NAVITEMS] = { "BACK", "HUD", "CHS", "GHOST", "DEMOS", "MISC", "MP", "Q3" };
-static const char *uiDfNavHelp[UI_DF_NAVITEMS] = {
-	"^1Click to save and return to game",
-	"^4Click for ^7HUD^4 options",
-	"^4Click for ^7Crosshair^4 options",
-	"^4Click for ^7Ghost^4 options",
-	"^4Click for ^7Demos^4 options",
-	"^4Click for ^7Misc^4 options",
-	"^4Click for ^7Multiplayer^4 options",
-	"^4Click for ^7Quake 3 Extras^4 options"
-};
 
 // 0x48ac: status line at the bottom; df_ui_CustomMenu 2 keeps the colour codes
 static void UI_DF_DrawStatus( const char *text ) {
@@ -157,60 +137,10 @@ static void UI_DF_DrawStatus( const char *text ) {
 	}
 }
 
-// 0x48ec: cvar name in the top left corner
+// 0x48ec: cvar name (DeFRaG: top left corner), under the status line
 static void UI_DF_DrawCvarName( const char *name ) {
 	if ( name && name[0] && df_ui_DisplayCVarName.integer ) {
-		UI_DrawString( 5, 10, name, UI_SMALLFONT, text_color_status );
-	}
-}
-
-// 0x468c
-static void UI_DF_NavStatus( void *ptr ) {
-	int id = ( (menucommon_s *)ptr )->id;
-
-	if ( id == ID_NAV_BACK ) {
-		UI_DF_DrawStatus( uiDfNavHelp[0] );
-	} else if ( id >= ID_NAV_FIRST && id <= ID_NAV_LAST ) {
-		UI_DF_DrawStatus( uiDfNavHelp[id - ID_NAV_FIRST + 1] );
-	}
-}
-
-// 0x46e4: the part of the event handler every settings page shares
-static void UI_DF_NavEvent( void *ptr, int event ) {
-	int id;
-
-	if ( event != QM_ACTIVATED ) {
-		return;
-	}
-	id = ( (menucommon_s *)ptr )->id;
-	if ( id == ID_NAV_BACK ) {
-		UI_PopMenu();
-	} else if ( id >= ID_NAV_FIRST && id <= ID_NAV_LAST && uiDfPageOpen[id - ID_NAV_FIRST + 1] ) {
-		UI_PopMenu();
-		uiDfPageOpen[id - ID_NAV_FIRST + 1]();
-	}
-}
-
-// 0x474c: BACK + seven page buttons down the left side
-static void UI_DF_NavInit( menuframework_s *menu, menutext_s *nav, void ( *callback )( void *, int ) ) {
-	int i, y = 30;
-
-	for ( i = 0; i < UI_DF_NAVITEMS; i++ ) {
-		nav[i].generic.type		= MTYPE_PTEXT;
-		nav[i].generic.flags	= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
-		nav[i].generic.id		= i ? ID_NAV_FIRST + i - 1 : ID_NAV_BACK;
-		nav[i].generic.x		= 10;
-		nav[i].generic.y		= y;
-		nav[i].generic.callback	= callback;
-		nav[i].generic.statusbar = UI_DF_NavStatus;
-		nav[i].string			= (char *)uiDfNavText[i];
-		nav[i].style			= 0;
-		nav[i].color			= uiDfColorBig;
-		if ( i && !uiDfPageOpen[i] ) {
-			nav[i].generic.flags |= QMF_GRAYED;
-		}
-		Menu_AddItem( menu, &nav[i] );
-		y += ( i ? 30 : 60 );
+		UI_DrawString( SETTINGS_PANEL_W + 18, 466, name, UI_SMALLFONT, text_color_status );
 	}
 }
 
@@ -431,9 +361,13 @@ static void UI_DF_ModEvent( void *ptr, int event ) {
 	if ( ( (menucommon_s *)ptr )->id == ID_MOD_PAGE ) {
 		UI_DF_ModRefreshAll();
 		UI_DF_ModShowPage( s_dfmod.def->show[s_dfmod.pageSpin.curvalue] );
-	} else {
-		UI_DF_NavEvent( ptr, event );
 	}
+}
+
+// the settings rail is leaving the page: what the Back button did, and Escape does
+static void UI_DF_Leave( void ) {
+	UI_DF_ModApplyAll();
+	UI_DF_ModApplyCmd();
 }
 
 // 0xb531
@@ -460,14 +394,12 @@ static void UI_DF_OpenPage( const uiDfPageDef_t *def ) {
 	s_dfmod.menu.fullscreen = qtrue;
 	s_dfmod.menu.key = UI_DF_ModKey;
 
-	UI_DF_NavInit( &s_dfmod.menu, s_dfmod.nav, UI_DF_ModEvent );
-
 	s_dfmod.pageSpin.generic.type		= MTYPE_SPINCONTROL;
 	s_dfmod.pageSpin.generic.name		= def->spinLabel;
 	s_dfmod.pageSpin.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 	s_dfmod.pageSpin.generic.id			= ID_MOD_PAGE;
-	s_dfmod.pageSpin.generic.x			= 350;
-	s_dfmod.pageSpin.generic.y			= 10;
+	s_dfmod.pageSpin.generic.x			= 500;		// right of the page title
+	s_dfmod.pageSpin.generic.y			= 7;
 	s_dfmod.pageSpin.generic.callback	= UI_DF_ModEvent;
 	s_dfmod.pageSpin.generic.statusbar	= UI_DF_ModStatus;
 	s_dfmod.pageSpin.itemnames			= def->pageNames;
@@ -508,6 +440,8 @@ static void UI_DF_OpenPage( const uiDfPageDef_t *def ) {
 		Menu_AddItem( &s_dfmod.menu, w );
 	}
 
+	UI_Settings_AddRail( &s_dfmod.menu, def->railPage, UI_DF_Leave );
+
 	// 0xb4ca: hide the pages, load them, write them back once, load again
 	UI_DF_ModShowPage( 0 );
 	UI_DF_ModRefreshAll();
@@ -515,7 +449,6 @@ static void UI_DF_OpenPage( const uiDfPageDef_t *def ) {
 	UI_DF_ModRefreshAll();
 	UI_DF_ModShowPage( s_dfmod.def->show[0] );
 
-	Menu_SetCursorToItem( &s_dfmod.menu, &s_dfmod.nav[def->navIndex] );
 	UI_PushMenu( &s_dfmod.menu );
 }
 
@@ -523,20 +456,72 @@ void UI_DF_Q3ExtrasMenu( void ) {
 	UI_DF_OpenPage( &uiDfQ3Page );
 }
 
-void UI_DF_MpMenu( void ) {
-	UI_DF_OpenPage( &uiDfMpPage );
+/*
+===============
+UI_DF_Compose
+
+Two DeFRaG pages as one: the widgets of b follow those of a, their table pages and ids are moved out of the way, and the
+section spinner lists the sections of both.
+===============
+*/
+static int			s_composeShow[UI_DF_MAXSECTIONS];
+static uiDfModItem_t	s_composeItems[UI_DF_MAXITEMS];
+static uiDfPageDef_t	s_composeDef;
+
+static int UI_DF_CountNames( const char **names ) {
+	int n = 0;
+
+	while ( names[n] ) {
+		n++;
+	}
+	return n;
 }
 
-void UI_DF_MiscMenu( void ) {
-	UI_DF_OpenPage( &uiDfMiscPage );
+static void UI_DF_Compose( const uiDfPageDef_t *a, const uiDfPageDef_t *b, const char **names, int railPage, const char *help ) {
+	int	i, n = 0, shift = 0, na = UI_DF_CountNames( a->pageNames ), nb = UI_DF_CountNames( b->pageNames );
+
+	for ( i = 0; i < a->numItems; i++ ) {
+		if ( a->items[i].pg >= shift ) {
+			shift = a->items[i].pg + 1;
+		}
+		s_composeItems[n++] = a->items[i];
+	}
+	for ( i = 0; i < b->numItems; i++ ) {
+		s_composeItems[n] = b->items[i];
+		s_composeItems[n].pg += shift;
+		if ( s_composeItems[n].id ) {
+			s_composeItems[n].id += 1000;
+		}
+		n++;
+	}
+	for ( i = 0; i < na; i++ ) {
+		s_composeShow[i] = a->show[i];
+	}
+	for ( i = 0; i < nb; i++ ) {
+		s_composeShow[na + i] = b->show[i] << shift;
+	}
+
+	s_composeDef.items = s_composeItems;
+	s_composeDef.numItems = n;
+	s_composeDef.show = s_composeShow;
+	s_composeDef.spinLabel = "Section:";
+	s_composeDef.spinHelp = help;
+	s_composeDef.pageNames = names;
+	s_composeDef.railPage = railPage;
+	s_composeDef.liveTheme = qfalse;
 }
 
-void UI_DF_DemosMenu( void ) {
-	UI_DF_OpenPage( &uiDfDemosPage );
+static const char *uiDfReplaysNames[] = { "Demos: Misc 1", "Demos: Cameras", "Demos: Misc 2", "Ghosts: Global", "Ghosts: 1 and 2", "Ghosts: Miniview", 0 };
+static const char *uiDfGameplayNames[] = { "Game Settings", "Non Defrag Maps", "Misc", "Multiplayer", 0 };
+
+void UI_DF_ReplaysMenu( void ) {
+	UI_DF_Compose( &uiDfDemosPage, &uiDfGhostPage, uiDfReplaysNames, SETP_REPLAYS, "^1Click for ^7Demo and Ghost^1 sections" );
+	UI_DF_OpenPage( &s_composeDef );
 }
 
-void UI_DF_GhostMenu( void ) {
-	UI_DF_OpenPage( &uiDfGhostPage );
+void UI_DF_GameplayMenu( void ) {
+	UI_DF_Compose( &uiDfMiscPage, &uiDfMpPage, uiDfGameplayNames, SETP_GAMEPLAY, "^1Click for ^7Gameplay^1 sections" );
+	UI_DF_OpenPage( &s_composeDef );
 }
 
 void UI_DF_ChsMenu( void ) {

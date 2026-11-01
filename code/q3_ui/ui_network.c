@@ -31,17 +31,8 @@ NETWORK OPTIONS MENU
 #include "ui_local.h"
 
 
-#define ART_FRAMEL			"menu/art/frame2_l"
-#define ART_FRAMER			"menu/art/frame1_r"
-#define ART_BACK0			"menu/art/back_0"
-#define ART_BACK1			"menu/art/back_1"
-
-#define ID_GRAPHICS			10
-#define ID_DISPLAY			11
-#define ID_SOUND			12
-#define ID_NETWORK			13
 #define ID_RATE				14
-#define ID_BACK				15
+#define ID_ALLOWDOWNLOAD	15
 
 
 static const char *rate_items[] = {
@@ -56,18 +47,10 @@ static const char *rate_items[] = {
 typedef struct {
 	menuframework_s	menu;
 
-	menutext_s		banner;
-	menubitmap_s	framel;
-	menubitmap_s	framer;
-
-	menutext_s		graphics;
-	menutext_s		display;
-	menutext_s		sound;
-	menutext_s		network;
 
 	menulist_s		rate;
+	menuradiobutton_s	allowdownload;
 
-	menubitmap_s	back;
 } networkOptionsInfo_t;
 
 static networkOptionsInfo_t	networkOptionsInfo;
@@ -84,22 +67,9 @@ static void UI_NetworkOptionsMenu_Event( void* ptr, int event ) {
 	}
 
 	switch( ((menucommon_s*)ptr)->id ) {
-	case ID_GRAPHICS:
-		UI_PopMenu();
-		UI_GraphicsOptionsMenu();
-		break;
-
-	case ID_DISPLAY:
-		UI_PopMenu();
-		UI_DisplayOptionsMenu();
-		break;
-
-	case ID_SOUND:
-		UI_PopMenu();
-		UI_SoundOptionsMenu();
-		break;
-
-	case ID_NETWORK:
+	case ID_ALLOWDOWNLOAD:
+		// DeFRaG 0x12cc3: only the client side cvar is set (stock Q3 also sets sv_allowDownload)
+		trap_Cvar_SetValue( "cl_allowDownload", networkOptionsInfo.allowdownload.curvalue );
 		break;
 
 	case ID_RATE:
@@ -120,9 +90,6 @@ static void UI_NetworkOptionsMenu_Event( void* ptr, int event ) {
 		}
 		break;
 
-	case ID_BACK:
-		UI_PopMenu();
-		break;
 	}
 }
 
@@ -142,100 +109,32 @@ static void UI_NetworkOptionsMenu_Init( void ) {
 	networkOptionsInfo.menu.wrapAround = qtrue;
 	networkOptionsInfo.menu.fullscreen = qtrue;
 
-	networkOptionsInfo.banner.generic.type		= MTYPE_BTEXT;
-	networkOptionsInfo.banner.generic.flags		= QMF_CENTER_JUSTIFY;
-	networkOptionsInfo.banner.generic.x			= 320;
-	networkOptionsInfo.banner.generic.y			= 16;
-	networkOptionsInfo.banner.string			= "SYSTEM SETUP";
-	networkOptionsInfo.banner.color				= color_white;
-	networkOptionsInfo.banner.style				= UI_CENTER;
 
-	networkOptionsInfo.framel.generic.type		= MTYPE_BITMAP;
-	networkOptionsInfo.framel.generic.name		= ART_FRAMEL;
-	networkOptionsInfo.framel.generic.flags		= QMF_INACTIVE;
-	networkOptionsInfo.framel.generic.x			= 0;  
-	networkOptionsInfo.framel.generic.y			= 78;
-	networkOptionsInfo.framel.width				= 256;
-	networkOptionsInfo.framel.height			= 329;
-
-	networkOptionsInfo.framer.generic.type		= MTYPE_BITMAP;
-	networkOptionsInfo.framer.generic.name		= ART_FRAMER;
-	networkOptionsInfo.framer.generic.flags		= QMF_INACTIVE;
-	networkOptionsInfo.framer.generic.x			= 376;
-	networkOptionsInfo.framer.generic.y			= 76;
-	networkOptionsInfo.framer.width				= 256;
-	networkOptionsInfo.framer.height			= 334;
-
-	networkOptionsInfo.graphics.generic.type		= MTYPE_PTEXT;
-	networkOptionsInfo.graphics.generic.flags		= QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS;
-	networkOptionsInfo.graphics.generic.id			= ID_GRAPHICS;
-	networkOptionsInfo.graphics.generic.callback	= UI_NetworkOptionsMenu_Event;
-	networkOptionsInfo.graphics.generic.x			= 216;
-	networkOptionsInfo.graphics.generic.y			= 240 - 2 * PROP_HEIGHT;
-	networkOptionsInfo.graphics.string				= "GRAPHICS";
-	networkOptionsInfo.graphics.style				= UI_RIGHT;
-	networkOptionsInfo.graphics.color				= color_red;
-
-	networkOptionsInfo.display.generic.type			= MTYPE_PTEXT;
-	networkOptionsInfo.display.generic.flags		= QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS;
-	networkOptionsInfo.display.generic.id			= ID_DISPLAY;
-	networkOptionsInfo.display.generic.callback		= UI_NetworkOptionsMenu_Event;
-	networkOptionsInfo.display.generic.x			= 216;
-	networkOptionsInfo.display.generic.y			= 240 - PROP_HEIGHT;
-	networkOptionsInfo.display.string				= "DISPLAY";
-	networkOptionsInfo.display.style				= UI_RIGHT;
-	networkOptionsInfo.display.color				= color_red;
-
-	networkOptionsInfo.sound.generic.type			= MTYPE_PTEXT;
-	networkOptionsInfo.sound.generic.flags			= QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS;
-	networkOptionsInfo.sound.generic.id				= ID_SOUND;
-	networkOptionsInfo.sound.generic.callback		= UI_NetworkOptionsMenu_Event;
-	networkOptionsInfo.sound.generic.x				= 216;
-	networkOptionsInfo.sound.generic.y				= 240;
-	networkOptionsInfo.sound.string					= "SOUND";
-	networkOptionsInfo.sound.style					= UI_RIGHT;
-	networkOptionsInfo.sound.color					= color_red;
-
-	networkOptionsInfo.network.generic.type			= MTYPE_PTEXT;
-	networkOptionsInfo.network.generic.flags		= QMF_RIGHT_JUSTIFY;
-	networkOptionsInfo.network.generic.id			= ID_NETWORK;
-	networkOptionsInfo.network.generic.callback		= UI_NetworkOptionsMenu_Event;
-	networkOptionsInfo.network.generic.x			= 216;
-	networkOptionsInfo.network.generic.y			= 240 + PROP_HEIGHT;
-	networkOptionsInfo.network.string				= "NETWORK";
-	networkOptionsInfo.network.style				= UI_RIGHT;
-	networkOptionsInfo.network.color				= color_red;
-
-	y = 240 - 1 * (BIGCHAR_HEIGHT+2);
+	y = SETTINGS_FORM_Y;
 	networkOptionsInfo.rate.generic.type		= MTYPE_SPINCONTROL;
 	networkOptionsInfo.rate.generic.name		= "Data Rate:";
 	networkOptionsInfo.rate.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 	networkOptionsInfo.rate.generic.callback	= UI_NetworkOptionsMenu_Event;
 	networkOptionsInfo.rate.generic.id			= ID_RATE;
-	networkOptionsInfo.rate.generic.x			= 400;
+	networkOptionsInfo.rate.generic.x			= SETTINGS_FORM_X;
 	networkOptionsInfo.rate.generic.y			= y;
 	networkOptionsInfo.rate.itemnames			= rate_items;
+	y += SETTINGS_ROW_H;
 
-	networkOptionsInfo.back.generic.type		= MTYPE_BITMAP;
-	networkOptionsInfo.back.generic.name		= ART_BACK0;
-	networkOptionsInfo.back.generic.flags		= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
-	networkOptionsInfo.back.generic.callback	= UI_NetworkOptionsMenu_Event;
-	networkOptionsInfo.back.generic.id			= ID_BACK;
-	networkOptionsInfo.back.generic.x			= 0;
-	networkOptionsInfo.back.generic.y			= 480-64;
-	networkOptionsInfo.back.width				= 128;
-	networkOptionsInfo.back.height				= 64;
-	networkOptionsInfo.back.focuspic			= ART_BACK1;
+	networkOptionsInfo.allowdownload.generic.type		= MTYPE_RADIOBUTTON;
+	networkOptionsInfo.allowdownload.generic.name		= "Automatic Downloading:";
+	networkOptionsInfo.allowdownload.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	networkOptionsInfo.allowdownload.generic.callback	= UI_NetworkOptionsMenu_Event;
+	networkOptionsInfo.allowdownload.generic.id			= ID_ALLOWDOWNLOAD;
+	networkOptionsInfo.allowdownload.generic.x			= SETTINGS_FORM_X;
+	networkOptionsInfo.allowdownload.generic.y			= y;
 
-	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.banner );
-	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.framel );
-	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.framer );
-	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.graphics );
-	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.display );
-	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.sound );
-	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.network );
+
 	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.rate );
-	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.back );
+	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.allowdownload );
+	UI_Settings_AddRail( &networkOptionsInfo.menu, SETP_NETWORK, NULL );
+
+	networkOptionsInfo.allowdownload.curvalue = trap_Cvar_VariableValue( "cl_allowDownload" ) != 0;
 
 	rate = trap_Cvar_VariableValue( "rate" );
 	if( rate <= 2500 ) {
@@ -262,10 +161,6 @@ UI_NetworkOptionsMenu_Cache
 ===============
 */
 void UI_NetworkOptionsMenu_Cache( void ) {
-	trap_R_RegisterShaderNoMip( ART_FRAMEL );
-	trap_R_RegisterShaderNoMip( ART_FRAMER );
-	trap_R_RegisterShaderNoMip( ART_BACK0 );
-	trap_R_RegisterShaderNoMip( ART_BACK1 );
 }
 
 
@@ -277,5 +172,4 @@ UI_NetworkOptionsMenu
 void UI_NetworkOptionsMenu( void ) {
 	UI_NetworkOptionsMenu_Init();
 	UI_PushMenu( &networkOptionsInfo.menu );
-	Menu_SetCursorToItem( &networkOptionsInfo.menu, &networkOptionsInfo.network );
 }

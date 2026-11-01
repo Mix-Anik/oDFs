@@ -17,6 +17,7 @@ vmCvar_t	df_ui_TextColorMedium;
 vmCvar_t	df_ui_TextColorBig;
 vmCvar_t	df_ui_TextColorDisabled;
 vmCvar_t	df_ui_TextColorHighlight;
+vmCvar_t	df_ui_theme;
 vmCvar_t	df_ui_PulseColor;
 vmCvar_t	df_ui_ListbarColor;
 vmCvar_t	df_ui_StatusColor;
@@ -47,16 +48,17 @@ static uiDfCvar_t uiDfCvarTable[] = {
 	{ &df_demos_indexMaxAge, "df_demos_indexMaxAge", "24", CVAR_ARCHIVE },	// oDFs: hours a demo index file is trusted before a rescan (0 = always scan)
 	{ &df_ui_CustomMenu, "df_ui_CustomMenu", "2", CVAR_ARCHIVE },
 	{ &df_ui_DisplayCVarName, "df_ui_DisplayCVarName", "1", CVAR_ARCHIVE },
-	{ &df_ui_TextColorLabel, "df_ui_TextColorLabel", "1.00 1.00 0.00 1.00", CVAR_ARCHIVE },
-	{ &df_ui_TextColorValue, "df_ui_TextColorValue", "1.00 0.00 0.00 1.00", CVAR_ARCHIVE },
-	{ &df_ui_TextColorMedium, "df_ui_TextColorMedium", "0.00 0.00 1.00 1.00", CVAR_ARCHIVE },
-	{ &df_ui_TextColorBig, "df_ui_TextColorBig", "1.00 0.00 0.00 1.00", CVAR_ARCHIVE },
-	{ &df_ui_TextColorDisabled, "df_ui_TextColorDisabled", "0.50 0.50 0.50 1.00", CVAR_ARCHIVE },
-	{ &df_ui_TextColorHighlight, "df_ui_TextColorHighlight", "1.00 1.00 0.00 1.00", CVAR_ARCHIVE },
+	{ &df_ui_TextColorLabel, "df_ui_TextColorLabel", "1.00 0.82 0.76 1.00", CVAR_ARCHIVE },
+	{ &df_ui_TextColorValue, "df_ui_TextColorValue", "1.00 1.00 1.00 1.00", CVAR_ARCHIVE },
+	{ &df_ui_TextColorMedium, "df_ui_TextColorMedium", "1.00 0.38 0.22 1.00", CVAR_ARCHIVE },
+	{ &df_ui_TextColorBig, "df_ui_TextColorBig", "1.00 0.82 0.76 1.00", CVAR_ARCHIVE },
+	{ &df_ui_TextColorDisabled, "df_ui_TextColorDisabled", "0.45 0.35 0.33 1.00", CVAR_ARCHIVE },
+	{ &df_ui_TextColorHighlight, "df_ui_TextColorHighlight", "1.00 0.85 0.25 1.00", CVAR_ARCHIVE },
 	{ &df_ui_PulseColor, "df_ui_PulseColor", "1.00 1.00 1.00 1.00", CVAR_ARCHIVE },
-	{ &df_ui_ListbarColor, "df_ui_ListbarColor", "1.00 0.00 0.00 0.30", CVAR_ARCHIVE },
-	{ &df_ui_StatusColor, "df_ui_StatusColor", "1.00 1.00 1.00 1.00", CVAR_ARCHIVE },
+	{ &df_ui_ListbarColor, "df_ui_ListbarColor", "0.85 0.15 0.08 0.32", CVAR_ARCHIVE },
+	{ &df_ui_StatusColor, "df_ui_StatusColor", "1.00 0.82 0.76 1.00", CVAR_ARCHIVE },
 	{ &df_ui_CursorColor, "df_ui_CursorColor", "0.50 0.80 1.00 1.00", CVAR_ARCHIVE },
+	{ &df_ui_theme, "df_ui_theme", "0", CVAR_ARCHIVE },	// oDFs: 2 = the colours that were still an old default have been moved to the new ones (UI_DF_MigrateTheme)
 	{ &df_ui_showMods, "df_ui_showMods", "0", CVAR_ARCHIVE },	// oDFs: 1 shows the stock "Mods" entry (game mod switcher) in the main menu
 	{ &df_ui_mouseSpeed, "df_ui_mouseSpeed", "1", CVAR_ARCHIVE },	// oDFs: menu cursor speed, 1 = one pixel per mouse count (UI_MouseEvent)
 	{ &df_ui_mapsMode, "df_ui_mapsMode", "0", CVAR_ARCHIVE },	// oDFs: map browser: mode chip (0 All, 1 VQ3, 2 CPM, 3 Tricks, 4 Fast Caps)
@@ -359,9 +361,9 @@ df_ui_CursorColor tints the mouse cursor (see UI_DF_DrawCursor).
 extern vec4_t pulse_color;
 extern vec4_t text_color_status;
 
-vec4_t uiDfColorValue	= { 1.00f, 0.43f, 0.00f, 1.00f };
-vec4_t uiDfColorMedium	= { 1.00f, 0.00f, 0.00f, 1.00f };
-vec4_t uiDfColorBig		= { 1.00f, 0.00f, 0.00f, 1.00f };
+vec4_t uiDfColorValue	= { 1.00f, 1.00f, 1.00f, 1.00f };
+vec4_t uiDfColorMedium	= { 1.00f, 0.38f, 0.22f, 1.00f };
+vec4_t uiDfColorBig		= { 1.00f, 0.82f, 0.76f, 1.00f };
 
 static void UI_DF_ParseColor( const char *str, vec4_t color ) {
 	const char	*p = str;
@@ -379,9 +381,9 @@ static void UI_DF_ParseColor( const char *str, vec4_t color ) {
 
 static void UI_DF_ApplyTheme( void ) {
 	static const float defaults[9][4] = {
-		{ 1.0f, 1.0f, 1.0f, 1.0f }, { 0.5f, 0.5f, 0.5f, 1.0f }, { 1.0f, 0.43f, 0.0f, 1.0f }, { 1.0f, 0.43f, 0.0f, 1.0f },
-		{ 1.0f, 0.0f, 0.0f, 1.0f }, { 1.0f, 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f, 0.0f, 1.0f }, { 1.0f, 0.43f, 0.0f, 0.3f },
-		{ 1.0f, 1.0f, 1.0f, 1.0f }
+		{ 1.0f, 1.0f, 1.0f, 1.0f }, { 0.45f, 0.35f, 0.33f, 1.0f }, { 1.0f, 0.82f, 0.76f, 1.0f }, { 1.0f, 1.0f, 1.0f, 1.0f },
+		{ 1.0f, 0.38f, 0.22f, 1.0f }, { 1.0f, 0.82f, 0.76f, 1.0f }, { 1.0f, 0.85f, 0.25f, 1.0f }, { 0.85f, 0.15f, 0.08f, 0.32f },
+		{ 1.0f, 0.82f, 0.76f, 1.0f }
 	};
 	vec4_t *const targets[9] = { &pulse_color, &text_color_disabled, &text_color_normal, &uiDfColorValue, &uiDfColorMedium,
 		&uiDfColorBig, &text_color_highlight, &listbar_color, &text_color_status };
@@ -399,6 +401,41 @@ static void UI_DF_ApplyTheme( void ) {
 	}
 }
 
+/*
+oDFs: the menu colours are archived cvars, so a config that was saved before the new colours still has the old ones in
+it and would keep them.  Once (df_ui_theme), the ones that still read exactly like an old default (DeFRaG's, or the blue
+set this had for a while) are moved to the new default, the colours of the map and demo browsers; a colour somebody set
+to something else stays.
+*/
+static void UI_DF_MigrateTheme( void ) {
+	static const char *const names[8] = { "df_ui_TextColorLabel", "df_ui_TextColorValue", "df_ui_TextColorMedium", "df_ui_TextColorBig",
+		"df_ui_TextColorDisabled", "df_ui_TextColorHighlight", "df_ui_ListbarColor", "df_ui_StatusColor" };
+	static const char *const oldValues[2][8] = {
+		{ "1.00 1.00 0.00 1.00", "1.00 0.00 0.00 1.00", "0.00 0.00 1.00 1.00", "1.00 0.00 0.00 1.00",
+		  "0.50 0.50 0.50 1.00", "1.00 1.00 0.00 1.00", "1.00 0.00 0.00 0.30", "1.00 1.00 1.00 1.00" },
+		{ "0.70 0.78 0.88 1.00", "1.00 1.00 1.00 1.00", "0.53 0.77 1.00 1.00", "0.53 0.77 1.00 1.00",
+		  "0.45 0.48 0.55 1.00", "1.00 0.85 0.30 1.00", "0.53 0.77 1.00 0.18", "0.80 0.90 1.00 1.00" }
+	};
+	static const char *const newValues[8] = { "1.00 0.82 0.76 1.00", "1.00 1.00 1.00 1.00", "1.00 0.38 0.22 1.00", "1.00 0.82 0.76 1.00",
+		"0.45 0.35 0.33 1.00", "1.00 0.85 0.25 1.00", "0.85 0.15 0.08 0.32", "1.00 0.82 0.76 1.00" };
+	char	buf[64];
+	int		i, j;
+
+	if ( df_ui_theme.integer >= 2 ) {
+		return;
+	}
+	for ( i = 0; i < 8; i++ ) {
+		trap_Cvar_VariableStringBuffer( names[i], buf, sizeof( buf ) );
+		for ( j = 0; j < 2; j++ ) {
+			if ( !Q_stricmp( buf, oldValues[j][i] ) ) {
+				trap_Cvar_Set( names[i], newValues[i] );
+				break;
+			}
+		}
+	}
+	trap_Cvar_Set( "df_ui_theme", "2" );
+}
+
 void UI_DF_RegisterCvars( void ) {
 	int i;
 
@@ -406,6 +443,10 @@ void UI_DF_RegisterCvars( void ) {
 		trap_Cvar_Register( uiDfCvarTable[i].vmCvar, uiDfCvarTable[i].cvarName, uiDfCvarTable[i].defaultString, uiDfCvarTable[i].cvarFlags );
 	}
 	UI_DF_RegisterDefaults();
+	UI_DF_MigrateTheme();
+	for ( i = 0; i < uiDfCvarTableSize; i++ ) {
+		trap_Cvar_Update( uiDfCvarTable[i].vmCvar );
+	}
 	UI_DF_ApplyTheme();
 }
 
