@@ -454,3 +454,7 @@ qboolean trap_GetValue( char *value, int valueSize, const char *key ) {
 void trap_ODF_SetPlayerState( const playerState_t *ps, int viewFlags ) {
 	syscall( CG_ODF_SET_PLAYERSTATE, ps, viewFlags );
 }
+
+void trap_ODF_DemoSeekSupport( int version ) {
+	syscall( CG_ODF_DEMOSEEK_SUPPORT, version );
+}

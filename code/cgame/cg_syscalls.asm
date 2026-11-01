@@ -106,4 +106,5 @@ equ acos						-112
 
 equ trap_GetValue				-701
 equ trap_ODF_SetPlayerState		-711
+equ trap_ODF_DemoSeekSupport	-712
 

@@ -307,6 +307,91 @@ static snapshot_t *CG_ReadNextSnapshot( void ) {
 
 
 /*
+===============
+Demo seeking (oDFe)
+
+The engine jumped to another position of the demo (cl_demoseek.c): it restored the state of the demo parser,
+parsed forward and now tells the cgame. The snapshot with the given number is read again as the first snapshot
+of a demo (CG_SetInitialSnapshot), the server commands up to the sequence were not and are not to be executed,
+the ones after it are the configstring differences the engine made up. Everything that has a time of the old
+position is dropped. The race time decoding of DeFRaG (the demo time offset) is kept: this is not a new demo.
+
+CG_DemoTimeChange only notes it; the reset is made at the start of the next CG_ProcessSnapshots so that cg.snap
+is never NULL while other code runs.
+===============
+*/
+static struct {
+	qboolean	pending;
+	int			serverTime, snapshotNum, serverCommandSequence;
+} timeChange;
+
+void CG_DemoSeekRegister( void ) {
+	char value[16];
+
+	trap_Cvar_VariableStringBuffer( "//trap_GetValue", value, sizeof( value ) );
+	if ( atoi( value ) == CG_TRAP_GETVALUE
+		&& trap_GetValue( value, sizeof( value ), "trap_ODF_DemoSeekSupport" ) && atoi( value ) == CG_ODF_DEMOSEEK_SUPPORT ) {
+		trap_ODF_DemoSeekSupport( CG_DEMOSEEK_VERSION );
+	}
+}
+
+void CG_DemoTimeChange( int serverTime, int snapshotNum, int serverCommandSequence ) {
+	if ( !cg.demoPlayback ) {
+		return;		// a demo only
+	}
+	timeChange.pending = qtrue;
+	timeChange.serverTime = serverTime;
+	timeChange.snapshotNum = snapshotNum;
+	timeChange.serverCommandSequence = serverCommandSequence;
+}
+
+static void CG_ApplyTimeChange( void ) {
+	timeChange.pending = qfalse;
+
+	// read the snapshot again as the first one
+	cg.snap = NULL;
+	cg.nextSnap = NULL;
+	cg.latestSnapshotNum = timeChange.snapshotNum;
+	cgs.processedSnapshotNum = timeChange.snapshotNum - 1;
+	cgs.serverCommandSequence = timeChange.serverCommandSequence;
+
+	cg.time = cg.oldTime = timeChange.serverTime;
+	cg.frametime = 0;
+	cg.thisFrameTeleport = qfalse;
+	cg.nextFrameTeleport = qfalse;
+	cg.validPPS = qfalse;
+
+	// everything that holds a time of the old position
+	CG_InitLocalEntities();
+	CG_InitMarkPolys();
+	CG_ClearParticles();
+	memset( cg_entities, 0, sizeof( cg_entities ) );
+	trap_S_ClearLoopingSounds( qtrue );
+
+	cg.centerPrintTime = 0;
+	cg.rewardTime = 0;
+	cg.rewardStack = 0;
+	cg.soundBufferIn = cg.soundBufferOut = 0;
+	cg.soundTime = 0;
+	cg.itemPickupTime = cg.itemPickupBlendTime = 0;
+	cg.damageTime = 0;
+	cg.v_dmg_time = 0;
+	cg.stepTime = cg.duckTime = cg.landTime = 0;
+	cg.predictedErrorTime = 0;
+	cg.zoomTime = 0;
+	cg.weaponSelectTime = cg.weaponAnimationTime = 0;
+	cg.headStartTime = cg.headEndTime = 0;
+	cg.powerupTime = 0;
+	cg.attackerTime = 0;
+	cg.crosshairClientTime = 0;
+	cg.voiceTime = 0;
+	cg.scoreFadeTime = 0;
+
+	CG_DF_TimeChange();
+}
+
+
+/*
 ============
 CG_ProcessSnapshots
 
@@ -328,6 +413,10 @@ of an interpolating one)
 void CG_ProcessSnapshots( void ) {
 	snapshot_t		*snap;
 	int				n;
+
+	if ( timeChange.pending ) {
+		CG_ApplyTimeChange();
+	}
 
 	// see what the latest snapshot the client system has is
 	trap_GetCurrentSnapshotNumber( &n, &cg.latestSnapshotTime );

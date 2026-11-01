@@ -187,8 +187,11 @@ typedef enum {
 	// oDFe engine extensions. Call them only after CG_PlayerStateExportSupported(): on any other engine they are unknown
 	// syscalls and a fatal "bad cgame system trap".
 	CG_TRAP_GETVALUE = 700,			// qboolean ( char *value, int valueSize, const char *key ): looks an extension up by name
-	CG_ODF_SET_PLAYERSTATE = 710	// void ( const playerState_t *ps ): hands the predicted player state to the client plugins
+	CG_ODF_SET_PLAYERSTATE = 710,	// void ( const playerState_t *ps ): hands the predicted player state to the client plugins
+	CG_ODF_DEMOSEEK_SUPPORT = 711	// void ( int version ): this cgame takes CG_ODF_TIME_CHANGE; the engine may then jump around in a demo
 } cgameImport_t;
+
+#define CG_DEMOSEEK_VERSION 1
 
 
 /*
@@ -236,8 +239,12 @@ typedef enum {
 
 	CG_MOUSE_EVENT,
 //	void	(*CG_MouseEvent)( int dx, int dy );
-	CG_EVENT_HANDLING
+	CG_EVENT_HANDLING,
 //	void (*CG_EventHandling)(int type);
+
+	// oDFe extension, only sent after trap_ODF_DemoSeekSupport( CG_DEMOSEEK_VERSION )
+	CG_ODF_TIME_CHANGE = 100
+//	void (*CG_DemoTimeChange)( int serverTime, int snapshotNum, int serverCommandSequence );
 } cgameExport_t;
 
 //----------------------------------------------

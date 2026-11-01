@@ -20,6 +20,11 @@ Opensource DeFRaG server runtime
 - Scrollable list with scrollbar, double click starts the map; mode, type and last map are remembered
 - Info / Gameplay / Weapons / Timer as tabs (only the ones the mode has), server cheats and run server always visible
 
+### Demo playback (oDFe)
+- Pause (`SPACE`, `demo_pause`), speed (`UP`/`DOWN`, `demo_speed`), seek (`LEFT`/`RIGHT` +-5 s, `HOME`, `demo_seek 83.5 | 1:23 | +5 | 50%`) and a timeline with a mouse cursor: click or drag to seek
+- Seeking forward and back without reloading the demo: the cgame takes the jump (`CG_ODF_TIME_CHANGE`), the engine keeps keyframes of the demo parser; other cgames fall back to a demo restart
+- `+mouseseek`: hold it and move the mouse to scrub the demo, forward and back (`cl_demoMouseSeek` ms per mouse count); `LEFT` / `RIGHT` while held step one snapshot (server frame) back / forward
+
 ### Menus
 - "Mods" (stock game mod switcher) is hidden from the main menu unless `df_ui_showMods 1`
 - Credits moved from the main menu list to a small dim link at the bottom of the screen

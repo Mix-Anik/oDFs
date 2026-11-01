@@ -1631,6 +1631,17 @@ void CG_DF_ReadSnapshot( const snapshot_t *old, const snapshot_t *cur ) {
 	dfDecodeTime = 0;
 }
 
+// the demo was moved to another position (CG_ApplyTimeChange): what follows a run is gone, as when the watched player changes.
+// The demo time offset of the race time decoding stays.
+void CG_DF_TimeChange( void ) {
+	dfPrevRunMs = -1;
+	dfFinishPrint = qfalse;
+	runActive = qfalse;
+	dfDemoFails = 0;
+	CG_DF_Reset();
+	CG_DF_RecLoad();
+}
+
 // called when the read snapshot becomes the current one, after its server commands were executed
 void CG_DF_FlushFinishPrint( void ) {
 	if ( !dfFinishPrint ) {

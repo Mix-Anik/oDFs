@@ -1911,6 +1911,10 @@ qboolean	trap_GetEntityToken( char *buffer, int bufferSize );
 // oDFe engine extensions, call only after CG_PlayerStateExportSupported()
 qboolean	trap_GetValue( char *value, int valueSize, const char *key );
 void		trap_ODF_SetPlayerState( const playerState_t *ps, int viewFlags );
+void		trap_ODF_DemoSeekSupport( int version );
+void		CG_DemoSeekRegister( void );
+void		CG_DemoTimeChange( int serverTime, int snapshotNum, int serverCommandSequence );
+void		CG_DF_TimeChange( void );
 #define CG_ODF_VIEW_SCOREBOARD		1	// the scoreboard is up
 #define CG_ODF_VIEW_NOT_FIRST_PERSON	2	// third person, chase or replay camera: the view is not the player's
 qboolean	CG_PlayerStateExportSupported( void );
