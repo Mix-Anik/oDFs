@@ -333,6 +333,8 @@ static void UI_DF_RegisterDefaults( void ) {
 	int i;
 
 	trap_Cvar_Register( &df_ui_seedServerCvars, "df_ui_seedServerCvars", "0", CVAR_ARCHIVE );
+	trap_Cvar_Register( NULL, "df_ui_browserType", "0", CVAR_ARCHIVE );		// server browser: mode filter (0 all, 1 run, 2 tricks, 3 fast caps)
+	trap_Cvar_Register( NULL, "df_ui_browserSortRev", "0", CVAR_ARCHIVE );	// server browser: the sort order is reversed
 	trap_Cvar_Register( NULL, "df_ui_browserDefragOnly", "1", CVAR_ARCHIVE );		// not a DeFRaG cvar: switch for the "game defrag" server list filter
 	if ( df_ui_seedServerCvars.integer ) {
 		trap_Cvar_Set( "sv_pure", "0" );		// ui 0x8e0 sets it on every start (it overrides the local server's setting)
@@ -364,6 +366,7 @@ extern vec4_t text_color_status;
 vec4_t uiDfColorValue	= { 1.00f, 1.00f, 1.00f, 1.00f };
 vec4_t uiDfColorMedium	= { 1.00f, 0.38f, 0.22f, 1.00f };
 vec4_t uiDfColorBig		= { 1.00f, 0.82f, 0.76f, 1.00f };
+vec4_t uiDfColorSetting	= { 1.00f, 0.43f, 0.00f, 1.00f };	// oDFs: setting names on the Settings pages (the orange of the key bindings)
 
 static void UI_DF_ParseColor( const char *str, vec4_t color ) {
 	const char	*p = str;
@@ -397,6 +400,20 @@ static void UI_DF_ApplyTheme( void ) {
 		}
 		if ( df_ui_CustomMenu.integer ) {
 			UI_DF_ParseColor( cvars[i]->string, *targets[i] );
+		}
+	}
+	// the setting names are orange; a Label colour somebody changed from the default theme's replaces it, as in DeFRaG
+	{
+		static const vec4_t orange = { 1.00f, 0.43f, 0.00f, 1.00f };
+		qboolean custom = qfalse;
+
+		for ( j = 0; j < 4; j++ ) {
+			if ( text_color_normal[j] != defaults[2][j] ) {
+				custom = qtrue;
+			}
+		}
+		for ( j = 0; j < 4; j++ ) {
+			uiDfColorSetting[j] = custom ? text_color_normal[j] : orange[j];
 		}
 	}
 }

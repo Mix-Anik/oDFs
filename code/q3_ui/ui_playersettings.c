@@ -22,41 +22,52 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 #include "ui_local.h"
 
-#define ART_MODEL0			"menu/art/model_0"
-#define ART_MODEL1			"menu/art/model_1"
-#define ART_FX_BASE			"menu/art/fx_base"
-#define ART_FX_BLUE			"menu/art/fx_blue"
-#define ART_FX_CYAN			"menu/art/fx_cyan"
-#define ART_FX_GREEN		"menu/art/fx_grn"
-#define ART_FX_RED			"menu/art/fx_red"
-#define ART_FX_TEAL			"menu/art/fx_teal"
-#define ART_FX_WHITE		"menu/art/fx_white"
-#define ART_FX_YELLOW		"menu/art/fx_yel"
+/*
+oDFs: the Player page of the Settings menu: the name (the colour codes are shown in colour), the handicap as a slider,
+the colour of the effects as a row of swatches, the model (a button that opens the model picker) and the 3D preview.
+*/
 
 #define ID_NAME			10
 #define ID_HANDICAP		11
-#define ID_EFFECTS		12
 #define ID_MODEL		14
+#define ID_LOGIN		30
+#define ID_FX0			20		// 7 swatches
 
 #define MAX_NAMELENGTH	20
+
+#define PS_X			226		// where the controls start, the labels end 8 left of it
+#define PS_ROW			28
+#define PS_FIELD_W		( MAX_NAMELENGTH * SMALLCHAR_WIDTH + 8 )
+#define PS_SWATCH		20
+#define PS_SWATCH_GAP	4
+#define PS_BUTTON_W		( PS_FIELD_W )
+#define PS_BUTTON_H		22
+
+// the records login of the engine (cl_login, cl_loginStatus)
+#define PS_REC_Y		200
+#define PS_REC_LOGIN_Y	( PS_REC_Y + 28 )
+#define PS_REC_ACCOUNT_Y ( PS_REC_Y + 56 )
+#define PS_REC_STATUS_Y	( PS_REC_Y + 76 )
+
+#define PS_PREVIEW_X	410
+#define PS_PREVIEW_Y	36
+#define PS_PREVIEW_W	220
+#define PS_PREVIEW_H	350
 
 
 typedef struct {
 	menuframework_s		menu;
 
-	menubitmap_s		player;
-
 	menufield_s			name;
-	menulist_s			handicap;
-	menulist_s			effects;
+	menuslider_s		handicap;
+	menutext_s			fx[7];
+	menutext_s			model;
+	menuradiobutton_s	login;
+	qboolean			records;		// the engine has the login
 
-	menubitmap_s		model;
-	menubitmap_s		item_null;
-
-	qhandle_t			fxBasePic;
-	qhandle_t			fxPic[7];
 	playerInfo_t		playerinfo;
-	int					current_fx;
+	uiPlayerView_t		view;
+	int					effects;
 	char				playerModel[MAX_QPATH];
 } playersettings_t;
 
@@ -65,29 +76,73 @@ static playersettings_t	s_playersettings;
 static int gamecodetoui[] = {4,2,3,0,5,1,6};
 static int uitogamecode[] = {4,6,2,3,1,5,7};
 
-static const char *handicap_items[] = {
-	"None",
-	"95",
-	"90",
-	"85",
-	"80",
-	"75",
-	"70",
-	"65",
-	"60",
-	"55",
-	"50",
-	"45",
-	"40",
-	"35",
-	"30",
-	"25",
-	"20",
-	"15",
-	"10",
-	"5",
-	NULL
+// the swatches in the order of the effects colour (red, yellow, green, cyan, blue, magenta, white)
+static vec4_t	psFx[7] = {
+	{ 1.00f, 0.15f, 0.10f, 1.0f }, { 1.00f, 0.90f, 0.10f, 1.0f }, { 0.20f, 0.95f, 0.20f, 1.0f }, { 0.10f, 0.90f, 0.95f, 1.0f },
+	{ 0.25f, 0.35f, 1.00f, 1.0f }, { 1.00f, 0.20f, 0.90f, 1.0f }, { 1.00f, 1.00f, 1.00f, 1.0f }
 };
+static vec4_t	psWhite = { 1.0f, 1.0f, 1.0f, 1.0f };
+static vec4_t	psPlate = { 0.14f, 0.02f, 0.02f, 0.90f };
+static vec4_t	psPlateFocus = { 0.26f, 0.04f, 0.03f, 0.95f };
+static vec4_t	psBorderFocus = { 1.0f, 0.85f, 0.25f, 1.0f };
+static vec4_t	psHint = { 0.62f, 0.38f, 0.34f, 1.0f };
+static vec4_t	psLabel ={ 1.0f, 0.82f, 0.76f, 1.0f };
+static vec4_t	psFill = { 0.70f, 0.08f, 0.05f, 0.14f };
+static vec4_t	psFillLit = { 0.85f, 0.15f, 0.08f, 0.32f };
+static vec4_t	psGood = { 0.55f, 0.85f, 0.55f, 1.0f };
+static vec4_t	psWarn = { 1.0f, 0.85f, 0.25f, 1.0f };
+
+
+static void PS_Outline( int x, int y, int w, int h, int t, const float *color ) {
+	UI_FillRect( x, y, w, t, color );
+	UI_FillRect( x, y + h - t, w, t, color );
+	UI_FillRect( x, y, t, h, color );
+	UI_FillRect( x + w - t, y, t, h, color );
+}
+
+/*
+=================
+PS_DrawColored
+
+A name with its colour codes at work (^0 is shown white).  Without "colors" the text is plain.
+Returns the number of characters drawn.
+=================
+*/
+static int PS_DrawColored( int x, int y, const char *txt, qboolean colors, int style ) {
+	float		*color = psWhite;
+	int			n, count = 0;
+
+	while ( *txt ) {
+		if ( colors && Q_IsColorString( txt ) ) {
+			n = UI_ColorIndex( *( txt + 1 ) );
+			if ( n == 0 ) {
+				n = 7;
+			}
+			color = (float *)g_color_table[n];
+			txt += 2;
+			continue;
+		}
+		UI_DrawChar( x, y, *txt, style, color );
+		txt++;
+		x += SMALLCHAR_WIDTH;
+		count++;
+	}
+	return count;
+}
+
+static int PS_ColoredLength( const char *txt ) {
+	int	count = 0;
+
+	while ( *txt ) {
+		if ( Q_IsColorString( txt ) ) {
+			txt += 2;
+			continue;
+		}
+		txt++;
+		count++;
+	}
+	return count;
+}
 
 
 /*
@@ -96,136 +151,158 @@ PlayerSettings_DrawName
 =================
 */
 static void PlayerSettings_DrawName( void *self ) {
-	menufield_s		*f;
-	qboolean		focus;
-	int				style;
-	char			*txt;
-	char			c;
-	float			*color;
-	int				n;
-	int				basex, x, y;
-	char			name[32];
+	menufield_s		*f = (menufield_s *)self;
+	qboolean		focus = ( f->generic.parent->cursor == f->generic.menuPosition );
+	int				x = f->generic.x, y = f->generic.y;
+	int				style = UI_LEFT | UI_SMALLFONT;
 
-	f = (menufield_s*)self;
-	basex = f->generic.x;
-	y = f->generic.y;
-	focus = (f->generic.parent->cursor == f->generic.menuPosition);
+	UI_DrawString( x - SMALLCHAR_WIDTH, y, "Name:", UI_RIGHT | UI_SMALLFONT,
+		UI_DF_NAMECOLOR( f->generic.parent, focus ? text_color_highlight : text_color_normal ) );
 
-	style = UI_LEFT|UI_SMALLFONT;
-	color = text_color_normal;
-	if( focus ) {
-		style |= UI_PULSE;
-		color = text_color_highlight;
+	UI_FillRect( x - 4, y - 2, PS_FIELD_W, SMALLCHAR_HEIGHT + 4, focus ? psPlateFocus : psPlate );
+	if ( focus ) {
+		PS_Outline( x - 4, y - 2, PS_FIELD_W, SMALLCHAR_HEIGHT + 4, 1, psBorderFocus );
+		PS_DrawColored( x, y, f->field.buffer, qfalse, style );
+		// the cursor
+		UI_DrawChar( x + f->field.cursor * SMALLCHAR_WIDTH, y, trap_Key_GetOverstrikeMode() ? 11 : 10, UI_LEFT | UI_SMALLFONT | UI_BLINK, psWhite );
+	} else {
+		PS_DrawColored( x, y, f->field.buffer, qtrue, style );
 	}
-
-	UI_DrawProportionalString( basex, y, "Name", style, color );
-
-	// draw the actual name
-	basex += 64;
-	y += PROP_HEIGHT;
-	txt = f->field.buffer;
-	color = (float *)g_color_table[ColorIndex(COLOR_WHITE)];
-	x = basex;
-	while ( (c = *txt) != 0 ) {
-		if ( !focus && Q_IsColorString( txt ) ) {
-			n = UI_ColorIndex( *(txt+1) );
-			if( n == 0 ) {
-				n = 7;
-			}
-			color = (float *)g_color_table[n];
-			txt += 2;
-			continue;
-		}
-		UI_DrawChar( x, y, c, style, color );
-		txt++;
-		x += SMALLCHAR_WIDTH;
-	}
-
-	// draw cursor if we have focus
-	if( focus ) {
-		if ( trap_Key_GetOverstrikeMode() ) {
-			c = 11;
-		} else {
-			c = 10;
-		}
-
-		style &= ~UI_PULSE;
-		style |= UI_BLINK;
-
-		UI_DrawChar( basex + f->field.cursor * SMALLCHAR_WIDTH, y, c, style, color_white );
-	}
-
-	// draw at bottom also using proportional font
-	Q_strncpyz( name, f->field.buffer, sizeof(name) );
-	Q_CleanStr( name );
-	UI_DrawProportionalString( 320, 440, name, UI_CENTER|UI_BIGFONT, text_color_normal );
 }
 
 
 /*
 =================
-PlayerSettings_DrawHandicap
+PlayerSettings_SwatchDraw
 =================
 */
-static void PlayerSettings_DrawHandicap( void *self ) {
-	menulist_s		*item;
-	qboolean		focus;
-	int				style;
-	float			*color;
+static void PlayerSettings_SwatchDraw( void *self ) {
+	menutext_s	*t = (menutext_s *)self;
+	int			fx = t->generic.id - ID_FX0;
+	qboolean	lit = ( t->generic.flags & QMF_HASMOUSEFOCUS ) || Menu_ItemAtCursor( t->generic.parent ) == self;
+	int			x = t->generic.left, y = t->generic.top;
 
-	item = (menulist_s *)self;
-	focus = (item->generic.parent->cursor == item->generic.menuPosition);
-
-	style = UI_LEFT|UI_SMALLFONT;
-	color = text_color_normal;
-	if( focus ) {
-		style |= UI_PULSE;
-		color = text_color_highlight;
+	UI_FillRect( x, y, PS_SWATCH, PS_SWATCH, psFx[fx] );
+	if ( fx == s_playersettings.effects ) {
+		PS_Outline( x - 3, y - 3, PS_SWATCH + 6, PS_SWATCH + 6, 2, psWhite );
+	} else if ( lit ) {
+		PS_Outline( x - 2, y - 2, PS_SWATCH + 4, PS_SWATCH + 4, 1, psBorderFocus );
 	}
-
-	UI_DrawProportionalString( item->generic.x, item->generic.y, "Handicap", style, color );
-	// DeFRaG 0x1274c: the value is drawn in the "Value" menu colour while the item has no focus
-	UI_DrawProportionalString( item->generic.x + 64, item->generic.y + PROP_HEIGHT, handicap_items[item->curvalue], style, UI_DF_VALUECOLOR( color ) );
 }
 
 
 /*
 =================
-PlayerSettings_DrawEffects
+PlayerSettings_ModelDraw
+
+The button shows the model that is set.
 =================
 */
-static void PlayerSettings_DrawEffects( void *self ) {
-	menulist_s		*item;
-	qboolean		focus;
-	int				style;
-	float			*color;
+static void PlayerSettings_ModelDraw( void *self ) {
+	menutext_s	*t = (menutext_s *)self;
+	qboolean	lit = ( t->generic.flags & QMF_HASMOUSEFOCUS ) || Menu_ItemAtCursor( t->generic.parent ) == self;
+	int			x = t->generic.left, y = t->generic.top;
+	char		buf[MAX_QPATH];
 
-	item = (menulist_s *)self;
-	focus = (item->generic.parent->cursor == item->generic.menuPosition);
+	UI_DrawString( x - SMALLCHAR_WIDTH, y + ( PS_BUTTON_H - SMALLCHAR_HEIGHT ) / 2, "Model:", UI_RIGHT | UI_SMALLFONT,
+		UI_DF_NAMECOLOR( t->generic.parent, text_color_normal ) );
 
-	style = UI_LEFT|UI_SMALLFONT;
-	color = text_color_normal;
-	if( focus ) {
-		style |= UI_PULSE;
-		color = text_color_highlight;
+	UI_FillRect( x, y, PS_BUTTON_W, PS_BUTTON_H, lit ? psFillLit : psFill );
+	if ( lit ) {
+		PS_Outline( x, y, PS_BUTTON_W, PS_BUTTON_H, 1, psBorderFocus );
 	}
-
-	UI_DrawProportionalString( item->generic.x, item->generic.y, "Effects", style, color );
-
-	UI_DrawHandlePic( item->generic.x + 64, item->generic.y + PROP_HEIGHT + 8, 128, 8, s_playersettings.fxBasePic );
-	UI_DrawHandlePic( item->generic.x + 64 + item->curvalue * 16 + 8, item->generic.y + PROP_HEIGHT + 6, 16, 12, s_playersettings.fxPic[item->curvalue] );
+	trap_Cvar_VariableStringBuffer( "model", buf, sizeof( buf ) );
+	if ( strlen( buf ) > MAX_NAMELENGTH ) {
+		buf[MAX_NAMELENGTH - 1] = '>';
+		buf[MAX_NAMELENGTH] = '\0';
+	}
+	UI_DrawString( x + 8, y + ( PS_BUTTON_H - SMALLCHAR_HEIGHT ) / 2, buf, UI_LEFT | UI_SMALLFONT, lit ? psWhite : psLabel );
 }
 
 
 /*
 =================
-PlayerSettings_DrawPlayer
+PlayerSettings_DrawRecords
+
+The records account: whether the login is on, who the server says you are, and your public key.  The status is only
+known while a server is joined (the engine clears it on leaving); the account of the last login is remembered.
 =================
 */
-static void PlayerSettings_DrawPlayer( void *self ) {
-	menubitmap_s	*b;
-	vec3_t			viewangles;
-	char			buf[MAX_QPATH];
+static void PlayerSettings_DrawRecords( void ) {
+	char			status[64], account[64], text[32];
+	const char		*reason;
+	float			*statusColor = psHint, *accountColor = psHint;
+	uiClientState_t	cs;
+	qboolean		loginOn, connected, loggedIn = qfalse;
+	int				labelX = PS_X - SMALLCHAR_WIDTH;
+
+	trap_Cvar_VariableStringBuffer( "cl_loginStatus", status, sizeof( status ) );
+	account[0] = '\0';
+	trap_GetClientState( &cs );
+	connected = cs.connState == CA_ACTIVE;
+	loginOn = trap_Cvar_VariableValue( "cl_login" ) != 0;
+
+	// what the server said
+	if ( !loginOn ) {
+		Q_strncpyz( text, "Login is off", sizeof( text ) );
+	} else if ( !connected ) {
+		Q_strncpyz( text, "Not connected", sizeof( text ) );
+	} else if ( !Q_stricmpn( status, "ok ", 3 ) ) {
+		Q_strncpyz( text, "Logged in", sizeof( text ) );
+		statusColor = psGood;
+		loggedIn = qtrue;
+		Q_strncpyz( account, status + 3, sizeof( account ) );
+	} else if ( !Q_stricmp( status, "unknown_key" ) ) {
+		Q_strncpyz( text, "Key not registered", sizeof( text ) );
+		statusColor = psWarn;
+	} else if ( !Q_stricmp( status, "unavailable" ) ) {
+		Q_strncpyz( text, "Service unavailable", sizeof( text ) );
+		statusColor = psWarn;
+	} else if ( !Q_stricmpn( status, "failed", 6 ) ) {
+		reason = status[6] == ' ' ? status + 7 : "";
+		Com_sprintf( text, sizeof( text ), "Failed: %.12s", reason );
+		statusColor = psWarn;
+	} else if ( !Q_stricmp( status, "off" ) ) {
+		Q_strncpyz( text, "Logged out", sizeof( text ) );
+	} else {
+		Q_strncpyz( text, "No records here", sizeof( text ) );
+	}
+
+	// the account the server logged this player in as
+	Q_CleanStr( account );
+	if ( loggedIn ) {
+		accountColor = psGood;
+	}
+	if ( strlen( account ) > 14 ) {
+		account[13] = '>';
+		account[14] = '\0';
+	}
+
+	UI_DrawString( 130, PS_REC_Y, "RECORDS", UI_LEFT | UI_SMALLFONT, uiDfColorMedium );
+	UI_FillRect( 130, PS_REC_Y + 17, PS_X + PS_FIELD_W - 4 - 130, 1, psBorderFocus );
+
+	UI_DrawString( labelX, PS_REC_ACCOUNT_Y, "Account:", UI_RIGHT | UI_SMALLFONT, UI_DF_NAMECOLOR( &s_playersettings.menu, text_color_normal ) );
+	if ( account[0] ) {
+		UI_DrawString( PS_X, PS_REC_ACCOUNT_Y, account, UI_LEFT | UI_SMALLFONT, accountColor );
+	} else {
+		UI_DrawString( PS_X, PS_REC_ACCOUNT_Y, "-", UI_LEFT | UI_SMALLFONT, psHint );
+	}
+
+	UI_DrawString( labelX, PS_REC_STATUS_Y, "Status:", UI_RIGHT | UI_SMALLFONT, UI_DF_NAMECOLOR( &s_playersettings.menu, text_color_normal ) );
+	UI_DrawString( PS_X, PS_REC_STATUS_Y, text, UI_LEFT | UI_SMALLFONT, statusColor );
+
+}
+
+
+/*
+=================
+PlayerSettings_MenuDraw
+=================
+*/
+static void PlayerSettings_MenuDraw( void ) {
+	vec3_t	viewangles;
+	char	buf[MAX_QPATH];
+	int		y, len;
 
 	trap_Cvar_VariableStringBuffer( "model", buf, sizeof( buf ) );
 	if ( strcmp( buf, s_playersettings.playerModel ) != 0 ) {
@@ -237,9 +314,23 @@ static void PlayerSettings_DrawPlayer( void *self ) {
 		viewangles[ROLL]  = 0;
 		UI_PlayerInfo_SetInfo( &s_playersettings.playerinfo, LEGS_IDLE, TORSO_STAND, viewangles, vec3_origin, WP_MACHINEGUN, qfalse );
 	}
+	UI_PlayerView_Draw( &s_playersettings.view, PS_PREVIEW_X, PS_PREVIEW_Y, PS_PREVIEW_W, PS_PREVIEW_H, &s_playersettings.playerinfo, uis.realtime / 2 );
 
-	b = (menubitmap_s*) self;
-	UI_DrawPlayer( b->generic.x, b->generic.y, b->width, b->height, &s_playersettings.playerinfo, uis.realtime/2 );
+	// the name as the others will see it, under the model
+	y = PS_PREVIEW_Y + PS_PREVIEW_H + 6;
+	len = PS_ColoredLength( s_playersettings.name.field.buffer );
+	PS_DrawColored( PS_PREVIEW_X + PS_PREVIEW_W / 2 - len * SMALLCHAR_WIDTH / 2, y, s_playersettings.name.field.buffer, qtrue, UI_LEFT | UI_SMALLFONT );
+	UI_DrawString( PS_PREVIEW_X + PS_PREVIEW_W / 2, y + SMALLCHAR_HEIGHT + 4, "drag to turn, wheel to zoom", UI_CENTER | UI_SMALLFONT, psHint );
+
+	// the label of the swatches
+	UI_DrawString( PS_X - SMALLCHAR_WIDTH, s_playersettings.fx[0].generic.top + ( PS_SWATCH - SMALLCHAR_HEIGHT ) / 2, "Effects:", UI_RIGHT | UI_SMALLFONT,
+		UI_DF_NAMECOLOR( &s_playersettings.menu, text_color_normal ) );
+
+	if ( s_playersettings.records ) {
+		PlayerSettings_DrawRecords();
+	}
+
+	Menu_Draw( &s_playersettings.menu );
 }
 
 
@@ -253,10 +344,10 @@ static void PlayerSettings_SaveChanges( void ) {
 	trap_Cvar_Set( "name", s_playersettings.name.field.buffer );
 
 	// handicap
-	trap_Cvar_SetValue( "handicap", 100 - s_playersettings.handicap.curvalue * 5 );
+	trap_Cvar_SetValue( "handicap", (int)( s_playersettings.handicap.curvalue + 0.5f ) );
 
 	// effects color
-	trap_Cvar_SetValue( "color1", uitogamecode[s_playersettings.effects.curvalue] );
+	trap_Cvar_SetValue( "color1", uitogamecode[s_playersettings.effects] );
 }
 
 
@@ -266,8 +357,43 @@ PlayerSettings_MenuKey
 =================
 */
 static sfxHandle_t PlayerSettings_MenuKey( int key ) {
+	menucommon_s	*m;
+	int				fx;
+
 	if( key == K_MOUSE2 || key == K_ESCAPE ) {
 		PlayerSettings_SaveChanges();
+	}
+
+	// drag in the preview turns the model, the wheel there zooms
+	if ( ( key == K_MOUSE1 || key == K_MWHEELUP || key == K_MWHEELDOWN )
+		&& UI_PlayerView_Key( &s_playersettings.view, key, PS_PREVIEW_X, PS_PREVIEW_Y, PS_PREVIEW_W, PS_PREVIEW_H ) ) {
+		return menu_null_sound;
+	}
+
+	// the swatches are a row: left and right move along it, up and down leave it
+	m = Menu_ItemAtCursor( &s_playersettings.menu );
+	if ( m && m->id >= ID_FX0 && m->id < ID_FX0 + 7 ) {
+		fx = m->id - ID_FX0;
+		switch ( key ) {
+		case K_LEFTARROW: case K_KP_LEFTARROW:
+			if ( fx > 0 ) {
+				Menu_SetCursorToItem( &s_playersettings.menu, &s_playersettings.fx[fx - 1] );
+				return menu_move_sound;
+			}
+			return menu_buzz_sound;
+		case K_RIGHTARROW: case K_KP_RIGHTARROW:
+			if ( fx < 6 ) {
+				Menu_SetCursorToItem( &s_playersettings.menu, &s_playersettings.fx[fx + 1] );
+				return menu_move_sound;
+			}
+			return menu_buzz_sound;
+		case K_UPARROW: case K_KP_UPARROW:
+			Menu_SetCursorToItem( &s_playersettings.menu, &s_playersettings.handicap );
+			return menu_move_sound;
+		case K_DOWNARROW: case K_KP_DOWNARROW:
+			Menu_SetCursorToItem( &s_playersettings.menu, &s_playersettings.model );
+			return menu_move_sound;
+		}
 	}
 	return Menu_DefaultKey( &s_playersettings.menu, key );
 }
@@ -291,21 +417,22 @@ static void PlayerSettings_SetMenuItems( void ) {
 	if( c < 0 || c > 6 ) {
 		c = 6;
 	}
-	s_playersettings.effects.curvalue = gamecodetoui[c];
+	s_playersettings.effects = gamecodetoui[c];
 
 	// model/skin
 	memset( &s_playersettings.playerinfo, 0, sizeof(playerInfo_t) );
-	
+
 	viewangles[YAW]   = 180 - 30;
 	viewangles[PITCH] = 0;
 	viewangles[ROLL]  = 0;
 
 	UI_PlayerInfo_SetModel( &s_playersettings.playerinfo, UI_Cvar_VariableString( "model" ) );
 	UI_PlayerInfo_SetInfo( &s_playersettings.playerinfo, LEGS_IDLE, TORSO_STAND, viewangles, vec3_origin, WP_MACHINEGUN, qfalse );
+	trap_Cvar_VariableStringBuffer( "model", s_playersettings.playerModel, sizeof( s_playersettings.playerModel ) );
 
 	// handicap
 	h = Com_Clamp( 5, 100, trap_Cvar_VariableValue("handicap") );
-	s_playersettings.handicap.curvalue = 20 - h / 5;
+	s_playersettings.handicap.curvalue = h;
 }
 
 
@@ -315,13 +442,16 @@ PlayerSettings_MenuEvent
 =================
 */
 static void PlayerSettings_MenuEvent( void* ptr, int event ) {
+	int		id;
+
 	if( event != QM_ACTIVATED ) {
 		return;
 	}
 
-	switch( ((menucommon_s*)ptr)->id ) {
+	id = ((menucommon_s*)ptr)->id;
+	switch( id ) {
 	case ID_HANDICAP:
-		trap_Cvar_Set( "handicap", va( "%i", 100 - 25 * s_playersettings.handicap.curvalue ) );
+		trap_Cvar_SetValue( "handicap", (int)( s_playersettings.handicap.curvalue + 0.5f ) );
 		break;
 
 	case ID_MODEL:
@@ -329,6 +459,18 @@ static void PlayerSettings_MenuEvent( void* ptr, int event ) {
 		UI_PlayerModelMenu();
 		break;
 
+	case ID_LOGIN:
+		// the commands also make the key when it is wanted
+		trap_Cmd_ExecuteText( EXEC_APPEND, s_playersettings.login.curvalue ? "login\n" : "logout\n" );
+		break;
+
+
+	default:
+		if ( id >= ID_FX0 && id < ID_FX0 + 7 ) {
+			s_playersettings.effects = id - ID_FX0;
+			trap_Cvar_SetValue( "color1", uitogamecode[s_playersettings.effects] );
+		}
+		break;
 	}
 }
 
@@ -339,115 +481,100 @@ PlayerSettings_MenuInit
 =================
 */
 static void PlayerSettings_MenuInit( void ) {
-	int		y;
+	int		i, y;
 
 	memset(&s_playersettings,0,sizeof(playersettings_t));
 
-	PlayerSettings_Cache();
-
 	s_playersettings.menu.key        = PlayerSettings_MenuKey;
+	s_playersettings.menu.draw       = PlayerSettings_MenuDraw;
 	s_playersettings.menu.wrapAround = qtrue;
 	s_playersettings.menu.fullscreen = qtrue;
+	UI_PlayerView_Init( &s_playersettings.view );
 
 
-	y = 144;
+	y = SETTINGS_FORM_Y;
 	s_playersettings.name.generic.type			= MTYPE_FIELD;
 	s_playersettings.name.generic.flags			= QMF_NODEFAULTINIT;
 	s_playersettings.name.generic.ownerdraw		= PlayerSettings_DrawName;
 	s_playersettings.name.field.widthInChars	= MAX_NAMELENGTH;
 	s_playersettings.name.field.maxchars		= MAX_NAMELENGTH;
-	s_playersettings.name.generic.x				= 192;
+	s_playersettings.name.generic.x				= PS_X;
 	s_playersettings.name.generic.y				= y;
-	s_playersettings.name.generic.left			= 192 - 8;
-	s_playersettings.name.generic.top			= y - 8;
-	s_playersettings.name.generic.right			= 192 + 200;
-	s_playersettings.name.generic.bottom		= y + 2 * PROP_HEIGHT;
-
-	y += 3 * PROP_HEIGHT;
-	s_playersettings.handicap.generic.type		= MTYPE_SPINCONTROL;
-	s_playersettings.handicap.generic.flags		= QMF_NODEFAULTINIT;
-	s_playersettings.handicap.generic.id		= ID_HANDICAP;
-	s_playersettings.handicap.generic.ownerdraw	= PlayerSettings_DrawHandicap;
-	s_playersettings.handicap.generic.x			= 192;
-	s_playersettings.handicap.generic.y			= y;
-	s_playersettings.handicap.generic.left		= 192 - 8;
-	s_playersettings.handicap.generic.top		= y - 8;
-	s_playersettings.handicap.generic.right		= 192 + 200;
-	s_playersettings.handicap.generic.bottom	= y + 2 * PROP_HEIGHT;
-	s_playersettings.handicap.numitems			= 20;
-
-	y += 3 * PROP_HEIGHT;
-	s_playersettings.effects.generic.type		= MTYPE_SPINCONTROL;
-	s_playersettings.effects.generic.flags		= QMF_NODEFAULTINIT;
-	s_playersettings.effects.generic.id			= ID_EFFECTS;
-	s_playersettings.effects.generic.ownerdraw	= PlayerSettings_DrawEffects;
-	s_playersettings.effects.generic.x			= 192;
-	s_playersettings.effects.generic.y			= y;
-	s_playersettings.effects.generic.left		= 192 - 8;
-	s_playersettings.effects.generic.top		= y - 8;
-	s_playersettings.effects.generic.right		= 192 + 200;
-	s_playersettings.effects.generic.bottom		= y + 2* PROP_HEIGHT;
-	s_playersettings.effects.numitems			= 7;
-
-	s_playersettings.model.generic.type			= MTYPE_BITMAP;
-	s_playersettings.model.generic.name			= ART_MODEL0;
-	s_playersettings.model.generic.flags		= QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_playersettings.model.generic.id			= ID_MODEL;
-	s_playersettings.model.generic.callback		= PlayerSettings_MenuEvent;
-	s_playersettings.model.generic.x			= 640;
-	s_playersettings.model.generic.y			= 480-64;
-	s_playersettings.model.width				= 128;
-	s_playersettings.model.height				= 64;
-	s_playersettings.model.focuspic				= ART_MODEL1;
-
-	s_playersettings.player.generic.type		= MTYPE_BITMAP;
-	s_playersettings.player.generic.flags		= QMF_INACTIVE;
-	s_playersettings.player.generic.ownerdraw	= PlayerSettings_DrawPlayer;
-	s_playersettings.player.generic.x			= 400;
-	s_playersettings.player.generic.y			= -40;
-	s_playersettings.player.width				= 32*10;
-	s_playersettings.player.height				= 56*10;
-
-
-	s_playersettings.item_null.generic.type		= MTYPE_BITMAP;
-	s_playersettings.item_null.generic.flags	= QMF_LEFT_JUSTIFY|QMF_MOUSEONLY|QMF_SILENT;
-	s_playersettings.item_null.generic.x		= 0;
-	s_playersettings.item_null.generic.y		= 0;
-	s_playersettings.item_null.width			= 640;
-	s_playersettings.item_null.height			= 480;
-
-
+	s_playersettings.name.generic.left			= PS_X - 4;
+	s_playersettings.name.generic.top			= y - 2;
+	s_playersettings.name.generic.right			= PS_X - 4 + PS_FIELD_W;
+	s_playersettings.name.generic.bottom		= y + SMALLCHAR_HEIGHT + 2;
 	Menu_AddItem( &s_playersettings.menu, &s_playersettings.name );
+
+	y += PS_ROW;
+	s_playersettings.handicap.generic.type		= MTYPE_SLIDER;
+	s_playersettings.handicap.generic.name		= "Handicap:";
+	s_playersettings.handicap.generic.flags		= QMF_SMALLFONT;
+	s_playersettings.handicap.generic.id		= ID_HANDICAP;
+	s_playersettings.handicap.generic.callback	= PlayerSettings_MenuEvent;
+	s_playersettings.handicap.generic.x			= PS_X;
+	s_playersettings.handicap.generic.y			= y;
+	s_playersettings.handicap.minvalue			= 5;
+	s_playersettings.handicap.maxvalue			= 100;
+	s_playersettings.handicap.step				= 5;
+	s_playersettings.handicap.suffix			= "%";
 	Menu_AddItem( &s_playersettings.menu, &s_playersettings.handicap );
-	Menu_AddItem( &s_playersettings.menu, &s_playersettings.effects );
+
+	y += PS_ROW;
+	for ( i = 0; i < 7; i++ ) {
+		menutext_s	*t = &s_playersettings.fx[i];
+
+		t->generic.type		= MTYPE_PTEXT;
+		t->generic.flags	= QMF_LEFT_JUSTIFY;
+		t->generic.id		= ID_FX0 + i;
+		t->generic.x		= PS_X + i * ( PS_SWATCH + PS_SWATCH_GAP );
+		t->generic.y		= y;
+		t->generic.callback	= PlayerSettings_MenuEvent;
+		t->generic.ownerdraw = PlayerSettings_SwatchDraw;
+		t->string			= "";
+		Menu_AddItem( &s_playersettings.menu, t );
+		// the widget worked out its mouse area from its text: use the swatch
+		t->generic.left		= PS_X + i * ( PS_SWATCH + PS_SWATCH_GAP );
+		t->generic.right	= t->generic.left + PS_SWATCH - 1;
+		t->generic.top		= y;
+		t->generic.bottom	= y + PS_SWATCH - 1;
+	}
+
+	y += PS_ROW + 4;
+	s_playersettings.model.generic.type			= MTYPE_PTEXT;
+	s_playersettings.model.generic.flags		= QMF_LEFT_JUSTIFY;
+	s_playersettings.model.generic.id			= ID_MODEL;
+	s_playersettings.model.generic.x			= PS_X;
+	s_playersettings.model.generic.y			= y;
+	s_playersettings.model.generic.callback		= PlayerSettings_MenuEvent;
+	s_playersettings.model.generic.ownerdraw	= PlayerSettings_ModelDraw;
+	s_playersettings.model.string				= "";
 	Menu_AddItem( &s_playersettings.menu, &s_playersettings.model );
+	s_playersettings.model.generic.left			= PS_X;
+	s_playersettings.model.generic.right		= PS_X + PS_BUTTON_W - 1;
+	s_playersettings.model.generic.top			= y;
+	s_playersettings.model.generic.bottom		= y + PS_BUTTON_H - 1;
+
+	// the records account: only where the engine has the login (cl_login exists)
+	s_playersettings.records = UI_Cvar_VariableString( "cl_login" )[0] != '\0';
+
+	s_playersettings.login.generic.type		= MTYPE_RADIOBUTTON;
+	s_playersettings.login.generic.name		= "Login:";
+	s_playersettings.login.generic.flags	= QMF_SMALLFONT;
+	s_playersettings.login.generic.id		= ID_LOGIN;
+	s_playersettings.login.generic.callback	= PlayerSettings_MenuEvent;
+	s_playersettings.login.generic.x		= PS_X;
+	s_playersettings.login.generic.y		= PS_REC_LOGIN_Y;
+	s_playersettings.login.curvalue			= trap_Cvar_VariableValue( "cl_login" ) != 0;
+	Menu_AddItem( &s_playersettings.menu, &s_playersettings.login );
+
+	if ( !s_playersettings.records ) {
+		s_playersettings.login.generic.flags |= QMF_HIDDEN | QMF_INACTIVE;
+	}
+
 	UI_Settings_AddRail( &s_playersettings.menu, SETP_PLAYER, PlayerSettings_SaveChanges );
 
-	Menu_AddItem( &s_playersettings.menu, &s_playersettings.player );
-
-	Menu_AddItem( &s_playersettings.menu, &s_playersettings.item_null );
-
 	PlayerSettings_SetMenuItems();
-}
-
-
-/*
-=================
-PlayerSettings_Cache
-=================
-*/
-void PlayerSettings_Cache( void ) {
-	trap_R_RegisterShaderNoMip( ART_MODEL0 );
-	trap_R_RegisterShaderNoMip( ART_MODEL1 );
-
-	s_playersettings.fxBasePic = trap_R_RegisterShaderNoMip( ART_FX_BASE );
-	s_playersettings.fxPic[0] = trap_R_RegisterShaderNoMip( ART_FX_RED );
-	s_playersettings.fxPic[1] = trap_R_RegisterShaderNoMip( ART_FX_YELLOW );
-	s_playersettings.fxPic[2] = trap_R_RegisterShaderNoMip( ART_FX_GREEN );
-	s_playersettings.fxPic[3] = trap_R_RegisterShaderNoMip( ART_FX_TEAL );
-	s_playersettings.fxPic[4] = trap_R_RegisterShaderNoMip( ART_FX_BLUE );
-	s_playersettings.fxPic[5] = trap_R_RegisterShaderNoMip( ART_FX_CYAN );
-	s_playersettings.fxPic[6] = trap_R_RegisterShaderNoMip( ART_FX_WHITE );
 }
 
 

@@ -186,7 +186,7 @@ static void Crosshair_Draw( void *self ) {
 		UI_DrawChar( x, y, 13, UI_CENTER|UI_BLINK|UI_SMALLFONT, color);
 	}
 
-	UI_DrawString( x - SMALLCHAR_WIDTH, y, s->generic.name, style|UI_RIGHT, color );
+	UI_DrawString( x - SMALLCHAR_WIDTH, y, s->generic.name, style|UI_RIGHT, UI_DF_NAMECOLOR( s->generic.parent, color ) );
 	if( !s->curvalue ) {
 		return;
 	}

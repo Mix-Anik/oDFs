@@ -801,7 +801,7 @@ static void Controls_GetConfig( void )
 	s_controls.smoothmouse.curvalue  = UI_ClampCvar( 0, 1, Controls_GetCvarValue( "m_filter" ) );
 	s_controls.alwaysrun.curvalue    = UI_ClampCvar( 0, 1, Controls_GetCvarValue( "cl_run" ) );
 	s_controls.autoswitch.curvalue   = UI_ClampCvar( 0, 1, Controls_GetCvarValue( "cg_autoswitch" ) );
-	s_controls.sensitivity.curvalue  = UI_ClampCvar( 2, 30, Controls_GetCvarValue( "sensitivity" ) );
+	s_controls.sensitivity.curvalue  = UI_ClampCvar( 0.1f, 10, Controls_GetCvarValue( "sensitivity" ) );
 	s_controls.joyenable.curvalue    = UI_ClampCvar( 0, 1, Controls_GetCvarValue( "in_joystick" ) );
 	s_controls.joythreshold.curvalue = UI_ClampCvar( 0.05f, 0.75f, Controls_GetCvarValue( "joy_threshold" ) );
 	s_controls.freelook.curvalue     = UI_ClampCvar( 0, 1, Controls_GetCvarValue( "cl_freelook" ) );
@@ -1478,8 +1478,10 @@ static void Controls_MenuInit( void )
 	s_controls.sensitivity.generic.name	     = "mouse speed";
 	s_controls.sensitivity.generic.id 	     = ID_MOUSESPEED;
 	s_controls.sensitivity.generic.callback  = Controls_MenuEvent;
-	s_controls.sensitivity.minvalue		     = 2;
-	s_controls.sensitivity.maxvalue		     = 30;
+	s_controls.sensitivity.minvalue		     = 0.1f;
+	s_controls.sensitivity.maxvalue		     = 10;
+	s_controls.sensitivity.step		         = 0.1f;
+	s_controls.sensitivity.decimals		     = -1;
 	s_controls.sensitivity.generic.statusbar = Controls_StatusBar;
 
 	s_controls.gesture.generic.type	     = MTYPE_ACTION;
@@ -1540,6 +1542,8 @@ static void Controls_MenuInit( void )
 	s_controls.joythreshold.generic.callback  = Controls_MenuEvent;
 	s_controls.joythreshold.minvalue		  = 0.05f;
 	s_controls.joythreshold.maxvalue		  = 0.75f;
+	s_controls.joythreshold.step			  = 0.01f;
+	s_controls.joythreshold.decimals		  = 2;
 	s_controls.joythreshold.generic.statusbar = Controls_StatusBar;
 
 	s_controls.name.generic.type	= MTYPE_PTEXT;

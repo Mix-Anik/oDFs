@@ -375,7 +375,7 @@ void MenuField_Draw( menufield_s *f )
 	}
 
 	if ( f->generic.name ) {
-		UI_DrawString( x - w, y, f->generic.name, style|UI_RIGHT, color );
+		UI_DrawString( x - w, y, f->generic.name, style|UI_RIGHT, UI_DF_NAMECOLOR( f->generic.parent, color ) );
 	}
 
 	// DeFRaG 0xf815: the text of the field uses the Value colour while the field is neither focused nor grayed

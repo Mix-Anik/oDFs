@@ -117,6 +117,8 @@ typedef struct {
 	menulist_s		pageSpin;
 	uiDfModWidget_t	w[UI_DF_MAXITEMS];
 	const uiDfPageDef_t	*def;
+	qboolean		keyNav;		// a key was used since the pointer last moved: the item with the cursor gets its hint
+	int				lastCursorX, lastCursorY;
 } uiDfMod_t;
 
 static uiDfMod_t	s_dfmod;
@@ -323,6 +325,17 @@ static void UI_DF_ModStatus( void *ptr ) {
 	int id = ( (menucommon_s *)ptr )->id;
 	int i;
 
+	// oDFs: the hint belongs to the item under the pointer (or the one the keys moved to).  A page that has just opened
+	// has the cursor on its first item and showed that item's hint until the pointer moved
+	if ( uis.cursorx != s_dfmod.lastCursorX || uis.cursory != s_dfmod.lastCursorY ) {
+		s_dfmod.lastCursorX = uis.cursorx;
+		s_dfmod.lastCursorY = uis.cursory;
+		s_dfmod.keyNav = qfalse;
+	}
+	if ( !( ( (menucommon_s *)ptr )->flags & QMF_HASMOUSEFOCUS ) && !s_dfmod.keyNav ) {
+		return;
+	}
+
 	if ( id == ID_MOD_PAGE ) {
 		UI_DF_DrawStatus( s_dfmod.def->spinHelp );
 		return;
@@ -375,6 +388,9 @@ static sfxHandle_t UI_DF_ModKey( int key ) {
 	if ( key == K_ESCAPE || key == K_MOUSE2 ) {
 		UI_DF_ModApplyAll();
 		UI_DF_ModApplyCmd();
+	}
+	if ( key != K_MOUSE1 && key != K_MOUSE2 && key != K_MWHEELUP && key != K_MWHEELDOWN ) {
+		s_dfmod.keyNav = qtrue;
 	}
 	return Menu_DefaultKey( &s_dfmod.menu, key );
 }

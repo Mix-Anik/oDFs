@@ -222,7 +222,6 @@ if(BUILD_QVM)
             code/q3_ui/ui_settings.c
             code/q3_ui/ui_sound.c
             code/q3_ui/ui_sparena.c
-            code/q3_ui/ui_specifyserver.c
             code/q3_ui/ui_splevel.c
             code/q3_ui/ui_sppostgame.c
             code/q3_ui/ui_spskill.c

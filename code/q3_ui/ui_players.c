@@ -42,6 +42,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 
 static int			dp_realtime;
+static float		dp_viewWidth;		// oDFs: 0: the box is sized for the model (UI_PlayerView_Draw sets it)
 static float		jumpHeight;
 
 
@@ -765,8 +766,8 @@ void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int ti
 	refdef.fov_y = atan2( refdef.height / uis.yscale, xx );
 	refdef.fov_y *= ( 360 / M_PI );
 
-	// calculate distance so the player nearly fills the box
-	len = 0.7 * ( maxs[2] - mins[2] );		
+	// calculate distance so the player nearly fills the box (oDFs: or so the box is dp_viewWidth units wide)
+	len = dp_viewWidth > 0 ? 0.5 * dp_viewWidth : 0.7 * ( maxs[2] - mins[2] );
 	origin[0] = len / tan( DEG2RAD(refdef.fov_x) * 0.5 );
 	origin[1] = 0.5 * ( mins[1] + maxs[1] );
 	origin[2] = -0.5 * ( mins[2] + maxs[2] );
@@ -1335,4 +1336,74 @@ void UI_PlayerInfo_SetInfo( playerInfo_t *pi, int legsAnim, int torsoAnim, vec3_
 		pi->pendingTorsoAnim = 0;
 		UI_ForceTorsoAnim( pi, torsoAnim );
 	}
+}
+
+
+/*
+===============
+UI_PlayerView
+
+oDFs: a preview that can be turned.  A left click in its box starts a drag (the menu system gets no button releases, so
+the drag is followed from the draw function with trap_Key_IsDown), the wheel zooms.  The model is kept still: the body
+is turned with the view angle at once instead of swinging after it.
+===============
+*/
+#define PLAYERVIEW_YAW		150.0f		// 180 faces the viewer
+#define PLAYERVIEW_WIDTH	54.0f
+#define PLAYERVIEW_MINW		34.0f
+#define PLAYERVIEW_MAXW		90.0f
+#define PLAYERVIEW_DEGREES	0.8f		// per pixel
+
+void UI_PlayerView_Init( uiPlayerView_t *v ) {
+	v->yaw = PLAYERVIEW_YAW;
+	v->width = PLAYERVIEW_WIDTH;
+	v->drag = qfalse;
+	v->lastX = 0;
+}
+
+qboolean UI_PlayerView_Key( uiPlayerView_t *v, int key, int x, int y, int w, int h ) {
+	if ( !UI_CursorInRect( x, y, w, h ) ) {
+		return qfalse;
+	}
+	switch ( key ) {
+	case K_MOUSE1:
+		v->drag = qtrue;
+		v->lastX = uis.cursorx;
+		return qtrue;
+	case K_MWHEELUP:
+		v->width = Com_Clamp( PLAYERVIEW_MINW, PLAYERVIEW_MAXW, v->width - 4 );
+		return qtrue;
+	case K_MWHEELDOWN:
+		v->width = Com_Clamp( PLAYERVIEW_MINW, PLAYERVIEW_MAXW, v->width + 4 );
+		return qtrue;
+	}
+	return qfalse;
+}
+
+void UI_PlayerView_Draw( uiPlayerView_t *v, float x, float y, float w, float h, playerInfo_t *pi, int time ) {
+	if ( v->drag ) {
+		if ( trap_Key_IsDown( K_MOUSE1 ) ) {
+			v->yaw += ( uis.cursorx - v->lastX ) * PLAYERVIEW_DEGREES;
+			v->lastX = uis.cursorx;
+		} else {
+			v->drag = qfalse;
+		}
+	}
+	while ( v->yaw < 0 ) {
+		v->yaw += 360;
+	}
+	while ( v->yaw >= 360 ) {
+		v->yaw -= 360;
+	}
+
+	pi->viewAngles[YAW] = v->yaw;
+	pi->moveAngles[YAW] = v->yaw;
+	pi->legs.yawAngle = v->yaw;
+	pi->torso.yawAngle = v->yaw;
+	pi->legs.yawing = qfalse;
+	pi->torso.yawing = qfalse;
+
+	dp_viewWidth = v->width;
+	UI_DrawPlayer( x, y, w, h, pi, time );
+	dp_viewWidth = 0;
 }

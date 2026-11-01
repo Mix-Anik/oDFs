@@ -44,7 +44,6 @@ A page that has to save something when it is left (the controls, the player name
 "leave" function, which runs before the page closes, however it is left through the rail.
 */
 
-#define ID_DEFAULTS				100
 #define ID_BACK					101
 
 #define RAIL_X					12		// headings; the pages are indented under them
@@ -55,8 +54,7 @@ A page that has to save something when it is left (the controls, the player name
 #define RAIL_GROUP_GAP			12		// between the last page of a group and the next heading
 #define RAIL_ROW_L				6		// where the highlight of a row starts and ends
 #define RAIL_ROW_R				( SETTINGS_PANEL_W - 6 )
-#define RAIL_RULE_Y				396
-#define RAIL_DEFAULTS_Y			408
+#define RAIL_RULE_Y				424
 #define RAIL_BACK_Y				436
 
 #define TITLE_X					( SETTINGS_PANEL_W + 18 )
@@ -80,10 +78,10 @@ static const settingsPage_t settingsPages[SETP_COUNT] = {
 	{ "Replays",		UI_DF_ReplaysMenu,		NULL },
 	{ "Gameplay",		UI_DF_GameplayMenu,		NULL },
 	{ "Advanced",		UI_DF_Q3ExtrasMenu,		NULL },
-	{ "Plugins",		UI_PluginsMenu,			"ADD-ONS" },
+	{ "Plugins",		UI_PluginsMenu,			"MISC" },
 };
 
-static menutext_s		s_rail[SETP_COUNT + 2];		// the pages, Defaults, Back
+static menutext_s		s_rail[SETP_COUNT + 1];		// the pages, Back
 static int				s_railY[SETP_COUNT];		// where the pages are (0: not on the rail)
 static int				s_headY[SETP_COUNT];		// where the heading of the group a page starts is
 static int				s_current;					// the page the rail is on
@@ -103,32 +101,6 @@ static vec4_t	rowFillSel = { 0.85f, 0.12f, 0.06f, 0.60f };
 static vec4_t	rowBorder = { 0.80f, 0.14f, 0.10f, 1.0f };
 static vec4_t	rowBorderLit = { 1.0f, 0.85f, 0.25f, 1.0f };
 static vec4_t	rowBorderSel = { 1.0f, 0.38f, 0.22f, 1.0f };
-
-
-/*
-=================
-Setup_ResetDefaults_Action
-=================
-*/
-static void Setup_ResetDefaults_Action( qboolean result ) {
-	if( !result ) {
-		return;
-	}
-	trap_Cmd_ExecuteText( EXEC_APPEND, "exec default.cfg\n");
-	trap_Cmd_ExecuteText( EXEC_APPEND, "cvar_restart\n");
-	trap_Cmd_ExecuteText( EXEC_APPEND, "vid_restart\n" );
-}
-
-
-/*
-=================
-Setup_ResetDefaults_Draw
-=================
-*/
-static void Setup_ResetDefaults_Draw( void ) {
-	UI_DrawProportionalString( SCREEN_WIDTH/2, 356 + PROP_HEIGHT * 0, "WARNING: This will reset *ALL*", UI_CENTER|UI_SMALLFONT, color_yellow );
-	UI_DrawProportionalString( SCREEN_WIDTH/2, 356 + PROP_HEIGHT * 1, "options to their default values.", UI_CENTER|UI_SMALLFONT, color_yellow );
-}
 
 
 static void Settings_Leave( void ) {
@@ -152,10 +124,6 @@ static void Settings_RailEvent( void *ptr, int event ) {
 
 	id = ((menucommon_s*)ptr)->id;
 	switch( id ) {
-	case ID_DEFAULTS:
-		UI_ConfirmMenu( "SET TO DEFAULTS?", Setup_ResetDefaults_Draw, Setup_ResetDefaults_Action );
-		return;
-
 	case ID_BACK:
 		Settings_Leave();
 		UI_PopMenu();
@@ -260,6 +228,7 @@ void UI_Settings_AddRail( menuframework_s *menu, int current, void ( *leave )( v
 	s_last = current;
 	s_leave = leave;
 	s_menu = menu;
+	menu->settings = qtrue;
 	s_pageDraw = menu->draw;
 	menu->draw = Settings_MenuDraw;
 
@@ -279,8 +248,7 @@ void UI_Settings_AddRail( menuframework_s *menu, int current, void ( *leave )( v
 		Settings_RailItem( menu, &s_rail[i], i, settingsPages[i].label, y );
 		y += RAIL_STEP;
 	}
-	Settings_RailItem( menu, &s_rail[SETP_COUNT], ID_DEFAULTS, "Defaults", RAIL_DEFAULTS_Y );
-	Settings_RailItem( menu, &s_rail[SETP_COUNT + 1], ID_BACK, "Back", RAIL_BACK_Y );
+	Settings_RailItem( menu, &s_rail[SETP_COUNT], ID_BACK, "Back", RAIL_BACK_Y );
 }
 
 

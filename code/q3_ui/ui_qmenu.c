@@ -529,7 +529,7 @@ static void RadioButton_Draw( menuradiobutton_s *rb )
 	}
 
 	if ( rb->generic.name )
-		UI_DrawString( x - SMALLCHAR_WIDTH, y, rb->generic.name, UI_RIGHT|UI_SMALLFONT, color );
+		UI_DrawString( x - SMALLCHAR_WIDTH, y, rb->generic.name, UI_RIGHT|UI_SMALLFONT, UI_DF_NAMECOLOR( rb->generic.parent, color ) );
 
 	if ( !rb->curvalue )
 	{
@@ -545,12 +545,116 @@ static void RadioButton_Draw( menuradiobutton_s *rb )
 
 /*
 =================
+Slider geometry (oDFs)
+
+The track starts one character right of the slider's x and is SLIDER_RANGE + 2 characters long; the handle moves
+between its ends.  The menu system gets key presses but no releases, so after a click the slider follows the mouse
+from Slider_Draw with trap_Key_IsDown until the button is let go (it keeps following outside the slider).
+=================
+*/
+#define SLIDER_TRACK_X( s )		( (s)->generic.x + SMALLCHAR_WIDTH )
+#define SLIDER_TRACK_W			( ( SLIDER_RANGE + 2 ) * SMALLCHAR_WIDTH )
+#define SLIDER_KNOB_W			10
+
+static menuslider_s	*sliderDrag;
+
+/*
+=================
+Slider_ValueText
+
+The value of a slider as shown right of it.
+=================
+*/
+static const char *Slider_ValueText( const menuslider_s *s )
+{
+	static char	buf[32];
+	float		v;
+	int			n, i;
+
+	if ( s->valueNames ) {
+		n = (int)( s->curvalue - s->minvalue + 0.5f );
+		for ( i = 0; i < n && s->valueNames[i]; i++ )
+			;
+		if ( n >= 0 && s->valueNames[i] )
+			return s->valueNames[i];
+	}
+
+	v = s->curvalue * ( s->displayScale ? s->displayScale : 1.0f );
+	switch ( s->decimals ) {
+	case 2:
+		n = (int)( v * 100 + 0.5f );
+		Com_sprintf( buf, sizeof( buf ), "%d.%02d%s", n / 100, n % 100, s->suffix ? s->suffix : "" );
+		break;
+	case 1:
+		n = (int)( v * 10 + 0.5f );
+		Com_sprintf( buf, sizeof( buf ), "%d.%d%s", n / 10, n % 10, s->suffix ? s->suffix : "" );
+		break;
+	case -1:
+		n = (int)( v * 10 + 0.5f );
+		if ( n % 10 )
+			Com_sprintf( buf, sizeof( buf ), "%d.%d%s", n / 10, n % 10, s->suffix ? s->suffix : "" );
+		else
+			Com_sprintf( buf, sizeof( buf ), "%d%s", n / 10, s->suffix ? s->suffix : "" );
+		break;
+	default:
+		Com_sprintf( buf, sizeof( buf ), "%d%s", (int)( v + 0.5f ), s->suffix ? s->suffix : "" );
+		break;
+	}
+	return buf;
+}
+
+/*
+=================
+Slider_Snap
+
+A value moved to the nearest step (the slider's step, else whole steps when it spans at least 1) and into the range.
+=================
+*/
+static float Slider_Snap( const menuslider_s *s, float v )
+{
+	float	step;
+
+	step = s->step;
+	if ( step <= 0 && s->maxvalue - s->minvalue >= 1 )
+		step = 1;
+	if ( step > 0 )
+		v = s->minvalue + (float)(int)( ( v - s->minvalue ) / step + 0.5f ) * step;
+
+	if ( v < s->minvalue )
+		v = s->minvalue;
+	else if ( v > s->maxvalue )
+		v = s->maxvalue;
+	return v;
+}
+
+static qboolean Slider_SetFromCursor( menuslider_s *s )
+{
+	float	t, v, old;
+
+	old = s->curvalue;
+	t = ( uis.cursorx - ( SLIDER_TRACK_X( s ) + SLIDER_KNOB_W / 2 ) ) / (float)( SLIDER_TRACK_W - SLIDER_KNOB_W );
+	if ( t < 0 )
+		t = 0;
+	else if ( t > 1 )
+		t = 1;
+
+	v = Slider_Snap( s, s->minvalue + t * ( s->maxvalue - s->minvalue ) );
+
+	s->curvalue = v;
+	return ( v != old );
+}
+
+/*
+=================
 Slider_Init
 =================
 */
 static void Slider_Init( menuslider_s *s )
 {
 	int len;
+
+	if ( sliderDrag == s )
+		sliderDrag = NULL;
 
 	// calculate bounds
 	if (s->generic.name)
@@ -572,47 +676,43 @@ Slider_Key
 static sfxHandle_t Slider_Key( menuslider_s *s, int key )
 {
 	sfxHandle_t	sound;
-	int			x;
-	int			oldvalue;
+	float		v;
 
 	switch (key)
 	{
 		case K_MOUSE1:
-			x           = uis.cursorx - s->generic.x - 2*SMALLCHAR_WIDTH;
-			oldvalue    = s->curvalue;
-			s->curvalue = (x/(float)(SLIDER_RANGE*SMALLCHAR_WIDTH)) * (s->maxvalue-s->minvalue) + s->minvalue;
-
-			if (s->curvalue < s->minvalue)
-				s->curvalue = s->minvalue;
-			else if (s->curvalue > s->maxvalue)
-				s->curvalue = s->maxvalue;
-			if (s->curvalue != oldvalue)
+			sound = 0;
+			// only the track takes the click (not the name), then it is dragged
+			if ( !( s->generic.flags & QMF_HASMOUSEFOCUS ) || uis.cursorx < SLIDER_TRACK_X( s ) - 4 || uis.cursorx > SLIDER_TRACK_X( s ) + SLIDER_TRACK_W + 4 )
+				break;
+			sliderDrag = s;
+			if ( Slider_SetFromCursor( s ) )
 				sound = menu_move_sound;
-			else
-				sound = 0;
 			break;
 
 		case K_KP_LEFTARROW:
 		case K_LEFTARROW:
-			if (s->curvalue > s->minvalue)
+			v = Slider_Snap( s, s->curvalue - ( s->step > 0 ? s->step : 1 ) );
+			if (v != s->curvalue)
 			{
-				s->curvalue--;
+				s->curvalue = v;
 				sound = menu_move_sound;
 			}
 			else
 				sound = menu_buzz_sound;
-			break;			
+			break;
 
 		case K_KP_RIGHTARROW:
 		case K_RIGHTARROW:
-			if (s->curvalue < s->maxvalue)
+			v = Slider_Snap( s, s->curvalue + ( s->step > 0 ? s->step : 1 ) );
+			if (v != s->curvalue)
 			{
-				s->curvalue++;
+				s->curvalue = v;
 				sound = menu_move_sound;
 			}
 			else
 				sound = menu_buzz_sound;
-			break;			
+			break;
 
 		default:
 			// key not handled
@@ -637,18 +737,32 @@ static void Slider_Draw( menuslider_s *s ) {
 	int			y;
 	int			style;
 	float		*color;
-	int			button;
 	qboolean	focus;
-	
+	qboolean	dragging;
+	vec4_t		groove, fill, rim;
+	float		*valueColor;
+	int			tx, kx;
+
 	x =	s->generic.x;
 	y = s->generic.y;
 	focus = (s->generic.parent->cursor == s->generic.menuPosition);
+
+	dragging = ( sliderDrag == s );
+	if ( dragging ) {
+		if ( !trap_Key_IsDown( K_MOUSE1 ) ) {
+			sliderDrag = NULL;
+			dragging = qfalse;
+		}
+		else if ( Slider_SetFromCursor( s ) && s->generic.callback ) {
+			s->generic.callback( s, QM_ACTIVATED );
+		}
+	}
 
 	if( s->generic.flags & QMF_GRAYED ) {
 		color = text_color_disabled;
 		style = UI_SMALLFONT;
 	}
-	else if( focus ) {
+	else if( focus || dragging ) {
 		color  = text_color_highlight;
 		style = UI_SMALLFONT | UI_PULSE;
 	}
@@ -658,12 +772,7 @@ static void Slider_Draw( menuslider_s *s ) {
 	}
 
 	// draw label
-	UI_DrawString( x - SMALLCHAR_WIDTH, y, s->generic.name, UI_RIGHT|style, color );
-
-	// draw slider
-	UI_SetColor( UI_DF_VALUECOLOR( color ) );
-	UI_DrawHandlePic( x + SMALLCHAR_WIDTH, y, 96, 16, sliderBar );
-	UI_SetColor( NULL );
+	UI_DrawString( x - SMALLCHAR_WIDTH, y, s->generic.name, UI_RIGHT|style, UI_DF_NAMECOLOR( s->generic.parent, color ) );
 
 	// clamp thumb
 	if( s->maxvalue > s->minvalue )	{
@@ -679,15 +788,21 @@ static void Slider_Draw( menuslider_s *s ) {
 		s->range = 0;
 	}
 
-	// draw thumb
-	if( style & UI_PULSE) {
-		button = sliderButton_1;
-	}
-	else {
-		button = sliderButton_0;
-	}
+	// draw the track (the part up to the handle in the value colour) and the handle
+	valueColor = UI_DF_VALUECOLOR( color );
+	tx = SLIDER_TRACK_X( s );
+	kx = tx + (int)( s->range * ( SLIDER_TRACK_W - SLIDER_KNOB_W ) );
 
-	UI_DrawHandlePic( (int)( x + 2*SMALLCHAR_WIDTH + (SLIDER_RANGE-1)*SMALLCHAR_WIDTH* s->range ) - 2, y - 2, 12, 20, button );
+	groove[0] = valueColor[0]; groove[1] = valueColor[1]; groove[2] = valueColor[2]; groove[3] = valueColor[3] * 0.22f;
+	fill[0] = valueColor[0]; fill[1] = valueColor[1]; fill[2] = valueColor[2]; fill[3] = valueColor[3] * 0.65f;
+	rim[0] = 0; rim[1] = 0; rim[2] = 0; rim[3] = 0.55f;
+
+	UI_FillRect( tx, y + 6, SLIDER_TRACK_W, 4, groove );
+	UI_FillRect( tx, y + 6, kx - tx + SLIDER_KNOB_W / 2, 4, fill );
+	UI_FillRect( kx - 1, y, SLIDER_KNOB_W + 2, 16, rim );
+	UI_FillRect( kx, y + 1, SLIDER_KNOB_W, 14, valueColor );
+
+	UI_DrawString( tx + SLIDER_TRACK_W + SMALLCHAR_WIDTH, y, Slider_ValueText( s ), UI_LEFT|UI_SMALLFONT, valueColor );
 }
 #else
 /*
@@ -868,7 +983,7 @@ static void SpinControl_Draw( menulist_s *s )
 		UI_DrawChar( x, y, 13, UI_CENTER|UI_BLINK|UI_SMALLFONT, color);
 	}
 
-	UI_DrawString( x - SMALLCHAR_WIDTH, y, s->generic.name, style|UI_RIGHT, color );
+	UI_DrawString( x - SMALLCHAR_WIDTH, y, s->generic.name, style|UI_RIGHT, UI_DF_NAMECOLOR( s->generic.parent, color ) );
 	UI_DrawString( x + SMALLCHAR_WIDTH, y, s->itemnames[s->curvalue], style|UI_LEFT, UI_DF_VALUECOLOR( color ) );
 }
 

@@ -31,68 +31,74 @@ INGAME MENU
 
 #include "ui_local.h"
 
+/*
+oDFs: the menu of the escape key is a small see-through panel over the dimmed game: the map and what the player is doing,
+then the rows.  The first row is what "Start" was: it changes the team of the player in one click (Join game / Spectate, with
+Join red / Join blue in the team game types) instead of opening a menu of its own.  Settings opens the Settings menu,
+Disconnect leaves the server.  Escape closes the menu.  The panel fades in when it opens.
+*/
 
-#define INGAME_FRAME					"menu/art/addbotframe"
-//#define INGAME_FRAME					"menu/art/cut_frame"
-#define INGAME_MENU_VERTICAL_SPACING	28
+#define PANEL_W					320
+#define PANEL_HEAD_H			70
+#define PANEL_PAD				24		// from the panel edge to the text
+#define ROW_MARGIN				8		// from the panel edge to the highlight of a row
+#define ROW_H					32
+#define ROW_STEP				36
+#define LEAVE_GAP				10		// extra space above Disconnect
+#define FADE_MS					180
 
-#define ID_TEAM					10
-#define ID_ADDBOTS				11
-#define ID_REMOVEBOTS			12
-#define ID_SETTINGS				13
-#define ID_SERVERINFO			14
-#define ID_LEAVEARENA			15
-#define ID_RESTART				16
-#define ID_QUIT					17
-#define ID_RESUME				18
-#define ID_TEAMORDERS			19
+#define ID_JOIN					10
+#define ID_JOINRED				11
+#define ID_JOINBLUE				12
+#define ID_SPECTATE				13
+#define ID_SETTINGS				14
+#define ID_DISCONNECT			15
 
+#define MAX_ROWS				6
 
 typedef struct {
 	menuframework_s	menu;
 
-	menubitmap_s	frame;
-	menutext_s		team;
-	menutext_s		settings;
-	menutext_s		server;
-	menutext_s		leave;
-	menutext_s		restart;
-	menutext_s		addbots;
-	menutext_s		removebots;
-	menutext_s		teamorders;
-	menutext_s		quit;
-	menutext_s		resume;
+	menutext_s		rows[MAX_ROWS];
+	int				numRows;
+	int				panelY;
+	int				panelH;
+	int				openTime;
+	float			fade;
+
+	char			map[MAX_QPATH];
+	int				team;
 } ingamemenu_t;
 
 static ingamemenu_t	s_ingame;
 
-
-/*
-=================
-InGame_RestartAction
-=================
-*/
-static void InGame_RestartAction( qboolean result ) {
-	if( !result ) {
-		return;
-	}
-
-	UI_PopMenu();
-	trap_Cmd_ExecuteText( EXEC_APPEND, "map_restart 0\n" );
-}
+static vec4_t	igDim = { 0.0f, 0.0f, 0.0f, 0.35f };
+static vec4_t	igPanel = { 0.05f, 0.03f, 0.04f, 0.62f };
+static vec4_t	igAccent = { 1.0f, 0.38f, 0.22f, 1.0f };
+static vec4_t	igRule = { 1.0f, 1.0f, 1.0f, 0.12f };
+static vec4_t	igLabel = { 0.92f, 0.86f, 0.84f, 1.0f };
+static vec4_t	igLeave = { 1.0f, 0.55f, 0.50f, 1.0f };
+static vec4_t	igWhite = { 1.0f, 1.0f, 1.0f, 1.0f };
+static vec4_t	igHover = { 1.0f, 1.0f, 1.0f, 0.10f };
+static vec4_t	igHoverLeave = { 0.90f, 0.15f, 0.10f, 0.22f };
+static vec4_t	igRed = { 1.0f, 0.35f, 0.30f, 1.0f };
+static vec4_t	igBlue = { 0.45f, 0.65f, 1.0f, 1.0f };
+static vec4_t	igGreen = { 0.55f, 1.0f, 0.55f, 1.0f };
 
 
 /*
 =================
-InGame_QuitAction
+InGame_Fade
+
+The colour with the alpha of the fade-in applied.
 =================
 */
-static void InGame_QuitAction( qboolean result ) {
-	if( !result ) {
-		return;
-	}
-	UI_PopMenu();
-	trap_Cmd_ExecuteText( EXEC_APPEND, "quit\n" );		// DeFRaG 0xf9f5: no credits screen
+static float *InGame_Fade( const vec4_t c, vec4_t out ) {
+	out[0] = c[0];
+	out[1] = c[1];
+	out[2] = c[2];
+	out[3] = c[3] * s_ingame.fade;
+	return out;
 }
 
 
@@ -101,52 +107,128 @@ static void InGame_QuitAction( qboolean result ) {
 InGame_Event
 =================
 */
-void InGame_Event( void *ptr, int notification ) {
+static void InGame_Event( void *ptr, int notification ) {
 	if( notification != QM_ACTIVATED ) {
 		return;
 	}
 
 	switch( ((menucommon_s*)ptr)->id ) {
-	case ID_TEAM:
-		UI_TeamMainMenu();
+	case ID_JOIN:
+		trap_Cmd_ExecuteText( EXEC_APPEND, "cmd team free\n" );
+		UI_ForceMenuOff();
+		break;
+
+	case ID_JOINRED:
+		trap_Cmd_ExecuteText( EXEC_APPEND, "cmd team red\n" );
+		UI_ForceMenuOff();
+		break;
+
+	case ID_JOINBLUE:
+		trap_Cmd_ExecuteText( EXEC_APPEND, "cmd team blue\n" );
+		UI_ForceMenuOff();
+		break;
+
+	case ID_SPECTATE:
+		trap_Cmd_ExecuteText( EXEC_APPEND, "cmd team spectator\n" );
+		UI_ForceMenuOff();
 		break;
 
 	case ID_SETTINGS:
 		UI_SettingsMenu();
 		break;
 
-	case ID_LEAVEARENA:
+	case ID_DISCONNECT:
 		trap_Cmd_ExecuteText( EXEC_APPEND, "disconnect\n" );
 		break;
-
-	case ID_RESTART:
-		UI_ConfirmMenu( "RESTART ARENA?", 0, InGame_RestartAction );
-		break;
-
-	case ID_QUIT:
-		UI_ConfirmMenu( "EXIT GAME?",  0, InGame_QuitAction );
-		break;
-
-	case ID_SERVERINFO:
-		UI_ServerInfoMenu();
-		break;
-
-	case ID_ADDBOTS:
-		UI_AddBotsMenu();
-		break;
-
-	case ID_REMOVEBOTS:
-		UI_RemoveBotsMenu();
-		break;
-
-	case ID_TEAMORDERS:
-		UI_TeamOrdersMenu();
-		break;
-
-	case ID_RESUME:
-		UI_PopMenu();
-		break;
 	}
+}
+
+
+/*
+=================
+InGame_RowDraw
+=================
+*/
+static void InGame_RowDraw( void *self ) {
+	menutext_s	*t = (menutext_s *)self;
+	qboolean	lit = ( t->generic.flags & QMF_HASMOUSEFOCUS ) || Menu_ItemAtCursor( t->generic.parent ) == self;
+	qboolean	leave = t->generic.id == ID_DISCONNECT;
+	int			x = t->generic.left, y = t->generic.top, w = t->generic.right - t->generic.left, h = t->generic.bottom - t->generic.top;
+	vec4_t		c;
+
+	if ( lit ) {
+		UI_FillRect( x, y, w, h, InGame_Fade( leave ? igHoverLeave : igHover, c ) );
+		UI_FillRect( x, y, 3, h, InGame_Fade( leave ? igLeave : igAccent, c ) );
+		UI_FillRect( x + w - 3, y, 3, h, InGame_Fade( leave ? igLeave : igAccent, c ) );
+	}
+	UI_DrawProportionalString( 320, y + ( h - 20 ) / 2, t->string, UI_CENTER|UI_SMALLFONT,
+		InGame_Fade( lit ? igWhite : leave ? igLeave : igLabel, c ) );
+}
+
+
+/*
+=================
+InGame_AddRow
+=================
+*/
+static void InGame_AddRow( int id, const char *label, int y ) {
+	menutext_s	*t = &s_ingame.rows[s_ingame.numRows++];
+
+	t->generic.type		= MTYPE_PTEXT;
+	t->generic.flags	= QMF_CENTER_JUSTIFY;
+	t->generic.x		= 320;
+	t->generic.y		= y;
+	t->generic.id		= id;
+	t->generic.callback	= InGame_Event;
+	t->generic.ownerdraw = InGame_RowDraw;
+	t->string			= (char *)label;
+	Menu_AddItem( &s_ingame.menu, t );
+	// the widget worked out its mouse area from the text: use the row
+	t->generic.left		= 320 - PANEL_W / 2 + ROW_MARGIN;
+	t->generic.right	= 320 + PANEL_W / 2 - ROW_MARGIN;
+	t->generic.top		= y;
+	t->generic.bottom	= y + ROW_H;
+}
+
+
+/*
+=================
+InGame_MenuDraw
+=================
+*/
+static void InGame_MenuDraw( void ) {
+	int			x = 320 - PANEL_W / 2, y = s_ingame.panelY, sx;
+	const char	*status;
+	float		*color;
+	vec4_t		c;
+
+	s_ingame.fade = ( uis.realtime - s_ingame.openTime ) / (float)FADE_MS;
+	if ( s_ingame.fade > 1.0f ) {
+		s_ingame.fade = 1.0f;
+	} else if ( s_ingame.fade < 0.0f ) {
+		s_ingame.fade = 0.0f;
+	}
+
+	UI_FillRect( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, InGame_Fade( igDim, c ) );
+	UI_FillRect( x, y, PANEL_W, s_ingame.panelH, InGame_Fade( igPanel, c ) );
+	UI_FillRect( x, y, PANEL_W, 2, InGame_Fade( igAccent, c ) );
+
+	if ( s_ingame.map[0] ) {
+		UI_DrawProportionalString( 320, y + 14, s_ingame.map, UI_CENTER|UI_SMALLFONT|UI_DROPSHADOW, InGame_Fade( igWhite, c ) );
+	}
+	switch ( s_ingame.team ) {
+	case TEAM_RED:			status = "Red team";	color = igRed;		break;
+	case TEAM_BLUE:			status = "Blue team";	color = igBlue;		break;
+	case TEAM_SPECTATOR:	status = "Spectating";	color = igAccent;	break;
+	default:				status = "Playing";		color = igGreen;	break;
+	}
+	// the dot and the status together in the middle
+	sx = 320 - ( 14 + (int)strlen( status ) * SMALLCHAR_WIDTH ) / 2;
+	UI_FillRect( sx, y + 44, 6, 6, InGame_Fade( color, c ) );
+	UI_DrawString( sx + 14, y + 40, status, UI_LEFT|UI_SMALLFONT, InGame_Fade( color, c ) );
+	UI_FillRect( x + PANEL_PAD, y + PANEL_HEAD_H - 8, PANEL_W - 2 * PANEL_PAD, 1, InGame_Fade( igRule, c ) );
+
+	Menu_Draw( &s_ingame.menu );
 }
 
 
@@ -155,174 +237,59 @@ void InGame_Event( void *ptr, int notification ) {
 InGame_MenuInit
 =================
 */
-void InGame_MenuInit( void ) {
-	int		y;
+static void InGame_MenuInit( void ) {
+	int		y, i, n = 0, gametype;
+	int		ids[MAX_ROWS];
+	const char	*labels[MAX_ROWS];
 	uiClientState_t	cs;
 	char	info[MAX_INFO_STRING];
-	int		team;
 
 	memset( &s_ingame, 0 ,sizeof(ingamemenu_t) );
 
-	InGame_Cache();
-
 	s_ingame.menu.wrapAround = qtrue;
 	s_ingame.menu.fullscreen = qfalse;
+	s_ingame.menu.draw = InGame_MenuDraw;
+	s_ingame.openTime = uis.realtime;
 
-	s_ingame.frame.generic.type			= MTYPE_BITMAP;
-	s_ingame.frame.generic.flags		= QMF_INACTIVE;
-	s_ingame.frame.generic.name			= INGAME_FRAME;
-	s_ingame.frame.generic.x			= 87;		// DeFRaG 0xfa6d: frame 466x256 at (87,112), items from y 156 every 28
-	s_ingame.frame.generic.y			= 112;
-	s_ingame.frame.width				= 466;//359;
-	s_ingame.frame.height				= 228;
+	// the map, and the team of the player
+	trap_GetConfigString( CS_SERVERINFO, info, sizeof( info ) );
+	gametype = atoi( Info_ValueForKey( info, "g_gametype" ) );
+	Q_strncpyz( s_ingame.map, Info_ValueForKey( info, "mapname" ), sizeof( s_ingame.map ) );
 
-	//y = 96;
-	y = 156;
-	s_ingame.team.generic.type			= MTYPE_PTEXT;
-	s_ingame.team.generic.flags			= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_ingame.team.generic.x				= 320;
-	s_ingame.team.generic.y				= y;
-	s_ingame.team.generic.id			= ID_TEAM;
-	s_ingame.team.generic.callback		= InGame_Event; 
-	s_ingame.team.string				= "START";
-	s_ingame.team.color					= uiDfColorBig;
-	s_ingame.team.style					= UI_CENTER|UI_SMALLFONT;
+	trap_GetClientState( &cs );
+	trap_GetConfigString( CS_PLAYERS + cs.clientNum, info, sizeof( info ) );
+	s_ingame.team = atoi( Info_ValueForKey( info, "t" ) );
 
-	y += INGAME_MENU_VERTICAL_SPACING;
-	s_ingame.addbots.generic.type		= MTYPE_PTEXT;
-	s_ingame.addbots.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_ingame.addbots.generic.x			= 320;
-	s_ingame.addbots.generic.y			= y;
-	s_ingame.addbots.generic.id			= ID_ADDBOTS;
-	s_ingame.addbots.generic.callback	= InGame_Event; 
-	s_ingame.addbots.string				= "ADD BOTS";
-	s_ingame.addbots.color				= uiDfColorBig;
-	s_ingame.addbots.style				= UI_CENTER|UI_SMALLFONT;
-	if( !trap_Cvar_VariableValue( "sv_running" ) || !trap_Cvar_VariableValue( "bot_enable" ) || (trap_Cvar_VariableValue( "g_gametype" ) == GT_SINGLE_PLAYER)) {
-		s_ingame.addbots.generic.flags |= QMF_GRAYED;
-	}
-
-	y += INGAME_MENU_VERTICAL_SPACING;
-	s_ingame.removebots.generic.type		= MTYPE_PTEXT;
-	s_ingame.removebots.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_ingame.removebots.generic.x			= 320;
-	s_ingame.removebots.generic.y			= y;
-	s_ingame.removebots.generic.id			= ID_REMOVEBOTS;
-	s_ingame.removebots.generic.callback	= InGame_Event; 
-	s_ingame.removebots.string				= "REMOVE BOTS";
-	s_ingame.removebots.color				= uiDfColorBig;
-	s_ingame.removebots.style				= UI_CENTER|UI_SMALLFONT;
-	if( !trap_Cvar_VariableValue( "sv_running" ) || !trap_Cvar_VariableValue( "bot_enable" ) || (trap_Cvar_VariableValue( "g_gametype" ) == GT_SINGLE_PLAYER)) {
-		s_ingame.removebots.generic.flags |= QMF_GRAYED;
-	}
-
-	y += INGAME_MENU_VERTICAL_SPACING;
-	s_ingame.teamorders.generic.type		= MTYPE_PTEXT;
-	s_ingame.teamorders.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_ingame.teamorders.generic.x			= 320;
-	s_ingame.teamorders.generic.y			= y;
-	s_ingame.teamorders.generic.id			= ID_TEAMORDERS;
-	s_ingame.teamorders.generic.callback	= InGame_Event; 
-	s_ingame.teamorders.string				= "TEAM ORDERS";
-	s_ingame.teamorders.color				= uiDfColorBig;
-	s_ingame.teamorders.style				= UI_CENTER|UI_SMALLFONT;
-	if( !(trap_Cvar_VariableValue( "g_gametype" ) >= GT_TEAM) ) {
-		s_ingame.teamorders.generic.flags |= QMF_GRAYED;
-	}
-	else {
-		trap_GetClientState( &cs );
-		trap_GetConfigString( CS_PLAYERS + cs.clientNum, info, MAX_INFO_STRING );
-		team = atoi( Info_ValueForKey( info, "t" ) );
-		if( team == TEAM_SPECTATOR ) {
-			s_ingame.teamorders.generic.flags |= QMF_GRAYED;
+	// what the first rows offer, then the panel is as high as the rows
+	if ( gametype >= GT_TEAM ) {
+		if ( s_ingame.team != TEAM_RED ) {
+			ids[n] = ID_JOINRED;	labels[n++] = "Join red";
 		}
+		if ( s_ingame.team != TEAM_BLUE ) {
+			ids[n] = ID_JOINBLUE;	labels[n++] = "Join blue";
+		}
+		if ( s_ingame.team != TEAM_SPECTATOR ) {
+			ids[n] = ID_SPECTATE;	labels[n++] = "Spectate";
+		}
+	} else if ( s_ingame.team == TEAM_SPECTATOR ) {
+		ids[n] = ID_JOIN;		labels[n++] = "Join game";
+	} else {
+		ids[n] = ID_SPECTATE;	labels[n++] = "Spectate";
 	}
+	ids[n] = ID_SETTINGS;		labels[n++] = "Settings";
 
-	y += INGAME_MENU_VERTICAL_SPACING;
-	s_ingame.settings.generic.type		= MTYPE_PTEXT;
-	s_ingame.settings.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_ingame.settings.generic.x			= 320;
-	s_ingame.settings.generic.y			= y;
-	s_ingame.settings.generic.id		= ID_SETTINGS;
-	s_ingame.settings.generic.callback	= InGame_Event;
-	s_ingame.settings.string			= "SETTINGS";
-	s_ingame.settings.color				= uiDfColorBig;
-	s_ingame.settings.style				= UI_CENTER|UI_SMALLFONT;
+	// Disconnect below the rest
+	s_ingame.panelH = PANEL_HEAD_H + n * ROW_STEP + LEAVE_GAP + ROW_H + PANEL_PAD;
+	s_ingame.panelY = ( SCREEN_HEIGHT - s_ingame.panelH ) / 2;
 
-	y += INGAME_MENU_VERTICAL_SPACING;
-	s_ingame.server.generic.type		= MTYPE_PTEXT;
-	s_ingame.server.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_ingame.server.generic.x			= 320;
-	s_ingame.server.generic.y			= y;
-	s_ingame.server.generic.id			= ID_SERVERINFO;
-	s_ingame.server.generic.callback	= InGame_Event; 
-	s_ingame.server.string				= "SERVER INFO";
-	s_ingame.server.color				= uiDfColorBig;
-	s_ingame.server.style				= UI_CENTER|UI_SMALLFONT;
-
-	y += INGAME_MENU_VERTICAL_SPACING;
-	s_ingame.restart.generic.type		= MTYPE_PTEXT;
-	s_ingame.restart.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_ingame.restart.generic.x			= 320;
-	s_ingame.restart.generic.y			= y;
-	s_ingame.restart.generic.id			= ID_RESTART;
-	s_ingame.restart.generic.callback	= InGame_Event; 
-	s_ingame.restart.string				= "RESTART ARENA";
-	s_ingame.restart.color				= uiDfColorBig;
-	s_ingame.restart.style				= UI_CENTER|UI_SMALLFONT;
-	if( !trap_Cvar_VariableValue( "sv_running" ) ) {
-		s_ingame.restart.generic.flags |= QMF_GRAYED;
+	y = s_ingame.panelY + PANEL_HEAD_H;
+	for ( i = 0; i < n; i++ ) {
+		InGame_AddRow( ids[i], labels[i], y );
+		y += ROW_STEP;
 	}
+	y += LEAVE_GAP;
 
-	y += INGAME_MENU_VERTICAL_SPACING;
-	s_ingame.resume.generic.type			= MTYPE_PTEXT;
-	s_ingame.resume.generic.flags			= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_ingame.resume.generic.x				= 320;
-	s_ingame.resume.generic.y				= y;
-	s_ingame.resume.generic.id				= ID_RESUME;
-	s_ingame.resume.generic.callback		= InGame_Event; 
-	s_ingame.resume.string					= "RESUME GAME";
-	s_ingame.resume.color					= uiDfColorBig;
-	s_ingame.resume.style					= UI_CENTER|UI_SMALLFONT;
-
-	y += INGAME_MENU_VERTICAL_SPACING;
-	s_ingame.leave.generic.type			= MTYPE_PTEXT;
-	s_ingame.leave.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_ingame.leave.generic.x			= 320;
-	s_ingame.leave.generic.y			= y;
-	s_ingame.leave.generic.id			= ID_LEAVEARENA;
-	s_ingame.leave.generic.callback		= InGame_Event; 
-	s_ingame.leave.string				= "LEAVE ARENA";
-	s_ingame.leave.color				= uiDfColorBig;
-	s_ingame.leave.style				= UI_CENTER|UI_SMALLFONT;
-
-	y += INGAME_MENU_VERTICAL_SPACING;
-	s_ingame.quit.generic.type			= MTYPE_PTEXT;
-	s_ingame.quit.generic.flags			= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_ingame.quit.generic.x				= 320;
-	s_ingame.quit.generic.y				= y;
-	s_ingame.quit.generic.id			= ID_QUIT;
-	s_ingame.quit.generic.callback		= InGame_Event; 
-	s_ingame.quit.string				= "EXIT GAME";
-	s_ingame.quit.color					= uiDfColorBig;
-	s_ingame.quit.style					= UI_CENTER|UI_SMALLFONT;
-
-	// DeFRaG lists only these entries (add bots / remove bots / team orders / server info are built but never added); oDFs
-	// has one Settings entry where DeFRaG has Setup and Defrag Setup
-	s_ingame.team.generic.y			= 156;
-	s_ingame.settings.generic.y			= 184;
-	s_ingame.restart.generic.y			= 212;
-	s_ingame.resume.generic.y			= 240;
-	s_ingame.leave.generic.y			= 268;
-	s_ingame.quit.generic.y				= 296;
-
-	Menu_AddItem( &s_ingame.menu, &s_ingame.frame );
-	Menu_AddItem( &s_ingame.menu, &s_ingame.team );
-	Menu_AddItem( &s_ingame.menu, &s_ingame.settings );
-	Menu_AddItem( &s_ingame.menu, &s_ingame.restart );
-	Menu_AddItem( &s_ingame.menu, &s_ingame.resume );
-	Menu_AddItem( &s_ingame.menu, &s_ingame.leave );
-	Menu_AddItem( &s_ingame.menu, &s_ingame.quit );
+	InGame_AddRow( ID_DISCONNECT, "Disconnect", y );
 }
 
 
@@ -332,7 +299,6 @@ InGame_Cache
 =================
 */
 void InGame_Cache( void ) {
-	trap_R_RegisterShaderNoMip( INGAME_FRAME );
 }
 
 
@@ -343,12 +309,13 @@ UI_InGameMenu
 */
 void UI_InGameMenu( void ) {
 	// force as top level menu
-	uis.menusp = 0;  
-
-	// set menu cursor to a nice location
-	uis.cursorx = 319;
-	uis.cursory = 80;
+	uis.menusp = 0;
 
 	InGame_MenuInit();
+
+	// set menu cursor to a nice location: on the first row
+	uis.cursorx = 320;
+	uis.cursory = s_ingame.rows[0].generic.top + ROW_H / 2;
+
 	UI_PushMenu( &s_ingame.menu );
 }

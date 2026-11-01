@@ -216,6 +216,8 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	soundOptionsInfo.sfxvolume.generic.y		= y;
 	soundOptionsInfo.sfxvolume.minvalue			= 0;
 	soundOptionsInfo.sfxvolume.maxvalue			= 10;
+	soundOptionsInfo.sfxvolume.displayScale		= 10;
+	soundOptionsInfo.sfxvolume.suffix			= "%";
 
 	y += SETTINGS_ROW_H;
 	soundOptionsInfo.musicvolume.generic.type		= MTYPE_SLIDER;
@@ -227,6 +229,8 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	soundOptionsInfo.musicvolume.generic.y			= y;
 	soundOptionsInfo.musicvolume.minvalue			= 0;
 	soundOptionsInfo.musicvolume.maxvalue			= 10;
+	soundOptionsInfo.musicvolume.displayScale		= 10;
+	soundOptionsInfo.musicvolume.suffix				= "%";
 
 	y += SETTINGS_ROW_H;
 	soundOptionsInfo.soundSystem.generic.type		= MTYPE_SPINCONTROL;

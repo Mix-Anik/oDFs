@@ -20,6 +20,14 @@ Opensource DeFRaG server runtime
 - Scrollable list with scrollbar, double click starts the map; mode, type and last map are remembered
 - Info / Gameplay / Weapons / Timer as tabs (only the ones the mode has), server cheats and run server always visible
 
+### Server browser
+- Redesigned in the colours of the map and demo browsers: search (name, map, address; several words = all must match), source tabs (Internet / Local / Favorites / extra masters), scrollable list with scrollbar
+- Mode column (run / tricks / fast caps) and a filter for it; asked from the servers' status in the background
+- Click a column heading to sort, again to reverse; Enter or double click connects, F5 refreshes, SPACE stops
+- Panel with the selected server: levelshot, address, map, mode, players, ping, version, password lock, player list
+- Favorites can be added and removed from any list (FAVORITE button, `*` mark in the list); "Specify server" page replaced by an address box (JOIN, Ctrl+Enter saves it as a favorite)
+- Gone: Game Type spinner (it never filtered), Punkbuster logo, net type column, old bitmap buttons
+
 ### Demo playback (oDFe)
 - Pause (`SPACE`, `demo_pause`), speed (`UP`/`DOWN`, `demo_speed`), seek (`LEFT`/`RIGHT` +-5 s, `HOME`, `demo_seek 83.5 | 1:23 | +5 | 50%`) and a timeline with a mouse cursor: click or drag to seek
 - Seeking forward and back without reloading the demo: the cgame takes the jump (`CG_ODF_TIME_CHANGE`), the engine keeps keyframes of the demo parser; other cgames fall back to a demo restart
@@ -29,6 +37,10 @@ Opensource DeFRaG server runtime
 - "Mods" (stock game mod switcher) is hidden from the main menu unless `df_ui_showMods 1`
 - Credits moved from the main menu list to a small dim link at the bottom of the screen
 - One "Settings" entry (main and in-game menu) instead of Setup, Defrag Setup and Plugins: every settings page has the same category rail on the left (General: Player, Controls, Video, Audio, Network, Game; DeFRag: HUD, Crosshair, Replays, Gameplay, Advanced; Plugins), a page title, one column layout; reopens on the page you used last; the CD Key page is gone
+- Settings look: orange setting names, sliders you can drag with the value shown, Driver Info page redone
+- Player page redone: coloured name, handicap slider, bigger 3D preview you can rotate, login/records section
+- Player model picker redone: portrait grid with search and live preview on hover
+- In-game (Escape) menu redone: small see-through panel, Join game / Spectate in one click, Settings, Disconnect
 - Settings pages merged: Video = Graphics + Display (brightness, screen size), Replays = Demos + Ghost, Gameplay = Misc + Multiplayer, Advanced = Quake 3 Extras; "Automatic Downloading" moved to Network
 - New menu colours (the dark red of the map and demo browsers): the `df_ui_*` colours that still have an old default are moved to them once (`df_ui_theme`), colours you changed stay
 - "Plugins" page in Settings: lists the client plugins of the plugins folder with version and state (ON / OFF / FAILED / CRASHED) and switches them on and off, also in a running game; the choice is kept in `plugins/disabled`

@@ -29,39 +29,47 @@ void GraphicsOptions_MenuInit( void );
 
 DRIVER INFORMATION MENU
 
+oDFs: what the renderer reports (vendor, version, renderer, video mode, pixel format) and the list of extensions it
+gave, on one plate in the colours of the map browser.  Back or Esc closes it.
+
 =======================================================================
 */
 
-
-#define DRIVERINFO_FRAMEL	"menu/art/frame2_l"
-#define DRIVERINFO_FRAMER	"menu/art/frame1_r"
-#define DRIVERINFO_BACK0	"menu/art/back_0"
-#define DRIVERINFO_BACK1	"menu/art/back_1"
-
-static char* driverinfo_artlist[] = 
-{
-	DRIVERINFO_FRAMEL,
-	DRIVERINFO_FRAMER,
-	DRIVERINFO_BACK0,
-	DRIVERINFO_BACK1,
-	NULL,
-};
-
 #define ID_DRIVERINFOBACK	100
+
+#define DI_X			16
+#define DI_VALUE_X		140
+#define DI_VALUE_CHARS	60
+#define DI_TOP			48
+#define DI_ROW_H		18
+#define DI_EXT_Y		178
+#define DI_EXT_BOTTOM	420
+#define DI_EXT_RIGHT	624
+#define DI_BACK_W		88
+#define DI_BACK_H		24
+#define DI_BACK_Y		432
 
 typedef struct
 {
 	menuframework_s	menu;
-	menutext_s		banner;
-	menubitmap_s	back;
-	menubitmap_s	framel;
-	menubitmap_s	framer;
+	menutext_s		back;
 	char			stringbuff[1024];
 	char*			strings[64];
 	int				numstrings;
 } driverinfo_t;
 
 static driverinfo_t	s_driverinfo;
+
+static vec4_t	diPlate = { 0.14f, 0.02f, 0.02f, 0.88f };
+static vec4_t	diEdge = { 0.62f, 0.10f, 0.08f, 1.0f };
+static vec4_t	diRule = { 0.80f, 0.14f, 0.10f, 1.0f };
+static vec4_t	diHead = { 1.0f, 0.38f, 0.22f, 1.0f };
+static vec4_t	diLabel = { 1.0f, 0.82f, 0.76f, 1.0f };
+static vec4_t	diDim = { 0.74f, 0.58f, 0.54f, 1.0f };
+static vec4_t	diWhite = { 1.0f, 1.0f, 1.0f, 1.0f };
+static vec4_t	diFill = { 0.85f, 0.15f, 0.08f, 0.20f };
+static vec4_t	diFillLit = { 0.85f, 0.15f, 0.08f, 0.45f };
+static vec4_t	diBorderLit = { 1.0f, 0.85f, 0.25f, 1.0f };
 
 /*
 =================
@@ -83,53 +91,84 @@ static void DriverInfo_Event( void* ptr, int event )
 
 /*
 =================
+DriverInfo_BackDraw
+=================
+*/
+static void DriverInfo_BackDraw( void *self )
+{
+	menutext_s	*t = (menutext_s *)self;
+	qboolean	lit = ( t->generic.flags & QMF_HASMOUSEFOCUS ) != 0;
+	int			x = t->generic.left, y = t->generic.top;
+
+	UI_FillRect( x, y, DI_BACK_W, DI_BACK_H, lit ? diFillLit : diFill );
+	if ( lit )
+		UI_DrawRect( x, y, DI_BACK_W, DI_BACK_H, diBorderLit );
+	UI_DrawString( x + DI_BACK_W / 2, y + ( DI_BACK_H - SMALLCHAR_HEIGHT ) / 2, "BACK", UI_CENTER|UI_SMALLFONT, lit ? diWhite : diLabel );
+}
+
+/*
+=================
 DriverInfo_MenuDraw
 =================
 */
 static void DriverInfo_MenuDraw( void )
 {
-	int	i;
-	int	y;
+	static const char *labels[] = { "VENDOR", "VERSION", "RENDERER", "VIDEO MODE", "PIXEL FORMAT" };
+	char	values[5][DI_VALUE_CHARS + 1];
+	char	mode[64];
+	int		i, x, y, w;
+
+	// the plate, the title
+	UI_FillRect( 10, 38, 620, 386, diPlate );
+	UI_DrawProportionalString( 18, 5, "DRIVER INFO", UI_LEFT|UI_SMALLFONT|UI_DROPSHADOW, diWhite );
+	UI_FillRect( 18, 28, 612, 2, diEdge );
+
+	// what the renderer reports
+	Q_strncpyz( values[0], uis.glconfig.vendor_string, sizeof( values[0] ) );
+	Q_strncpyz( values[1], uis.glconfig.version_string, sizeof( values[1] ) );
+	Q_strncpyz( values[2], uis.glconfig.renderer_string, sizeof( values[2] ) );
+
+	Com_sprintf( mode, sizeof( mode ), "%dx%d", uis.glconfig.vidWidth, uis.glconfig.vidHeight );
+	if ( uis.glconfig.displayFrequency )
+		Q_strcat( mode, sizeof( mode ), va( ", %d Hz", uis.glconfig.displayFrequency ) );
+	Q_strcat( mode, sizeof( mode ), uis.glconfig.isFullscreen ? ", fullscreen" : ", windowed" );
+	Q_strncpyz( values[3], mode, sizeof( values[3] ) );
+
+	Com_sprintf( values[4], sizeof( values[4] ), "%d-bit color, %d-bit depth, %d-bit stencil",
+		uis.glconfig.colorBits, uis.glconfig.depthBits, uis.glconfig.stencilBits );
+
+	y = DI_TOP;
+	for ( i = 0; i < 5; i++, y += DI_ROW_H ) {
+		UI_DrawString( DI_X, y, labels[i], UI_LEFT|UI_SMALLFONT, diHead );
+		UI_DrawString( DI_VALUE_X, y, values[i], UI_LEFT|UI_SMALLFONT, diWhite );
+	}
+
+	// the extensions, side by side and wrapped
+	y = DI_TOP + 5 * DI_ROW_H + 8;
+	UI_FillRect( DI_X, y, 608, 1, diRule );
+	y += 8;
+	UI_DrawString( DI_X, y, va( "EXTENSIONS (%d)", s_driverinfo.numstrings ), UI_LEFT|UI_SMALLFONT, diHead );
+
+	if ( !s_driverinfo.numstrings )
+		UI_DrawString( DI_X, DI_EXT_Y, "none reported", UI_LEFT|UI_SMALLFONT, diDim );
+
+	x = DI_X;
+	y = DI_EXT_Y;
+	for ( i = 0; i < s_driverinfo.numstrings; i++ ) {
+		w = strlen( s_driverinfo.strings[i] ) * SMALLCHAR_WIDTH;
+		if ( x > DI_X && x + w > DI_EXT_RIGHT ) {
+			x = DI_X;
+			y += SMALLCHAR_HEIGHT;
+		}
+		if ( y + SMALLCHAR_HEIGHT > DI_EXT_BOTTOM ) {
+			UI_DrawString( DI_EXT_RIGHT, DI_EXT_BOTTOM - SMALLCHAR_HEIGHT, "...", UI_RIGHT|UI_SMALLFONT, diDim );
+			break;
+		}
+		UI_DrawString( x, y, s_driverinfo.strings[i], UI_LEFT|UI_SMALLFONT, ( i & 1 ) ? diDim : diLabel );
+		x += w + 2 * SMALLCHAR_WIDTH;
+	}
 
 	Menu_Draw( &s_driverinfo.menu );
-
-	UI_DrawString( 320, 80, "VENDOR", UI_CENTER|UI_SMALLFONT, color_red );
-	UI_DrawString( 320, 152, "PIXELFORMAT", UI_CENTER|UI_SMALLFONT, color_red );
-	UI_DrawString( 320, 192, "EXTENSIONS", UI_CENTER|UI_SMALLFONT, color_red );
-
-	UI_DrawString( 320, 80+16, uis.glconfig.vendor_string, UI_CENTER|UI_SMALLFONT, text_color_normal );
-	UI_DrawString( 320, 96+16, uis.glconfig.version_string, UI_CENTER|UI_SMALLFONT, text_color_normal );
-	UI_DrawString( 320, 112+16, uis.glconfig.renderer_string, UI_CENTER|UI_SMALLFONT, text_color_normal );
-	UI_DrawString( 320, 152+16, va ("color(%d-bits) Z(%d-bits) stencil(%d-bits)", uis.glconfig.colorBits, uis.glconfig.depthBits, uis.glconfig.stencilBits), UI_CENTER|UI_SMALLFONT, text_color_normal );
-
-	// double column
-	y = 192+16;
-	for (i=0; i<s_driverinfo.numstrings/2; i++) {
-		UI_DrawString( 320-4, y, s_driverinfo.strings[i*2], UI_RIGHT|UI_SMALLFONT, text_color_normal );
-		UI_DrawString( 320+4, y, s_driverinfo.strings[i*2+1], UI_LEFT|UI_SMALLFONT, text_color_normal );
-		y += SMALLCHAR_HEIGHT;
-	}
-
-	if (s_driverinfo.numstrings & 1)
-		UI_DrawString( 320, y, s_driverinfo.strings[s_driverinfo.numstrings-1], UI_CENTER|UI_SMALLFONT, text_color_normal );
-}
-
-/*
-=================
-DriverInfo_Cache
-=================
-*/
-void DriverInfo_Cache( void )
-{
-	int	i;
-
-	// touch all our pics
-	for (i=0; ;i++)
-	{
-		if (!driverinfo_artlist[i])
-			break;
-		trap_R_RegisterShaderNoMip(driverinfo_artlist[i]);
-	}
 }
 
 /*
@@ -146,44 +185,23 @@ static void UI_DriverInfo_Menu( void )
 	// zero set all our globals
 	memset( &s_driverinfo, 0 ,sizeof(driverinfo_t) );
 
-	DriverInfo_Cache();
-
 	s_driverinfo.menu.fullscreen = qtrue;
 	s_driverinfo.menu.draw       = DriverInfo_MenuDraw;
 
-	s_driverinfo.banner.generic.type  = MTYPE_BTEXT;
-	s_driverinfo.banner.generic.x	  = 320;
-	s_driverinfo.banner.generic.y	  = 16;
-	s_driverinfo.banner.string		  = "DRIVER INFO";
-	s_driverinfo.banner.color	      = color_white;
-	s_driverinfo.banner.style	      = UI_CENTER;
-
-	s_driverinfo.framel.generic.type  = MTYPE_BITMAP;
-	s_driverinfo.framel.generic.name  = DRIVERINFO_FRAMEL;
-	s_driverinfo.framel.generic.flags = QMF_INACTIVE;
-	s_driverinfo.framel.generic.x	  = 0;
-	s_driverinfo.framel.generic.y	  = 78;
-	s_driverinfo.framel.width  	      = 256;
-	s_driverinfo.framel.height  	  = 329;
-
-	s_driverinfo.framer.generic.type  = MTYPE_BITMAP;
-	s_driverinfo.framer.generic.name  = DRIVERINFO_FRAMER;
-	s_driverinfo.framer.generic.flags = QMF_INACTIVE;
-	s_driverinfo.framer.generic.x	  = 376;
-	s_driverinfo.framer.generic.y	  = 76;
-	s_driverinfo.framer.width  	      = 256;
-	s_driverinfo.framer.height  	  = 334;
-
-	s_driverinfo.back.generic.type	   = MTYPE_BITMAP;
-	s_driverinfo.back.generic.name     = DRIVERINFO_BACK0;
-	s_driverinfo.back.generic.flags    = QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_driverinfo.back.generic.callback = DriverInfo_Event;
-	s_driverinfo.back.generic.id	   = ID_DRIVERINFOBACK;
-	s_driverinfo.back.generic.x		   = 0;
-	s_driverinfo.back.generic.y		   = 480-64;
-	s_driverinfo.back.width  		   = 128;
-	s_driverinfo.back.height  		   = 64;
-	s_driverinfo.back.focuspic         = DRIVERINFO_BACK1;
+	s_driverinfo.back.generic.type		= MTYPE_PTEXT;
+	s_driverinfo.back.generic.flags		= QMF_LEFT_JUSTIFY;
+	s_driverinfo.back.generic.x			= DI_X;
+	s_driverinfo.back.generic.y			= DI_BACK_Y;
+	s_driverinfo.back.generic.id		= ID_DRIVERINFOBACK;
+	s_driverinfo.back.generic.callback	= DriverInfo_Event;
+	s_driverinfo.back.generic.ownerdraw	= DriverInfo_BackDraw;
+	s_driverinfo.back.string			= "BACK";
+	Menu_AddItem( &s_driverinfo.menu, &s_driverinfo.back );
+	// the widget worked out its mouse area from the proportional text: use the button
+	s_driverinfo.back.generic.left		= DI_X;
+	s_driverinfo.back.generic.right		= DI_X + DI_BACK_W;
+	s_driverinfo.back.generic.top		= DI_BACK_Y;
+	s_driverinfo.back.generic.bottom	= DI_BACK_Y + DI_BACK_H;
 
   // TTimo: overflow with particularly long GL extensions (such as the gf3)
   // https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=399
@@ -193,7 +211,7 @@ static void UI_DriverInfo_Menu( void )
 
 	// build null terminated extension strings
 	eptr = s_driverinfo.stringbuff;
-	while ( s_driverinfo.numstrings<40 && *eptr )
+	while ( s_driverinfo.numstrings<60 && *eptr )
 	{
 		while ( *eptr && *eptr == ' ' )
 			*eptr++ = '\0';
@@ -209,16 +227,11 @@ static void UI_DriverInfo_Menu( void )
 	// safety length strings for display
 	for (i=0; i<s_driverinfo.numstrings; i++) {
 		len = strlen(s_driverinfo.strings[i]);
-		if (len > 32) {
-			s_driverinfo.strings[i][len-1] = '>';
-			s_driverinfo.strings[i][len]   = '\0';
+		if (len > 56) {
+			s_driverinfo.strings[i][55] = '>';
+			s_driverinfo.strings[i][56] = '\0';
 		}
 	}
-
-	Menu_AddItem( &s_driverinfo.menu, &s_driverinfo.banner );
-	Menu_AddItem( &s_driverinfo.menu, &s_driverinfo.framel );
-	Menu_AddItem( &s_driverinfo.menu, &s_driverinfo.framer );
-	Menu_AddItem( &s_driverinfo.menu, &s_driverinfo.back );
 
 	UI_PushMenu( &s_driverinfo.menu );
 }
@@ -987,6 +1000,14 @@ void GraphicsOptions_MenuInit( void )
 		"Trilinear",
 		NULL
 	};
+	static const char *tq_level_names[] =
+	{
+		"Lowest",
+		"Low",
+		"High",
+		"Highest",
+		NULL
+	};
 	static const char *quality_names[] =
 	{
 		"Low",
@@ -1073,6 +1094,8 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.brightness.generic.y			= y;
 	s_graphicsoptions.brightness.minvalue			= 5;
 	s_graphicsoptions.brightness.maxvalue			= 20;
+	s_graphicsoptions.brightness.displayScale		= 0.1f;
+	s_graphicsoptions.brightness.decimals			= 1;
 	if( !uis.glconfig.deviceSupportsGamma ) {
 		s_graphicsoptions.brightness.generic.flags |= QMF_GRAYED;
 	}
@@ -1088,6 +1111,8 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.screensize.generic.y			= y;
 	s_graphicsoptions.screensize.minvalue			= 3;
 	s_graphicsoptions.screensize.maxvalue			= 10;
+	s_graphicsoptions.screensize.displayScale		= 10;
+	s_graphicsoptions.screensize.suffix				= "%";
 	y += SETTINGS_ROW_H;
 	y += 12;
 	// references/modifies "r_vertexLight"
@@ -1114,6 +1139,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.tq.generic.y		= y;
 	s_graphicsoptions.tq.minvalue       = 0;
 	s_graphicsoptions.tq.maxvalue       = 3;
+	s_graphicsoptions.tq.valueNames     = tq_level_names;
 	s_graphicsoptions.tq.generic.callback = GraphicsOptions_TQEvent;
 	y += SETTINGS_ROW_H;
 	// references/modifies "r_textureBits"

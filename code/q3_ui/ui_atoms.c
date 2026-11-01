@@ -968,18 +968,14 @@ void UI_Cache_f( void ) {
 	MainMenu_Cache();
 	InGame_Cache();
 	ConfirmMenu_Cache();
-	PlayerModel_Cache();
-	PlayerSettings_Cache();
 	Controls_Cache();
 	Demos_Cache();
 	UI_CinematicsMenu_Cache();
 	Preferences_Cache();
 	ServerInfo_Cache();
-	SpecifyServer_Cache();
 	ArenaServers_Cache();
 	StartServer_Cache();
 	ServerOptions_Cache();
-	DriverInfo_Cache();
 	GraphicsOptions_Cache();
 
 	UI_SoundOptionsMenu_Cache();

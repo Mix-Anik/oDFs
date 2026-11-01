@@ -63,7 +63,6 @@ extern vmCvar_t	ui_spSkill;
 extern vmCvar_t	ui_spSelection;
 
 extern vmCvar_t	ui_browserMaster;
-extern vmCvar_t	ui_browserGameType;
 extern vmCvar_t	ui_browserSortKey;
 extern vmCvar_t	ui_browserShowFull;
 extern vmCvar_t	ui_browserShowEmpty;
@@ -159,6 +158,7 @@ typedef struct _tag_menuframework
 	qboolean	wrapAround;
 	qboolean	fullscreen;
 	qboolean	showlogo;
+	qboolean	settings;		// oDFs: a Settings page (UI_Settings_AddRail), its setting names use uiDfColorSetting
 } menuframework_s;
 
 typedef struct
@@ -203,6 +203,13 @@ typedef struct
 	float curvalue;
 
 	float range;
+
+	// oDFs: the value shown right of the slider; all optional (nothing set: the plain value)
+	float		step;			// what the mouse and the keys move it by (0: 1 when the range is at least 1, else free)
+	float		displayScale;	// shown = curvalue * displayScale (0: 1)
+	int			decimals;		// 0, 1, 2 decimals; -1: none for a whole value, else one
+	const char	*suffix;		// "%"
+	const char	**valueNames;	// text for each whole step from minvalue instead of a number
 } menuslider_s;
 
 typedef struct
@@ -299,6 +306,8 @@ extern vec4_t		uiDfColorMedium, uiDfColorBig;
 extern vec4_t		color_green;
 extern vec4_t		uiDfColorValue;		// DeFRaG: colour of the value part of a widget (df_ui_TextColorValue)
 #define UI_DF_VALUECOLOR( c )	( ( (c) == text_color_normal ) ? uiDfColorValue : (c) )
+extern vec4_t		uiDfColorSetting;	// oDFs: colour of the setting names on the Settings pages
+#define UI_DF_NAMECOLOR( m, c )	( ( (m)->settings && (c) == text_color_normal ) ? uiDfColorSetting : (c) )
 extern vec4_t		text_color_highlight;
 
 extern char	*ui_medalNames[];
@@ -415,13 +424,11 @@ extern void UI_ModsMenu_Cache( void );
 // ui_playermodel.c
 //
 extern void UI_PlayerModelMenu( void );
-extern void PlayerModel_Cache( void );
 
 //
 // ui_playersettings.c
 //
 extern void UI_PlayerSettingsMenu( void );
-extern void PlayerSettings_Cache( void );
 
 //
 // ui_preferences.c
@@ -434,12 +441,6 @@ extern void Preferences_Cache( void );
 //
 extern void UI_SpecifyLeagueMenu( void );
 extern void SpecifyLeague_Cache( void );
-
-//
-// ui_specifyserver.c
-//
-extern void UI_SpecifyServerMenu( void );
-extern void SpecifyServer_Cache( void );
 
 //
 // ui_servers2.c
@@ -469,7 +470,6 @@ extern void ServerInfo_Cache( void );
 //
 extern void UI_GraphicsOptionsMenu( void );
 extern void GraphicsOptions_Cache( void );
-extern void DriverInfo_Cache( void );
 
 //
 // ui_players.c
@@ -551,6 +551,17 @@ typedef struct {
 } playerInfo_t;
 
 void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int time );
+
+// oDFs: a player preview that is turned by dragging with the left mouse button and zoomed with the wheel
+typedef struct {
+	float		yaw;		// the way the model is turned
+	float		width;		// how many units wide the box looks (smaller: closer)
+	qboolean	drag;
+	int			lastX;
+} uiPlayerView_t;
+void UI_PlayerView_Init( uiPlayerView_t *v );
+qboolean UI_PlayerView_Key( uiPlayerView_t *v, int key, int x, int y, int w, int h );
+void UI_PlayerView_Draw( uiPlayerView_t *v, float x, float y, float w, float h, playerInfo_t *pi, int time );
 void UI_PlayerInfo_SetModel( playerInfo_t *pi, const char *model );
 void UI_PlayerInfo_SetInfo( playerInfo_t *pi, int legsAnim, int torsoAnim, vec3_t viewAngles, const float *moveAngles, weapon_t weaponNum, qboolean chat );
 qboolean UI_RegisterClientModelname( playerInfo_t *pi, const char *modelSkinName );
