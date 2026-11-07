@@ -308,10 +308,12 @@ static snapshot_t *CG_ReadNextSnapshot( void ) {
 
 /*
 ===============
-Demo seeking (oDFe)
+Demo seeking and game snapshots (oDFe)
 
 The engine jumped to another position of the demo (cl_demoseek.c): it restored the state of the demo parser,
-parsed forward and now tells the cgame. The snapshot with the given number is read again as the first snapshot
+parsed forward and now tells the cgame. In a live game the same happens when a client plugin applies a snapshot
+of the game (the server clock goes back to the time of the snapshot); then the "demo" is the game itself and the
+snapshot is the first one of the new timeline. The snapshot with the given number is read again as the first snapshot
 of a demo (CG_SetInitialSnapshot), the server commands up to the sequence were not and are not to be executed,
 the ones after it are the configstring differences the engine made up. Everything that has a time of the old
 position is dropped. The race time decoding of DeFRaG (the demo time offset) is kept: this is not a new demo.
@@ -336,9 +338,8 @@ void CG_DemoSeekRegister( void ) {
 }
 
 void CG_DemoTimeChange( int serverTime, int snapshotNum, int serverCommandSequence ) {
-	if ( !cg.demoPlayback ) {
-		return;		// a demo only
-	}
+	// the engine calls this after a demo seek, and in a live game after a client plugin put the game back to an earlier state
+	// (SnapshotApply): the server clock went back, everything that holds a time of the old position goes
 	timeChange.pending = qtrue;
 	timeChange.serverTime = serverTime;
 	timeChange.snapshotNum = snapshotNum;
@@ -387,7 +388,7 @@ static void CG_ApplyTimeChange( void ) {
 	cg.voiceTime = 0;
 	cg.scoreFadeTime = 0;
 
-	CG_DF_TimeChange();
+	CG_DF_TimeChange( timeChange.serverTime );
 }
 
 

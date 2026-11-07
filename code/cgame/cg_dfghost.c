@@ -66,7 +66,8 @@ typedef struct {
 	char		name[64];
 } dgSlot_t;
 
-static dgSlot_t	dgSlot[DG_SLOTS];
+#define DG_PATH_SLOT	DG_SLOTS		// the extra slot the path reader parses a file with
+static dgSlot_t	dgSlot[DG_SLOTS + 1];
 
 // The frame ring of a playing slot (slot+180, 500 frames of 624 bytes in DeFRaG): frames are streamed from the file into the ring, the cursor
 // (slot+168) is the index of the NEXT frame; a frame with time 0 is empty.  Playing backwards walks the frames that are still in the ring.
@@ -436,6 +437,127 @@ static qboolean DG_ReadFrame( int slot, dgFrame_t *fr ) {
 	return fr->time != 0;
 }
 
+// ---- the path of a played ghost for the client plugins (trap_ODF_GhostPath) ----
+// A plugin that draws the path of a ghost or compares the run with it needs all of it, not the few frames the playback keeps. When a ghost
+// starts playing its file is read a second time, 512 frames per client frame, and each part is handed to the engine; the engine keeps
+// the path (also after the ghost has stopped) until the next ghost of that slot. Times are relative to the first frame, which is recorded
+// when the race timer starts.
+typedef struct {
+	int		ms;
+	vec3_t	origin;
+	int		flags;		// 1: the ghost was moved (teleport) before this point
+} dgPathPoint_t;
+
+#define DG_PATH_CHUNK	512
+#define DG_PATH_MAX		131072		// ODFC_GHOST_MAX_POINTS of the engine
+static struct {
+	qboolean	active;
+	int			slot;			// the slot of the ghost
+	int			sent;			// points handed over so far
+	int			base;			// the time of the first frame
+	int			lastMs;
+	int			trap;			// 0 not asked yet, 1 the engine takes paths, -1 it does not
+	int			timeTrap;		// the same for the time of the run (trap_ODF_GhostTime)
+} dgPath;
+static dgFrame_t	dgPathFrame;
+
+static void DG_PathClose( void ) {
+	if ( dgSlot[DG_PATH_SLOT].f ) {
+		trap_FS_FCloseFile( dgSlot[DG_PATH_SLOT].f );
+	}
+	dgSlot[DG_PATH_SLOT].f = 0;
+	dgPath.active = qfalse;
+}
+
+static qboolean DG_PathTrap( void ) {
+	char value[16];
+
+	if ( !dgPath.trap ) {
+		trap_Cvar_VariableStringBuffer( "//trap_GetValue", value, sizeof( value ) );
+		dgPath.trap = atoi( value ) == CG_TRAP_GETVALUE && trap_GetValue( value, sizeof( value ), "trap_ODF_GhostPath" )
+			&& atoi( value ) == CG_ODF_GHOST_PATH ? 1 : -1;
+	}
+	return dgPath.trap > 0;
+}
+
+// the exact race time of the run the path of a slot was recorded from: the best run on record
+static void DG_PathTime( int slot, int ms ) {
+	char value[16];
+
+	if ( !DG_PathTrap() ) {
+		return;
+	}
+	if ( !dgPath.timeTrap ) {
+		dgPath.timeTrap = trap_GetValue( value, sizeof( value ), "trap_ODF_GhostTime" ) && atoi( value ) == CG_ODF_GHOST_TIME ? 1 : -1;
+	}
+	if ( dgPath.timeTrap > 0 && ms > 0 ) {
+		trap_ODF_GhostTime( slot, ms );
+	}
+}
+
+static void DG_PathStart( int slot, const char *path ) {
+	dgSlot_t *s = &dgSlot[DG_PATH_SLOT];
+	int len, type, magic, ver;
+	char hdr[16];
+
+	DG_PathClose();
+	if ( !DG_PathTrap() ) {
+		return;
+	}
+	trap_ODF_GhostPath( slot, 0, 0, NULL, 0 );		// the old path of the slot is gone
+	Com_Memset( s, 0, sizeof( *s ) );
+	len = trap_FS_FOpenFile( path, &s->f, FS_READ );
+	if ( !s->f || len <= 0 ) {
+		s->f = 0;
+		return;
+	}
+	s->remain = len;
+	Q_strncpyz( s->name, dgSlot[slot].name, sizeof( s->name ) );
+	if ( !DG_Get( DG_PATH_SLOT, &type, 4 ) || type != 1 || !DG_Get( DG_PATH_SLOT, &magic, 4 ) || !DG_Get( DG_PATH_SLOT, &ver, 4 )
+		|| !DG_Get( DG_PATH_SLOT, hdr, 16 ) || magic > DG_FILE_MAGIC ) {
+		DG_PathClose();
+		return;
+	}
+	dgPath.active = qtrue;
+	dgPath.slot = slot;
+	dgPath.sent = 0;
+	dgPath.base = -1;
+	dgPath.lastMs = 0;
+}
+
+static void DG_PathStep( void ) {
+	static dgPathPoint_t pts[DG_PATH_CHUNK];
+	int n = 0, done = 0;
+
+	if ( !dgPath.active ) {
+		return;
+	}
+	while ( n < DG_PATH_CHUNK ) {
+		if ( !DG_ReadFrame( DG_PATH_SLOT, &dgPathFrame ) ) {
+			done = 1;
+			break;
+		}
+		if ( dgPath.base < 0 ) {
+			dgPath.base = dgPathFrame.time;
+		}
+		if ( dgPathFrame.time - dgPath.base < dgPath.lastMs ) {
+			continue;		// time went back in the file: not a path any more
+		}
+		dgPath.lastMs = dgPathFrame.time - dgPath.base;
+		pts[n].ms = dgPath.lastMs;
+		VectorCopy( dgPathFrame.origin, pts[n].origin );
+		pts[n].flags = dgPathFrame.discont ? 1 : 0;
+		n++;
+	}
+	if ( n || done ) {
+		trap_ODF_GhostPath( dgPath.slot, dgPath.sent, n, pts, done );
+		dgPath.sent += n;
+	}
+	if ( done || dgPath.sent >= DG_PATH_MAX ) {
+		DG_PathClose();
+	}
+}
+
 // ---- stop / record / play ----
 // ---- status lines (cgame 0x13721), selected by df_ghosts_DrawOutput: 0 off, 1 white, 2-4 df_chs0..2 colours ----
 // The command flags of the executor 0x13b9a: bit 2 = print "command failed", bit 4 = print the success line (the console command and the
@@ -520,6 +642,8 @@ static void DG_Stop( int slot, int flags ) {
 // 0x10ec6 (from CG_Shutdown 0x7969): every slot's file is closed (0x11b8a), no status lines and no monitored-variable restore
 void CG_DF_GhostShutdown( void ) {
 	int i;
+
+	DG_PathClose();
 
 	for ( i = 0; i < DG_SLOTS; i++ ) {
 		if ( dgSlot[i].f ) {
@@ -632,6 +756,7 @@ static void DG_Play( int slot, const char *name, int flags ) {		// 0x13979 -> 0x
 	s->anchor = qtrue;
 	s->lastTime = cg.time;
 	s->state = 2;
+	DG_PathStart( slot, path );
 	if ( flags & 4 ) {
 		DG_Status( slot, DG_ST_PLAY );
 	}
@@ -1820,6 +1945,7 @@ void CG_DF_GhostFrame( void ) {
 			DG_PlayFrame( i, qfalse );
 		}
 	}
+	DG_PathStep();
 	DG_CommandCvar();
 	CG_DF_SmokeTrails();
 	CG_DF_AutoRecFrame();
@@ -1914,6 +2040,9 @@ static void DG_AutoBest( qboolean doRecord, qboolean doPlay, int flags ) {		// 0
 	}
 	if ( bestName[0] && doPlay ) {
 		DG_Play( playSlot, bestName, flags );
+		if ( dgSlot[playSlot].state == 2 && dgPath.active ) {
+			DG_PathTime( playSlot, dgBestMs );
+		}
 		if ( flags & 4 ) {
 			DG_Status( playSlot, DG_ST_BEST );
 		}

@@ -19,6 +19,20 @@ static int	dfRecR2[DF_REC_INTS];		// 0x11d634 personal record (new-record test)
 static qboolean	dfRecDirty;				// 0x11d5a8 a better record was written: R2 must be replaced
 static int	dfSessionModCount = -1;		// 0x11d5ac
 
+// The checkpoint list belongs to the game, not to the client: when a client plugin puts the game back to an earlier state (SnapshotApply),
+// the list has to go back with it. Every change of the current run (start, respawn, checkpoint, finish) is remembered with the time of the
+// snapshot it was seen in; CG_DF_RecRewind() takes the list as it was before a time.
+#define DF_REC_HISTORY	64
+typedef struct {
+	int			time;
+	qboolean	started;
+	int			b[DF_REC_INTS];
+} dfRecState_t;
+
+static dfRecState_t	dfRecHist[DF_REC_HISTORY];
+static int			dfRecHistCount;
+static qboolean		dfRecEvent;			// the current run changed in the snapshot that is being read
+
 // ---- DeFRaG ms -> string (cgame 0x1024) ---------------------------------------------------------------------
 
 const char *CG_DF_FormatTime( int ms ) {
@@ -359,6 +373,44 @@ void CG_DF_RecInit( void ) {
 	dfRecDirty = qfalse;
 	dfRecRunStarted = qfalse;
 	dfSessionModCount = -1;
+	dfRecHistCount = 0;
+	dfRecEvent = qfalse;
+}
+
+// at the end of reading a snapshot: remember the run if it changed
+void CG_DF_RecSnapshotDone( int serverTime ) {
+	dfRecState_t	*h;
+
+	if ( !dfRecEvent ) {
+		return;
+	}
+	dfRecEvent = qfalse;
+	if ( dfRecHistCount == DF_REC_HISTORY ) {
+		memmove( &dfRecHist[0], &dfRecHist[1], ( DF_REC_HISTORY - 1 ) * sizeof( dfRecHist[0] ) );
+		dfRecHistCount--;
+	}
+	h = &dfRecHist[dfRecHistCount++];
+	h->time = serverTime;
+	h->started = dfRecRunStarted;
+	memcpy( h->b, dfRecB, sizeof( h->b ) );
+}
+
+// the game was put back to the snapshot at serverTime: the run as it was just before that
+void CG_DF_RecRewind( int serverTime ) {
+	int	i = dfRecHistCount;
+
+	while ( i > 0 && dfRecHist[i - 1].time >= serverTime ) {
+		i--;
+	}
+	dfRecHistCount = i;
+	dfRecEvent = qfalse;
+	if ( i > 0 ) {
+		memcpy( dfRecB, dfRecHist[i - 1].b, sizeof( dfRecB ) );
+		dfRecRunStarted = dfRecHist[i - 1].started;
+	} else {
+		memset( dfRecB, 0, sizeof( dfRecB ) );
+		dfRecRunStarted = qfalse;
+	}
 }
 
 // called when the map's configstrings are known (record names depend on map, route, gametype, physics)
@@ -380,6 +432,7 @@ void CG_DF_RecReset( qboolean started ) {
 		CG_DF_LoadR1();
 	}
 	memset( dfRecB, 0, sizeof( dfRecB ) );
+	dfRecEvent = qtrue;
 }
 
 // start of a run (stats[12] bit 4 set)
@@ -400,6 +453,7 @@ void CG_DF_RecTrack( int ms ) {
 void CG_DF_RecCheckpoint( int t ) {
 	int *N = &dfRecB[DF_REC_COUNT];
 
+	dfRecEvent = qtrue;
 	dfRecB[*N] = t;
 	if ( *N + 1 < 32 ) {
 		CG_DF_CheckpointPopup( *N );
@@ -418,6 +472,7 @@ void CG_DF_RecFinish( int t ) {
 	char	path[256];
 
 	dfRecKeep = qfalse;
+	dfRecEvent = qtrue;
 	dfRecB[*N] = t;
 	// DeFRaG skips both the checkpoint popups and this whole block with sv_cheats; here the checkpoints stay visible (user choice),
 	// only the record files are not written for cheated runs

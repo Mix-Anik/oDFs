@@ -1482,6 +1482,8 @@ void CG_DF_AuthRequest( int token );
 void CG_DF_AuthBspCrc( int serverCrc );
 void CG_DF_RecInit( void );
 void CG_DF_RecLoad( void );
+void CG_DF_RecSnapshotDone( int serverTime );
+void CG_DF_RecRewind( int serverTime );
 void CG_DF_RecStart( void );
 void CG_DF_RecReset( qboolean started );
 void CG_DF_RecCheckpoint( int t );
@@ -1912,9 +1914,12 @@ qboolean	trap_GetEntityToken( char *buffer, int bufferSize );
 qboolean	trap_GetValue( char *value, int valueSize, const char *key );
 void		trap_ODF_SetPlayerState( const playerState_t *ps, int viewFlags );
 void		trap_ODF_DemoSeekSupport( int version );
+void		trap_ODF_GhostPath( int slot, int first, int count, const void *points, int complete );
+void		trap_ODF_GhostTime( int slot, int ms );
+void		trap_ODF_SetStatsTime( int serverTime );
 void		CG_DemoSeekRegister( void );
 void		CG_DemoTimeChange( int serverTime, int snapshotNum, int serverCommandSequence );
-void		CG_DF_TimeChange( void );
+void		CG_DF_TimeChange( int serverTime );
 #define CG_ODF_VIEW_SCOREBOARD		1	// the scoreboard is up
 #define CG_ODF_VIEW_NOT_FIRST_PERSON	2	// third person, chase or replay camera: the view is not the player's
 qboolean	CG_PlayerStateExportSupported( void );

@@ -458,3 +458,15 @@ void trap_ODF_SetPlayerState( const playerState_t *ps, int viewFlags ) {
 void trap_ODF_DemoSeekSupport( int version ) {
 	syscall( CG_ODF_DEMOSEEK_SUPPORT, version );
 }
+
+void trap_ODF_GhostPath( int slot, int first, int count, const void *points, int complete ) {
+	syscall( CG_ODF_GHOST_PATH, slot, first, count, points, complete );
+}
+
+void trap_ODF_GhostTime( int slot, int ms ) {
+	syscall( CG_ODF_GHOST_TIME, slot, ms );
+}
+
+void trap_ODF_SetStatsTime( int serverTime ) {
+	syscall( CG_ODF_SET_STATSTIME, serverTime );
+}

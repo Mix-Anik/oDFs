@@ -188,7 +188,10 @@ typedef enum {
 	// syscalls and a fatal "bad cgame system trap".
 	CG_TRAP_GETVALUE = 700,			// qboolean ( char *value, int valueSize, const char *key ): looks an extension up by name
 	CG_ODF_SET_PLAYERSTATE = 710,	// void ( const playerState_t *ps ): hands the predicted player state to the client plugins
-	CG_ODF_DEMOSEEK_SUPPORT = 711	// void ( int version ): this cgame takes CG_ODF_TIME_CHANGE; the engine may then jump around in a demo
+	CG_ODF_DEMOSEEK_SUPPORT = 711,	// void ( int version ): this cgame takes CG_ODF_TIME_CHANGE; the engine may then jump around in a demo
+	CG_ODF_SET_STATSTIME = 714,		// void ( int serverTime ): the server time of the snapshot the published player state is from
+	CG_ODF_GHOST_TIME = 713,		// void ( int slot, int ms ): the exact race time of the run the path of the slot was recorded from
+	CG_ODF_GHOST_PATH = 712			// void ( int slot, int first, int count, const void *points, int complete ): hands (a part of) the path of a played ghost to the client plugins
 } cgameImport_t;
 
 #define CG_DEMOSEEK_VERSION 1

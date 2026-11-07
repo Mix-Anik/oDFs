@@ -1628,18 +1628,27 @@ void CG_DF_ReadSnapshot( const snapshot_t *old, const snapshot_t *cur ) {
 	dfDecodeTime = cur->serverTime;
 	CG_DF_ScriptEvents( old, cur );
 	CG_DF_SnapshotTransition( &old->ps, &cur->ps );
+	CG_DF_RecSnapshotDone( cur->serverTime );
 	dfDecodeTime = 0;
 }
 
 // the demo was moved to another position (CG_ApplyTimeChange): what follows a run is gone, as when the watched player changes.
 // The demo time offset of the race time decoding stays.
-void CG_DF_TimeChange( void ) {
+// In a live game the game was put back by a client plugin (SnapshotApply) to the snapshot at serverTime: the checkpoint times of the run go
+// back with it, they are not lost.
+void CG_DF_TimeChange( int serverTime ) {
 	dfPrevRunMs = -1;
 	dfFinishPrint = qfalse;
 	runActive = qfalse;
 	dfDemoFails = 0;
-	CG_DF_Reset();
-	CG_DF_RecLoad();
+	if ( cg.demoPlayback ) {
+		CG_DF_Reset();
+		CG_DF_RecLoad();
+	} else {
+		dfReported = 0;
+		CG_DF_RecRewind( serverTime );
+		CG_DF_RecLoad();
+	}
 }
 
 // called when the read snapshot becomes the current one, after its server commands were executed
@@ -1863,6 +1872,31 @@ qboolean CG_PlayerStateExportSupported( void ) {
 	return state > 0;
 }
 
+// The snapshot the predicted player state starts from (cg_predict.c): the next one when there is one (the stats and flags of the
+// predicted state are then its stats and flags), else the current one. Told apart by the stats the predicted state has, which the
+// prediction does not change.
+static const snapshot_t *CG_PredictionBase( void ) {
+	const playerState_t *pp = &cg.predictedPlayerState;
+
+	if ( cg.nextSnap && pp->stats[STAT_DEFRAG_FLAGS] == cg.nextSnap->ps.stats[STAT_DEFRAG_FLAGS]
+		&& pp->stats[STAT_RACE_TIME_HI] == cg.nextSnap->ps.stats[STAT_RACE_TIME_HI]
+		&& pp->stats[STAT_RACE_TIME_LO] == cg.nextSnap->ps.stats[STAT_RACE_TIME_LO] ) {
+		return cg.nextSnap;
+	}
+	return cg.snap;
+}
+
+// can the engine be told which snapshot the published state is from?
+static qboolean CG_StatsTimeSupported( void ) {
+	static int state;		// 0 not asked yet, 1 yes, -1 no
+	char value[16];
+
+	if ( state == 0 ) {
+		state = trap_GetValue( value, sizeof( value ), "trap_ODF_SetStatsTime" ) && atoi( value ) == CG_ODF_SET_STATSTIME ? 1 : -1;
+	}
+	return state > 0;
+}
+
 // Once per frame, when the view is settled and before the scene is drawn: the oDFe client plugins work out what a shot fired
 // now would do (grenade and rocket paths) and draw the strafe helpers (snap, cgaz) from the state the player really has now,
 // not from the one the server sent a moment ago, and they hide when the view is not the player's.
@@ -1878,5 +1912,22 @@ void CG_PublishPlayerState( void ) {
 	if ( cg.renderingThirdPerson || CG_DF_ReplayOwnsView() || ( cg.demoPlayback && df_demos_CameraMode.integer ) ) {
 		flags |= CG_ODF_VIEW_NOT_FIRST_PERSON;
 	}
-	trap_ODF_SetPlayerState( &cg.predictedPlayerState, flags );
+	{		// the race time of a server that scrambles it (stats[7] / [8]) is published decoded, as a plain value, like it is with cheats
+		playerState_t		pub = cg.predictedPlayerState;
+		const snapshot_t	*base = CG_PredictionBase();
+		int					ms;
+
+		if ( base && ( base->ps.stats[STAT_DEFRAG_FLAGS] & 2 ) ) {
+			dfDecodeTime = base->serverTime;		// the time the server scrambled it with
+			if ( CG_DF_RaceTime( &base->ps, &ms ) && ms >= 0 ) {
+				pub.stats[STAT_RACE_TIME_HI] = ms >> 16;
+				pub.stats[STAT_RACE_TIME_LO] = ms & 0xffff;
+			}
+			dfDecodeTime = 0;
+		}
+		if ( CG_StatsTimeSupported() ) {
+			trap_ODF_SetStatsTime( base ? base->serverTime : 0 );
+		}
+		trap_ODF_SetPlayerState( &pub, flags );
+	}
 }
