@@ -293,7 +293,19 @@ static void AR_Start( void ) {		// 0x18ab
 	AR_Say( "Autorecord: started recording." );
 }
 
+qboolean CG_DF_DemoCheated( void ) {
+	return atoi( Info_ValueForKey( CG_ConfigString( CS_ODF_DEMO ), "cheats" ) ) != 0 ? qtrue : qfalse;
+}
+
 void CG_DF_AutoRecFrame( void ) {		// 0x19e0
+	if ( cg.demoPlayback ) {
+		static int noticed;
+
+		if ( !noticed && cg.snap && CG_DF_DemoCheated() ) {
+			noticed = 1;
+			CG_Printf( "^3This demo was recorded with cheats (a local game).^7\n" );
+		}
+	}
 	if ( cg.demoPlayback || !cg.snap || CG_DF_Cheats() ) {		// 0x19e4/0x19ea: no autorecord during demos or with sv_cheats
 		arEvents = 0;
 		return;

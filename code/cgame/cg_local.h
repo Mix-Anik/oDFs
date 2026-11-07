@@ -1246,6 +1246,8 @@ qboolean CG_DF_HideTrackedBody( int clientNum );
 qboolean CG_DF_CamOffsets( vec3_t pos, vec3_t ang );
 void CG_DF_CamAngleOffsets( vec3_t ang );
 void CG_DF_ArStartEvent( void );
+qboolean CG_DF_DemoCheated( void );
+#define CS_ODF_DEMO		1023
 void CG_DF_ArRespawnEvent( void );
 void CG_DF_ArFinishEvent( int ms, qboolean keep );
 qboolean CG_DF_RecKeep( void );

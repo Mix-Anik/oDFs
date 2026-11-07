@@ -1482,7 +1482,7 @@ void CG_DF_DemoValidation( int ms ) {
 	Com_sprintf( date, sizeof( date ), "%04i-%02i-%02i", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday );
 	Com_sprintf( file, sizeof( file ), "%s_summary", date );
 	CG_DF_WriteSummary( file, ms, qtrue );
-	if ( dfViolationCount ) {
+	if ( dfViolationCount || CG_DF_DemoCheated() ) {
 		Com_sprintf( file, sizeof( file ), "system/reports/%s_failed.txt", date );
 		trap_FS_FOpenFile( file, &f, FS_WRITE );
 		if ( f ) {
@@ -1636,6 +1636,8 @@ void CG_DF_ReadSnapshot( const snapshot_t *old, const snapshot_t *cur ) {
 // The demo time offset of the race time decoding stays.
 // In a live game the game was put back by a client plugin (SnapshotApply) to the snapshot at serverTime: the checkpoint times of the run go
 // back with it, they are not lost.
+static qboolean	dfLoadPending;		// the game was put back (SnapshotApply): the next first snapshot is not a map load or a respawn
+
 void CG_DF_TimeChange( int serverTime ) {
 	dfPrevRunMs = -1;
 	dfFinishPrint = qfalse;
@@ -1646,6 +1648,7 @@ void CG_DF_TimeChange( int serverTime ) {
 		CG_DF_RecLoad();
 	} else {
 		dfReported = 0;
+		dfLoadPending = qtrue;
 		CG_DF_RecRewind( serverTime );
 		CG_DF_RecLoad();
 	}
@@ -1687,6 +1690,12 @@ void CG_DF_ScriptEvents( const snapshot_t *old, const snapshot_t *cur ) {
 	const char *team;
 
 	dfSnapDelta = old ? cur->serverTime - old->serverTime : 0;
+
+	if ( !old && dfLoadPending ) {
+		dfLoadPending = qfalse;
+		return;
+	}
+	dfLoadPending = qfalse;
 
 	if ( !old ) {
 		ev = 0x11;
